@@ -1,0 +1,466 @@
+@import 'tailwindcss';
+
+/*
+ * Design direction (brief §7): dense and fast, not decorative. The assumption
+ * is one-handed phone use in a parking lot or a hardware store aisle - so tap
+ * targets are large, typing is minimised, and nothing is behind a modal chain.
+ * The desktop view is for reports and cleanup and can afford more density.
+ */
+
+@theme {
+  --color-ink-50: #f8fafc;
+  --color-ink-100: #f1f5f9;
+  --color-ink-200: #e2e8f0;
+  --color-ink-300: #cbd5e1;
+  --color-ink-400: #94a3b8;
+  --color-ink-500: #64748b;
+  --color-ink-600: #475569;
+  --color-ink-700: #334155;
+  --color-ink-800: #1e293b;
+  --color-ink-900: #0f172a;
+  --color-ink-950: #020617;
+
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-500: #3b82f6;
+  --color-brand-600: #2563eb;
+  --color-brand-700: #1d4ed8;
+
+  /* Eligible hours. The number the whole app exists to defend. */
+  --color-eligible-50: #ecfdf5;
+  --color-eligible-100: #d1fae5;
+  --color-eligible-500: #10b981;
+  --color-eligible-600: #059669;
+  --color-eligible-700: #047857;
+
+  /* Needs review / provisional. Flagged, never auto-resolved. */
+  --color-flag-50: #fffbeb;
+  --color-flag-100: #fef3c7;
+  --color-flag-500: #f59e0b;
+  --color-flag-600: #d97706;
+  --color-flag-700: #b45309;
+
+  --color-alert-50: #fef2f2;
+  --color-alert-100: #fee2e2;
+  --color-alert-500: #ef4444;
+  --color-alert-600: #dc2626;
+  --color-alert-700: #b91c1c;
+
+  /* Anything tappable clears the 48px comfortable-touch minimum. */
+  --tap-min: 3rem;
+}
+
+:root {
+  --surface: var(--color-ink-50);
+  --surface-raised: #ffffff;
+  --surface-sunken: var(--color-ink-100);
+  --border: var(--color-ink-200);
+  --border-strong: var(--color-ink-300);
+  --text: var(--color-ink-900);
+  --text-muted: var(--color-ink-500);
+  --text-subtle: var(--color-ink-400);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: var(--color-ink-950);
+    --surface-raised: var(--color-ink-900);
+    --surface-sunken: #0b1220;
+    --border: var(--color-ink-800);
+    --border-strong: var(--color-ink-700);
+    --text: var(--color-ink-100);
+    --text-muted: var(--color-ink-400);
+    --text-subtle: var(--color-ink-500);
+    color-scheme: dark;
+  }
+}
+
+html {
+  /* Stops iOS Safari zooming when a 16px input is focused. */
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--surface);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+
+/* Tabular figures everywhere a number is compared against another number. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+@layer components {
+  /* --- Surfaces ---------------------------------------------------------- */
+  .card {
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+  }
+
+  .card-pad {
+    padding: 0.875rem 1rem;
+  }
+
+  .section-title {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  /* --- Buttons ----------------------------------------------------------- */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: var(--tap-min);
+    padding: 0.625rem 1rem;
+    border-radius: 0.625rem;
+    border: 1px solid var(--border-strong);
+    background: var(--surface-raised);
+    color: var(--text);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 120ms ease, border-color 120ms ease;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .btn:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+  .btn-primary {
+    background: var(--color-brand-600);
+    border-color: var(--color-brand-600);
+    color: #fff;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: var(--color-brand-700);
+  }
+  .btn-danger {
+    background: transparent;
+    border-color: var(--color-alert-500);
+    color: var(--color-alert-600);
+  }
+  .btn-ghost {
+    background: transparent;
+    border-color: transparent;
+    color: var(--text-muted);
+    min-height: 2.25rem;
+    padding: 0.375rem 0.625rem;
+  }
+  .btn-block {
+    width: 100%;
+  }
+
+  /* The three quick-log buttons. Deliberately oversized - this is the screen
+     used standing up, one-handed, with the phone in a gloved hand. */
+  .btn-quick {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0.125rem;
+    width: 100%;
+    min-height: 5.5rem;
+    padding: 1rem 1.25rem;
+    border-radius: 1rem;
+    border: 1px solid var(--border-strong);
+    background: var(--surface-raised);
+    text-align: left;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .btn-quick strong {
+    font-size: 1.375rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .btn-quick span {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+  }
+
+  /* --- Forms ------------------------------------------------------------- */
+  .field {
+    display: block;
+    margin-bottom: 1rem;
+  }
+  .label {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    margin-bottom: 0.375rem;
+    color: var(--text);
+  }
+  .hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.3125rem;
+    line-height: 1.4;
+  }
+  .input,
+  .select,
+  .textarea {
+    display: block;
+    width: 100%;
+    min-height: var(--tap-min);
+    padding: 0.625rem 0.75rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 0.5rem;
+    background: var(--surface-raised);
+    color: var(--text);
+    /* 16px minimum, or iOS Safari zooms on focus and the layout jumps. */
+    font-size: 1rem;
+  }
+  .textarea {
+    min-height: 4.5rem;
+    resize: vertical;
+    line-height: 1.5;
+  }
+  .input:focus-visible,
+  .select:focus-visible,
+  .textarea:focus-visible,
+  .btn:focus-visible,
+  .chip:focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+  }
+  .error-text {
+    color: var(--color-alert-600);
+    font-size: 0.8125rem;
+    margin-top: 0.375rem;
+  }
+
+  /* --- Chips: the "minimal typing" primitive ----------------------------- */
+  .chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.75rem;
+    min-width: 3.25rem;
+    padding: 0.5rem 0.875rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    background: var(--surface-raised);
+    color: var(--text);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    cursor: pointer;
+    touch-action: manipulation;
+    font-variant-numeric: tabular-nums;
+  }
+  .chip[aria-pressed='true'],
+  .chip.chip-on {
+    background: var(--color-brand-600);
+    border-color: var(--color-brand-600);
+    color: #fff;
+  }
+
+  /* --- Category picker --------------------------------------------------- */
+  .cat-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    width: 100%;
+    min-height: var(--tap-min);
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 0.625rem;
+    background: var(--surface-raised);
+    text-align: left;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .cat-option[aria-pressed='true'] {
+    border-color: var(--color-brand-600);
+    background: var(--color-brand-50);
+  }
+  @media (prefers-color-scheme: dark) {
+    .cat-option[aria-pressed='true'] {
+      background: color-mix(in srgb, var(--color-brand-600) 18%, transparent);
+    }
+  }
+
+  /* --- Badges ------------------------------------------------------------ */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
+  .badge-eligible {
+    background: var(--color-eligible-100);
+    color: var(--color-eligible-700);
+  }
+  .badge-not-eligible {
+    background: var(--surface-sunken);
+    color: var(--text-muted);
+  }
+  .badge-flag {
+    background: var(--color-flag-100);
+    color: var(--color-flag-700);
+  }
+  .badge-alert {
+    background: var(--color-alert-100);
+    color: var(--color-alert-700);
+  }
+  @media (prefers-color-scheme: dark) {
+    .badge-eligible {
+      background: color-mix(in srgb, var(--color-eligible-500) 22%, transparent);
+      color: var(--color-eligible-100);
+    }
+    .badge-flag {
+      background: color-mix(in srgb, var(--color-flag-500) 22%, transparent);
+      color: var(--color-flag-100);
+    }
+    .badge-alert {
+      background: color-mix(in srgb, var(--color-alert-500) 22%, transparent);
+      color: var(--color-alert-100);
+    }
+  }
+
+  /* --- Dense list rows --------------------------------------------------- */
+  .row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+    min-height: var(--tap-min);
+  }
+  .row:last-child {
+    border-bottom: 0;
+  }
+  .row-main {
+    min-width: 0;
+    flex: 1;
+  }
+  .row-title {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .row-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.125rem;
+  }
+  .row-value {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* --- Navigation -------------------------------------------------------- */
+  .tabbar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 40;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    background: var(--surface-raised);
+    border-top: 1px solid var(--border);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .tabbar-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.125rem;
+    min-height: 3.5rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  .tabbar-item[data-active='true'] {
+    color: var(--color-brand-600);
+  }
+
+  /* --- Tables (desktop reports) ------------------------------------------ */
+  .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+  .table th {
+    text-align: left;
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border-strong);
+    white-space: nowrap;
+  }
+  .table td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .table .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .skip-link {
+    position: absolute;
+    left: -9999px;
+  }
+  .skip-link:focus {
+    left: 1rem;
+    top: 1rem;
+    z-index: 100;
+    padding: 0.5rem 0.75rem;
+    background: var(--surface-raised);
+    border: 1px solid var(--border-strong);
+    border-radius: 0.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
