@@ -39,7 +39,10 @@ export default function QuickLogPage() {
         </Link>
       ))}
 
-      <Link href="/log/income" className="btn btn-block mt-2">
+      <Link href="/timer" className="btn btn-block mt-2">
+        Start a timer instead
+      </Link>
+      <Link href="/log/income" className="btn btn-block">
         Record rent received
       </Link>
     </div>

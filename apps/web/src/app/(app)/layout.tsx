@@ -1,8 +1,11 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/session';
+import { getRunningTimer, LONG_RUNNING_MINUTES } from '@/server/services/timer';
+import { listProperties } from '@/server/services/reference';
 import { TabBar } from '@/components/TabBar';
 import { SignOutButton } from '@/components/SignOutButton';
+import { TimerBar } from '@/components/TimerBar';
 
 /**
  * The signed-in shell.
@@ -14,6 +17,13 @@ import { SignOutButton } from '@/components/SignOutButton';
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
   if (!user) redirect('/login');
+
+  // Read in the layout so the running timer follows the user onto every screen,
+  // which is what makes "forgot to stop it" recoverable (§8.2).
+  const timer = await getRunningTimer(user.actor.id);
+  const properties = timer?.propertyId ? await listProperties() : [];
+  const propertyName =
+    properties.find((p) => p.id === timer?.propertyId)?.nickname ?? null;
 
   return (
     <>
@@ -31,6 +41,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </span>
           <SignOutButton />
         </div>
+
+        {timer ? (
+          <TimerBar
+            id={timer.id}
+            startedAtMs={timer.startedAt.getTime()}
+            category={timer.category}
+            propertyName={propertyName}
+            longRunningMinutes={LONG_RUNNING_MINUTES}
+          />
+        ) : null}
       </header>
 
       <main id="main" className="mx-auto max-w-5xl px-4 pb-28 pt-4 sm:pb-10">
