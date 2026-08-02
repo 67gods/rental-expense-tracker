@@ -8,6 +8,14 @@
 import { z } from 'zod';
 import { HOUR_CATEGORY_IDS, type HourCategoryId } from './constants/hourCategories';
 import { SCHEDULE_E_CATEGORY_IDS, type ScheduleECategoryId } from './constants/scheduleE';
+import {
+  costTreatment,
+  cpaFigureKind,
+  documentSource,
+  paymentMethod,
+  placedInServiceEvidence,
+  reconciliationKind,
+} from './constants/captureLists';
 import { isIsoDate } from './dates';
 
 const isoDate = z
@@ -65,6 +73,55 @@ export const destinationKindSchema = z.enum([
 export const actorTypeSchema = z.enum(['owner', 'spouse', 'pm', 'contractor', 'other']);
 export const propertyTypeSchema = z.enum(['residential', 'commercial']);
 export const rentSourceSchema = z.enum(['property_manager', 'direct_from_tenant', 'other']);
+
+/**
+ * The picker vocabularies, validated from their own lists rather than restated
+ * as string unions. A second copy of a list is a list that drifts.
+ */
+const fromList = <T extends string>(
+  list: { ids: readonly T[]; has: (id: string) => id is T },
+  message: string,
+) =>
+  z.string().refine(list.has, { message }) as unknown as z.ZodType<T, z.ZodTypeDef, string>;
+
+export const documentSourceSchema = fromList(
+  documentSource,
+  'Pick where that figure came from.',
+);
+export const paymentMethodSchema = fromList(paymentMethod, 'Pick how it was paid.');
+export const placedInServiceEvidenceSchema = fromList(
+  placedInServiceEvidence,
+  'Pick what shows the property was available to rent.',
+);
+export const cpaFigureKindSchema = fromList(cpaFigureKind, 'Pick what kind of figure this is.');
+export const reconciliationKindSchema = fromList(
+  reconciliationKind,
+  'Pick why the two figures differ.',
+);
+export const costTreatmentSchema = fromList(costTreatment, 'Pick operating or acquisition.');
+
+/** A tax year, used by every year-scoped record. */
+const taxYear = z
+  .number()
+  .int()
+  .min(1900, { message: 'That is not a usable tax year.' })
+  .max(2999, { message: 'That is not a usable tax year.' });
+
+/**
+ * Money that may legitimately be negative.
+ *
+ * Only reconciliation items use this: a refundable deposit that reached the
+ * bank and is not on the 1099 subtracts. Everywhere else negative money is a
+ * data-entry error and `amountCents` rejects it.
+ */
+const signedAmountCents = z
+  .number()
+  .int({ message: 'Amounts are stored in whole cents.' })
+  .min(-1_000_000_000, { message: 'Amount looks wrong - under -$10,000,000.' })
+  .max(1_000_000_000, { message: 'Amount looks wrong - over $10,000,000.' });
+
+/** An optional money field on a form that may simply be left blank. */
+const optionalAmountCents = amountCents.nullable().optional().default(null);
 
 // --- Time entries ----------------------------------------------------------
 
@@ -198,20 +255,109 @@ export const createEnterpriseSchema = z.object({
   taxYearActive: z.number().int().min(1900).max(2999),
 });
 
-export const createPropertySchema = z.object({
-  enterpriseId: uuid,
-  nickname: requiredText('A nickname', 80),
-  address: requiredText('An address', 300),
-  acquiredDate: isoDate.nullable().optional().default(null),
-  unadjustedBasisCents: amountCents.optional().default(0),
-  ownershipPct: z.number().min(0).max(100).optional().default(100),
-  isSelfManaged: z.boolean().optional().default(false),
-  isTripleNet: z.boolean().optional().default(false),
-  hadPersonalUse: z.boolean().optional().default(false),
-});
+/**
+ * Every field below the first four is optional and none of them blocks a save.
+ * They are facts collected once from a closing package, and a property record
+ * that refuses to save because the county tax card is in another room is a
+ * property record that never gets created.
+ */
+export const createPropertySchema = z
+  .object({
+    enterpriseId: uuid,
+    nickname: requiredText('A nickname', 80),
+    address: requiredText('An address', 300),
+    acquiredDate: isoDate.nullable().optional().default(null),
+    unadjustedBasisCents: amountCents.optional().default(0),
+    ownershipPct: z.number().min(0).max(100).optional().default(100),
+    isSelfManaged: z.boolean().optional().default(false),
+    isTripleNet: z.boolean().optional().default(false),
+    hadPersonalUse: z.boolean().optional().default(false),
+
+    // --- Placed in service: ready and available to rent ------------------
+    placedInServiceDate: isoDate.nullable().optional().default(null),
+    placedInServiceEvidence: placedInServiceEvidenceSchema.nullable().optional().default(null),
+    firstTenantDate: isoDate.nullable().optional().default(null),
+
+    // --- Purchase facts, off the closing statement ------------------------
+    purchasePriceCents: optionalAmountCents,
+    closingCostsCents: optionalAmountCents,
+    /** Land does not depreciate. The CPA needs the split; the app just holds it. */
+    landValueCents: optionalAmountCents,
+
+    // --- Conversion from a home, where basis is the LESSER of two figures --
+    wasPersonalResidence: z.boolean().optional().default(false),
+    convertedToRentalDate: isoDate.nullable().optional().default(null),
+    fmvAtConversionCents: optionalAmountCents,
+
+    // --- Disposal ---------------------------------------------------------
+    soldDate: isoDate.nullable().optional().default(null),
+    salePriceCents: optionalAmountCents,
+
+    /** An election the owner made, recorded as a fact. Blank means ungrouped. */
+    section469Activity: optionalText(120),
+
+    /**
+     * Who manages it now. Consumed by the service to close the open management
+     * period and open a new one; never stored on the property row itself.
+     * The literal 'self' is how the form says "no manager" without a uuid.
+     */
+    managedByActorId: z
+      .union([uuid, z.literal('self')])
+      .nullable()
+      .optional()
+      .default(null),
+  })
+  .refine((v) => !v.soldDate || !v.acquiredDate || v.soldDate >= v.acquiredDate, {
+    message: 'A property cannot be sold before it was acquired.',
+    path: ['soldDate'],
+  })
+  .refine(
+    // Not a tax rule - just arithmetic. A property listed for rent before it was
+    // owned is a typo, and catching it here saves a wrong depreciation start.
+    (v) =>
+      !v.placedInServiceDate ||
+      !v.acquiredDate ||
+      v.wasPersonalResidence ||
+      v.placedInServiceDate >= v.acquiredDate,
+    {
+      message:
+        'The placed-in-service date is before the acquisition date. That is only expected on a property you lived in first - tick "was my home" if so.',
+      path: ['placedInServiceDate'],
+    },
+  );
 export type CreatePropertyInput = z.input<typeof createPropertySchema>;
 
-export const updatePropertySchema = createPropertySchema.partial().extend({ id: uuid });
+/**
+ * Rebuilt rather than `.partial()`: the refinements above wrap the object, and
+ * a ZodEffects has no `.partial()`. Restating the shape keeps every field
+ * optional for a patch while leaving the create-time rules intact.
+ */
+export const updatePropertySchema = z.object({
+  id: uuid,
+  enterpriseId: uuid.optional(),
+  nickname: requiredText('A nickname', 80).optional(),
+  address: requiredText('An address', 300).optional(),
+  acquiredDate: isoDate.nullable().optional(),
+  unadjustedBasisCents: amountCents.optional(),
+  ownershipPct: z.number().min(0).max(100).optional(),
+  isSelfManaged: z.boolean().optional(),
+  isTripleNet: z.boolean().optional(),
+  hadPersonalUse: z.boolean().optional(),
+  placedInServiceDate: isoDate.nullable().optional(),
+  placedInServiceEvidence: placedInServiceEvidenceSchema.nullable().optional(),
+  firstTenantDate: isoDate.nullable().optional(),
+  purchasePriceCents: amountCents.nullable().optional(),
+  closingCostsCents: amountCents.nullable().optional(),
+  landValueCents: amountCents.nullable().optional(),
+  wasPersonalResidence: z.boolean().optional(),
+  convertedToRentalDate: isoDate.nullable().optional(),
+  fmvAtConversionCents: amountCents.nullable().optional(),
+  soldDate: isoDate.nullable().optional(),
+  salePriceCents: amountCents.nullable().optional(),
+  section469Activity: optionalText(120),
+  managedByActorId: z.union([uuid, z.literal('self')]).nullable().optional(),
+});
+export type UpdatePropertyInput = z.input<typeof updatePropertySchema>;
 
 export const createActorSchema = z.object({
   name: requiredText('A name', 120),
@@ -248,6 +394,186 @@ export const stopTimerSchema = z.object({
   propertyId: uuid.nullable().optional(),
 });
 export type StopTimerInput = z.input<typeof stopTimerSchema>;
+
+// --- Expense payments (cash basis) -----------------------------------------
+
+export const createExpensePaymentSchema = z.object({
+  expenseId: uuid,
+  paidDate: isoDate,
+  // Strictly positive. A zero payment is not an event, and a negative one is a
+  // refund - which is its own expense line, not a payment that runs backwards.
+  amountCents: amountCents.refine((v) => v > 0, {
+    message: 'A payment has to be more than zero.',
+  }),
+  /** Planned, not yet made. Deductible nowhere until this is false. */
+  isScheduled: z.boolean().optional().default(false),
+  method: paymentMethodSchema.nullable().optional().default(null),
+  reference: optionalText(120),
+  receiptKey: z.string().max(500).nullable().optional().default(null),
+  notes: optionalText(),
+});
+export type CreateExpensePaymentInput = z.input<typeof createExpensePaymentSchema>;
+
+export const updateExpensePaymentSchema = z.object({
+  id: uuid,
+  paidDate: isoDate.optional(),
+  amountCents: amountCents
+    .refine((v) => v > 0, { message: 'A payment has to be more than zero.' })
+    .optional(),
+  isScheduled: z.boolean().optional(),
+  method: paymentMethodSchema.nullable().optional(),
+  reference: optionalText(120),
+  receiptKey: z.string().max(500).nullable().optional(),
+  notes: optionalText(),
+});
+export type UpdateExpensePaymentInput = z.input<typeof updateExpensePaymentSchema>;
+
+/** Spreading a remainder over instalments from the expense detail screen. */
+export const planInstalmentsSchema = z.object({
+  expenseId: uuid,
+  count: z
+    .number()
+    .int()
+    .min(1, { message: 'At least one instalment.' })
+    .max(60, { message: 'More than 60 instalments is almost certainly a mistake.' }),
+  firstDate: isoDate,
+});
+export type PlanInstalmentsInput = z.input<typeof planInstalmentsSchema>;
+
+// --- Loan and escrow facts per property per year ---------------------------
+
+/**
+ * Transcribed from the Form 1098, or from wherever the figure actually was when
+ * the 1098 was silent. Box 10 was blank on all four of the household's 2025
+ * forms, with the tax and insurance figures in a supplemental escrow block, so
+ * every money field carries a companion source.
+ */
+export const upsertLoanYearSchema = z.object({
+  id: uuid.optional(),
+  propertyId: uuid,
+  taxYear,
+  /** Name only. No account numbers and no TINs, masked or otherwise. */
+  lenderName: requiredText('The lender name', 200),
+  interestCents: optionalAmountCents,
+  pointsCents: optionalAmountCents,
+  mortgageInsuranceCents: optionalAmountCents,
+  propertyTaxCents: optionalAmountCents,
+  propertyTaxSource: documentSourceSchema.nullable().optional().default(null),
+  insurancePaidFromEscrowCents: optionalAmountCents,
+  insuranceSource: documentSourceSchema.nullable().optional().default(null),
+  escrowBalanceCents: optionalAmountCents,
+  originationDate: isoDate.nullable().optional().default(null),
+  originalPrincipalCents: optionalAmountCents,
+  interestRatePct: z.number().min(0).max(100).nullable().optional().default(null),
+  documentNote: optionalText(),
+});
+export type UpsertLoanYearInput = z.input<typeof upsertLoanYearSchema>;
+
+// --- Rent reconciliation ----------------------------------------------------
+
+export const upsertRentReconciliationSchema = z.object({
+  id: uuid.optional(),
+  propertyId: uuid,
+  taxYear,
+  payerActorId: uuid.nullable().optional().default(null),
+  /**
+   * Box 1 of the 1099-MISC exactly as issued. Null until the form arrives -
+   * which is different from zero, and the reconciliation rule treats it so.
+   */
+  reportedGrossCents: optionalAmountCents,
+  documentNote: optionalText(),
+});
+export type UpsertRentReconciliationInput = z.input<typeof upsertRentReconciliationSchema>;
+
+export const createReconciliationItemSchema = z.object({
+  reconciliationId: uuid,
+  kind: reconciliationKindSchema,
+  /**
+   * The only signed money in the app. Positive for money reported but never
+   * banked - a fee withheld, a forfeited deposit. Negative for money banked but
+   * not reported, which in practice means a deposit being held.
+   */
+  amountCents: signedAmountCents.refine((v) => v !== 0, {
+    message: 'An item of zero explains nothing. Remove it instead.',
+  }),
+  note: optionalText(),
+});
+export type CreateReconciliationItemInput = z.input<typeof createReconciliationItemSchema>;
+
+// --- Figures returned by the CPA -------------------------------------------
+
+export const upsertCpaFigureSchema = z
+  .object({
+    id: uuid.optional(),
+    /** Null for a portfolio-level figure. */
+    propertyId: uuid.nullable().optional().default(null),
+    taxYear,
+    kind: cpaFigureKindSchema,
+    categoryId: scheduleECategorySchema.nullable().optional().default(null),
+    scheduleELine: z.number().int().min(1).max(99).nullable().optional().default(null),
+    label: requiredText('A label', 200),
+    recoveryYears: z.number().min(0).max(99).nullable().optional().default(null),
+    /** Signed: a carryforward and an adjustment can both run negative. */
+    amountCents: signedAmountCents,
+    /** Required. A figure with no provenance cannot be checked next year. */
+    sourceNote: requiredText('Where this figure came from', 500),
+    enteredByActorId: uuid,
+  })
+  .refine((v) => v.kind !== 'schedule_e_line' || v.categoryId != null, {
+    message: 'A Schedule E figure needs to say which line it belongs on.',
+    path: ['categoryId'],
+  });
+export type UpsertCpaFigureInput = z.input<typeof upsertCpaFigureSchema>;
+
+// --- Jobs -------------------------------------------------------------------
+
+export const createJobSchema = z.object({
+  title: requiredText('A title', 200),
+  propertyId: uuid.nullable().optional().default(null),
+  notes: optionalText(),
+});
+export type CreateJobInput = z.input<typeof createJobSchema>;
+
+export const updateJobSchema = z.object({
+  id: uuid,
+  title: requiredText('A title', 200).optional(),
+  propertyId: uuid.nullable().optional(),
+  notes: optionalText(),
+});
+
+/**
+ * Attaching existing records to a job, which is the "group these" action.
+ * A job may be named instead of identified, so the first grouping does not
+ * require creating the job as a separate step.
+ */
+export const assignJobSchema = z
+  .object({
+    jobId: uuid.optional(),
+    newJobTitle: requiredText('A title', 200).optional(),
+    timeEntryIds: z.array(uuid).optional().default([]),
+    tripIds: z.array(uuid).optional().default([]),
+    expenseIds: z.array(uuid).optional().default([]),
+  })
+  .refine((v) => v.jobId != null || v.newJobTitle != null, {
+    message: 'Pick a job to add these to, or name a new one.',
+    path: ['jobId'],
+  })
+  .refine(
+    (v) =>
+      v.timeEntryIds.length + v.tripIds.length + v.expenseIds.length > 0,
+    {
+      message: 'Select at least one record to group.',
+      path: ['timeEntryIds'],
+    },
+  );
+export type AssignJobInput = z.input<typeof assignJobSchema>;
+
+/** Detaching a record leaves it intact; only the membership goes. */
+export const unassignJobSchema = z.object({
+  timeEntryIds: z.array(uuid).optional().default([]),
+  tripIds: z.array(uuid).optional().default([]),
+  expenseIds: z.array(uuid).optional().default([]),
+});
 
 // --- Reports ---------------------------------------------------------------
 
