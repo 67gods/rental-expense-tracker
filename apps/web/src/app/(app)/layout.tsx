@@ -39,6 +39,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <span className="hint ml-auto hidden sm:inline">
             {user.actor.name} · {user.taxYear}
           </span>
+          <Link href="/settings" className="btn btn-ghost text-xs">
+            Settings
+          </Link>
           <SignOutButton />
         </div>
 
