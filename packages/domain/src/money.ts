@@ -18,25 +18,60 @@ export class MoneyError extends Error {
  * worse than a rejected one.
  */
 export function parseAmountToCents(input: string | number): number {
+  let text: string;
+
   if (typeof input === 'number') {
     if (!Number.isFinite(input)) {
       throw new MoneyError(`Amount is not a finite number: ${input}`);
     }
-    return roundHalfUp(input * 100);
+    // Anything below half a cent is zero, which also sidesteps the exponential
+    // notation String() produces for very small numbers.
+    if (Math.abs(input) < 0.005) return 0;
+    text = String(input);
+    if (text.includes('e') || text.includes('E')) {
+      throw new MoneyError(`Amount is too large to record precisely: ${input}`);
+    }
+  } else {
+    text = input.trim().replace(/[$\s,]/g, '');
   }
 
-  const cleaned = input.trim().replace(/[$\s,]/g, '');
-  if (cleaned === '') {
+  if (text === '') {
     throw new MoneyError('Amount is required.');
   }
-  if (!/^-?\d*(\.\d+)?$/.test(cleaned) || cleaned === '-' || cleaned === '.') {
+  if (!/^-?\d*(\.\d+)?$/.test(text) || text === '-' || text === '.' || text === '-.') {
     throw new MoneyError(`Amount is not a valid number: "${input}"`);
   }
-  const asNumber = Number(cleaned);
-  if (!Number.isFinite(asNumber)) {
-    throw new MoneyError(`Amount is not a valid number: "${input}"`);
+
+  return decimalStringToCents(text);
+}
+
+/**
+ * Converts a decimal string to cents using integer arithmetic on the digits.
+ *
+ * Never multiplies the dollar value by 100. In binary floating point, 1.005
+ * is stored as 1.00499999999999989, so `1.005 * 100` rounds down to $1.00 and
+ * the receipt no longer matches the ledger. Reading the digits avoids the
+ * representation entirely.
+ */
+function decimalStringToCents(text: string): number {
+  const isNegative = text.startsWith('-');
+  const unsigned = isNegative ? text.slice(1) : text;
+  const [wholePart = '', fractionPart = ''] = unsigned.split('.');
+
+  const whole = wholePart === '' ? 0 : Number(wholePart);
+  // Pad to three digits so the third is available as the rounding digit.
+  const padded = `${fractionPart}000`.slice(0, 3);
+  const cents = Number(padded.slice(0, 2));
+  const roundingDigit = Number(padded[2]);
+
+  let total = whole * 100 + cents;
+  if (roundingDigit >= 5) total += 1; // half away from zero
+
+  if (!Number.isSafeInteger(total)) {
+    throw new MoneyError(`Amount is too large to record precisely: "${text}"`);
   }
-  return roundHalfUp(asNumber * 100);
+
+  return isNegative ? -total : total;
 }
 
 /**
