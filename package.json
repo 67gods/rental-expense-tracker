@@ -1,0 +1,27 @@
+{
+  "name": "rental-property",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Rental Property Operations Tracker - expenses, hours, mileage, and time-on-site for a five-property household portfolio.",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "npm run dev --workspace @rental/web",
+    "build": "npm run build --workspace @rental/web",
+    "start": "npm run start --workspace @rental/web",
+    "test": "npm run test --workspace @rental/domain",
+    "test:watch": "npm run test:watch --workspace @rental/domain",
+    "typecheck": "npm run typecheck --workspace @rental/domain && npm run typecheck --workspace @rental/web",
+    "lint": "npm run lint --workspace @rental/web",
+    "db:generate": "npm run db:generate --workspace @rental/web",
+    "db:migrate": "npm run db:migrate --workspace @rental/web",
+    "db:seed": "npm run db:seed --workspace @rental/web",
+    "db:check": "npm run db:check --workspace @rental/web",
+    "verify": "npm run typecheck && npm run test && npm run build"
+  }
+}
