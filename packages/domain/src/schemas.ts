@@ -6,8 +6,8 @@
  */
 
 import { z } from 'zod';
-import { HOUR_CATEGORY_IDS } from './constants/hourCategories';
-import { SCHEDULE_E_CATEGORY_IDS } from './constants/scheduleE';
+import { HOUR_CATEGORY_IDS, type HourCategoryId } from './constants/hourCategories';
+import { SCHEDULE_E_CATEGORY_IDS, type ScheduleECategoryId } from './constants/scheduleE';
 import { isIsoDate } from './dates';
 
 const isoDate = z
@@ -34,12 +34,18 @@ const amountCents = z
   .min(0, { message: 'Amount cannot be negative.' })
   .max(1_000_000_000, { message: 'Amount looks wrong - over $10,000,000.' });
 
+/**
+ * The cast preserves the literal union rather than widening to `string`.
+ * Without it a validated category would not satisfy `HourCategoryId`, and every
+ * caller would need its own unchecked assertion - which is exactly how an
+ * invalid category reaches the eligibility rule.
+ */
 export const hourCategorySchema = z.enum(
-  HOUR_CATEGORY_IDS as unknown as [string, ...string[]],
+  HOUR_CATEGORY_IDS as unknown as [HourCategoryId, ...HourCategoryId[]],
 );
 
 export const scheduleECategorySchema = z.enum(
-  SCHEDULE_E_CATEGORY_IDS as unknown as [string, ...string[]],
+  SCHEDULE_E_CATEGORY_IDS as unknown as [ScheduleECategoryId, ...ScheduleECategoryId[]],
 );
 
 export const capitalClassificationSchema = z.enum([
