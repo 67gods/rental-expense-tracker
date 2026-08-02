@@ -9,6 +9,7 @@
  * Safe to run more than once. It never overwrites an existing property.
  */
 
+import './loadEnv';
 import { eq } from 'drizzle-orm';
 import { getDb } from './client';
 import { enterprises, properties } from './schema';

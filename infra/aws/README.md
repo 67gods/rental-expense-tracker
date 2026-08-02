@@ -38,7 +38,19 @@ hard-to-guess public URL is not.
 
 ## Adding the Vercel URL later
 
-`s3-cors.json` lists `localhost:3000` and a Vercel placeholder. Local uploads
-work as soon as the bucket exists. Once deployed, replace the placeholder with
-the real Vercel URL and paste the CORS rule again — otherwise the browser
-blocks uploads from production with a CORS error.
+`s3-cors.json` currently allows only `http://localhost:4000`, which is where
+the app runs in development. Local uploads work as soon as the bucket exists.
+
+Once deployed, add the Vercel origin alongside it and paste the rule again:
+
+```json
+"AllowedOrigins": [
+  "http://localhost:4000",
+  "https://your-app.vercel.app"
+]
+```
+
+Without that, uploads from production fail with a CORS error even though the
+credentials are perfectly valid — the presign succeeds and the browser blocks
+the PUT. Note that JSON allows no comments; a `//` line will make S3 reject
+the whole rule.

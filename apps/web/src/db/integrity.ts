@@ -9,6 +9,7 @@
  * kind of silent change that makes a log indefensible.
  */
 
+import './loadEnv';
 import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import {
   deriveShEligible,

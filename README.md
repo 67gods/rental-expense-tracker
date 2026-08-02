@@ -53,7 +53,7 @@ cp .env.example .env.local
    project, then **APIs & Services → Credentials → Create OAuth client ID →
    Web application**.
 2. Add these authorised redirect URIs:
-   - `http://localhost:3000/api/auth/callback/google`
+   - `http://localhost:4000/api/auth/callback/google`
    - `https://YOUR-APP.vercel.app/api/auth/callback/google` (after deploying)
 3. Copy the client ID and secret into `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET`.
 4. Generate a session secret:
@@ -78,7 +78,7 @@ cp .env.example .env.local
      {
        "AllowedHeaders": ["*"],
        "AllowedMethods": ["PUT", "GET"],
-       "AllowedOrigins": ["http://localhost:3000", "https://YOUR-APP.vercel.app"],
+       "AllowedOrigins": ["http://localhost:4000", "https://YOUR-APP.vercel.app"],
        "ExposeHeaders": ["ETag"]
      }
    ]
@@ -99,7 +99,7 @@ entries near midnight between days.
 ### 6. Run it
 
 ```bash
-npm run dev          # http://localhost:3000
+npm run dev          # http://localhost:4000
 ```
 
 ### 7. Deploy — Vercel (free)

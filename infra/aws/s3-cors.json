@@ -2,10 +2,7 @@
   {
     "AllowedHeaders": ["*"],
     "AllowedMethods": ["PUT", "GET"],
-    "AllowedOrigins": [
-      "http://localhost:3000",
-      "https://REPLACE-WITH-YOUR-VERCEL-URL.vercel.app"
-    ],
+    "AllowedOrigins": ["http://localhost:4000"],
     "ExposeHeaders": ["ETag"],
     "MaxAgeSeconds": 3000
   }
