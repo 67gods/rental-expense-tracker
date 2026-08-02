@@ -14,7 +14,7 @@ import { toErrorPayload } from '@/server/errors';
 import { createExpense, deleteExpense } from '@/server/services/expenses';
 import { createTrip, deleteTrip } from '@/server/services/trips';
 import { createRentReceipt, deleteRentReceipt } from '@/server/services/reference';
-import type { FormState } from './timeEntries';
+import type { FormState } from './formState';
 
 /** Server actions for expenses, trips, and rent income. */
 

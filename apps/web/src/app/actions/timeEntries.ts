@@ -10,6 +10,7 @@ import {
   deleteTimeEntry,
   updateTimeEntry,
 } from '@/server/services/timeEntries';
+import type { FormState } from './formState';
 
 /**
  * Server actions for time entry.
@@ -18,16 +19,6 @@ import {
  * Android client at M4 go through one implementation of the rules rather than
  * two that drift.
  */
-
-export interface FormState {
-  ok: boolean;
-  message?: string;
-  fields?: Record<string, string>;
-  /** Confirmation text shown after a successful save. */
-  saved?: string;
-}
-
-export const EMPTY_FORM_STATE: FormState = { ok: false };
 
 export async function saveTimeEntryAction(
   _previous: FormState,

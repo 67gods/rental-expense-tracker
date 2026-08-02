@@ -4,7 +4,7 @@ import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { RENT_SOURCES } from '@rental/domain';
 import { saveIncomeAction } from '@/app/actions/capture';
-import { EMPTY_FORM_STATE } from '@/app/actions/timeEntries';
+import { EMPTY_FORM_STATE } from '@/app/actions/formState';
 import { ActorPicker, PropertyPicker, SubmitButton, type Option } from './Pickers';
 
 /**

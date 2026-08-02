@@ -6,7 +6,7 @@ import { isHourCategoryId } from '@rental/domain';
 import { requireUser } from '@/lib/session';
 import { toErrorPayload } from '@/server/errors';
 import { discardTimer, startTimer, stopTimer } from '@/server/services/timer';
-import type { FormState } from './timeEntries';
+import type { FormState } from './formState';
 
 export async function startTimerAction(
   _previous: FormState,

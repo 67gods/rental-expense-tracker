@@ -3,7 +3,7 @@
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { startTimerAction } from '@/app/actions/timer';
-import { EMPTY_FORM_STATE } from '@/app/actions/timeEntries';
+import { EMPTY_FORM_STATE } from '@/app/actions/formState';
 import { CategoryPicker } from './CategoryPicker';
 import { PropertyPicker, SubmitButton, type Option } from './Pickers';
 

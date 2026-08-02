@@ -2,7 +2,8 @@
 
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { EMPTY_FORM_STATE, saveTimeEntryAction } from '@/app/actions/timeEntries';
+import { saveTimeEntryAction } from '@/app/actions/timeEntries';
+import { EMPTY_FORM_STATE } from '@/app/actions/formState';
 import { CategoryPicker } from './CategoryPicker';
 import { MinutePicker } from './MinutePicker';
 import { ActorPicker, PropertyPicker, SubmitButton, type Option } from './Pickers';

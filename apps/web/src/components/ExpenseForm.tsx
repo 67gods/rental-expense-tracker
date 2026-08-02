@@ -4,7 +4,7 @@ import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { getScheduleECategory, listScheduleECategories } from '@rental/domain';
 import { saveExpenseAction } from '@/app/actions/capture';
-import { EMPTY_FORM_STATE } from '@/app/actions/timeEntries';
+import { EMPTY_FORM_STATE } from '@/app/actions/formState';
 import { ReceiptUpload } from './ReceiptUpload';
 import { ActorPicker, PropertyPicker, SelectField, SubmitButton, type Option } from './Pickers';
 

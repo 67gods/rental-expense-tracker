@@ -11,7 +11,7 @@ import {
   type DestinationKind,
 } from '@rental/domain';
 import { saveTripAction } from '@/app/actions/capture';
-import { EMPTY_FORM_STATE } from '@/app/actions/timeEntries';
+import { EMPTY_FORM_STATE } from '@/app/actions/formState';
 import { EligibilityBadge } from './CategoryPicker';
 import { ActorPicker, PropertyPicker, SubmitButton, type Option } from './Pickers';
 
