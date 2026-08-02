@@ -2,6 +2,7 @@ import { and, desc, eq, gte, isNull, lte, or, sql } from 'drizzle-orm';
 import {
   allocateExpense,
   createExpenseSchema,
+  formatCents,
   getScheduleECategory,
   isBackdated,
   taxYearRange,
@@ -11,10 +12,10 @@ import {
   type CreateExpenseInput,
   type UpdateExpenseInput,
 } from '@rental/domain';
-import { getDb } from '@/db/client';
-import { expenses, properties, type Expense } from '@/db/schema';
+import { getDb, withTransaction } from '@/db/client';
+import { expensePayments, expenses, properties, type Expense } from '@/db/schema';
 import { env } from '@/env';
-import { NotFoundError } from '../errors';
+import { NotFoundError, ValidationError } from '../errors';
 import { syncEligibilityForExpense } from './timeEntries';
 
 export interface ExpenseFilter {
@@ -28,9 +29,24 @@ export interface ExpenseFilter {
   limit?: number;
 }
 
-export async function createExpense(input: CreateExpenseInput): Promise<Expense> {
+/**
+ * Creates an expense and, with it, the one payment row that says "paid in full
+ * on the invoice date".
+ *
+ * THIS IS WHAT KEEPS THE SPLIT INVISIBLE. The expense form is unchanged - the
+ * same five fields it has always had, with no mention of payments - and the
+ * service writes the cash event itself. Only the two invoices a year that
+ * genuinely straddle a year boundary ever need the instalment UI.
+ *
+ * Both writes happen in one transaction. A half-written pair would leave an
+ * expense that reads as never paid, which drops it out of every report while
+ * still appearing in the ledger.
+ */
+export async function createExpense(
+  input: CreateExpenseInput,
+  options: { jobId?: string | null; paidDate?: string } = {},
+): Promise<Expense> {
   const data = createExpenseSchema.parse(input);
-  const db = getDb();
 
   // Validate the split before writing, so a rule that cannot be applied is
   // never persisted against the expense.
@@ -38,28 +54,45 @@ export async function createExpense(input: CreateExpenseInput): Promise<Expense>
     await assertAllocationApplies(data.amountCents, data.allocationRule as AllocationRule);
   }
 
-  const [row] = await db
-    .insert(expenses)
-    .values({
-      date: data.date,
-      actorId: data.actorId,
-      propertyId: data.propertyId,
-      turnId: data.turnId,
-      amountCents: data.amountCents,
-      vendor: data.vendor,
-      scheduleECategory: data.scheduleECategory,
-      capitalClassification: data.capitalClassification,
-      classificationAnswers: data.classificationAnswers,
-      contractorActorId: data.contractorActorId,
-      receiptKey: data.receiptKey,
-      notes: data.notes,
-      allocationRule: data.allocationRule as Record<string, unknown> | null,
-      isBackdated: isBackdated(data.date, new Date(), env.timeZone),
-    })
-    .returning();
+  return withTransaction(async (tx) => {
+    const [row] = await tx
+      .insert(expenses)
+      .values({
+        date: data.date,
+        actorId: data.actorId,
+        propertyId: data.propertyId,
+        turnId: data.turnId,
+        jobId: options.jobId ?? null,
+        amountCents: data.amountCents,
+        vendor: data.vendor,
+        scheduleECategory: data.scheduleECategory,
+        capitalClassification: data.capitalClassification,
+        classificationAnswers: data.classificationAnswers,
+        contractorActorId: data.contractorActorId,
+        receiptKey: data.receiptKey,
+        notes: data.notes,
+        allocationRule: data.allocationRule as Record<string, unknown> | null,
+        isBackdated: isBackdated(data.date, new Date(), env.timeZone),
+      })
+      .returning();
 
-  if (!row) throw new Error('The expense was not saved.');
-  return row;
+    if (!row) throw new Error('The expense was not saved.');
+
+    // A zero-amount expense gets no payment row: there was no cash event, and
+    // inventing a zero one to satisfy a rule would be a lie in the ledger.
+    // integrity.ts exempts it from the "every expense has a payment" check.
+    if (data.amountCents > 0) {
+      await tx.insert(expensePayments).values({
+        expenseId: row.id,
+        paidDate: options.paidDate ?? data.date,
+        amountCents: data.amountCents,
+        isScheduled: false,
+        receiptKey: data.receiptKey,
+      });
+    }
+
+    return row;
+  });
 }
 
 export async function updateExpense(input: UpdateExpenseInput): Promise<Expense> {
@@ -79,6 +112,16 @@ export async function updateExpense(input: UpdateExpenseInput): Promise<Expense>
   const classificationChanged =
     data.capitalClassification !== undefined &&
     data.capitalClassification !== existing.capitalClassification;
+
+  // Checked BEFORE the write, not after. This ran afterwards once, and an
+  // invoice was persisted at $1,000 with $8,244 of payments already against it:
+  // the caller saw an error while the database kept the contradiction. A
+  // refusal has to leave the record as it was.
+  const payments = await db
+    .select()
+    .from(expensePayments)
+    .where(eq(expensePayments.expenseId, data.id));
+  assertInvoiceCoversPayments(amountCents, payments, existing.amountCents);
 
   const [row] = await db
     .update(expenses)
@@ -113,6 +156,8 @@ export async function updateExpense(input: UpdateExpenseInput): Promise<Expense>
 
   if (!row) throw new NotFoundError('That expense no longer exists.');
 
+  await reconcilePaymentsToInvoice(row.id, amountCents, date, existing.amountCents, payments);
+
   // §5.2: reclassifying the work changes whether the hours it generated count.
   // Doing this here means the two records can never disagree.
   if (classificationChanged) {
@@ -120,6 +165,89 @@ export async function updateExpense(input: UpdateExpenseInput): Promise<Expense>
   }
 
   return row;
+}
+
+/**
+ * Refuses a new invoice total that the existing payments already exceed.
+ *
+ * Skipped for an unsplit expense whose single payment simply mirrors the
+ * invoice: that one is about to be rewritten to match, so it can never be the
+ * thing that blocks the edit.
+ */
+function assertInvoiceCoversPayments(
+  amountCents: number,
+  payments: readonly { amountCents: number }[],
+  previousAmountCents: number,
+): void {
+  const isMirroringSingle =
+    payments.length === 1 && payments[0]?.amountCents === previousAmountCents;
+  if (isMirroringSingle || payments.length === 0) return;
+
+  const committed = sumOf(payments);
+  if (committed > amountCents) {
+    throw new ValidationError(
+      `This expense has ${payments.length} payment${payments.length === 1 ? '' : 's'} against it totalling ${formatCents(committed)}, which is more than the new invoice total of ${formatCents(amountCents)}. Adjust the payments first.`,
+    );
+  }
+}
+
+/**
+ * Keeps the payment rows honest after the invoice total or date changed.
+ *
+ * An UNSPLIT expense - one payment, which is the ordinary case and the one the
+ * owner never sees - has its single payment follow the invoice. Correcting a
+ * typo in an amount should not also require finding a payments screen.
+ *
+ * A SPLIT expense is left alone. Those rows are real cash events with their own
+ * dates, and silently rewriting them would destroy the record of what was
+ * actually paid when. `assertInvoiceCoversPayments` has already refused the
+ * case where the new total no longer covers them.
+ */
+async function reconcilePaymentsToInvoice(
+  expenseId: string,
+  amountCents: number,
+  date: string,
+  previousAmountCents: number,
+  payments: readonly { id: string; amountCents: number }[],
+): Promise<void> {
+  const db = getDb();
+
+  if (payments.length === 0) {
+    // Either a zero-amount expense that has just been given a real amount, or a
+    // row from before payments existed. Either way it needs its cash event.
+    if (amountCents > 0) {
+      await db.insert(expensePayments).values({
+        expenseId,
+        paidDate: date,
+        amountCents,
+        isScheduled: false,
+      });
+    }
+    return;
+  }
+
+  if (payments.length === 1) {
+    const [only] = payments;
+    if (!only) return;
+    if (amountCents === 0) {
+      await db.delete(expensePayments).where(eq(expensePayments.id, only.id));
+      return;
+    }
+    // Only follow the invoice while the two still agree. Once someone has
+    // edited the payment to differ deliberately, it is a real cash event and
+    // stops being a mirror of the invoice.
+    const wasMirroring = only.amountCents === previousAmountCents;
+    if (wasMirroring) {
+      await db
+        .update(expensePayments)
+        .set({ amountCents, paidDate: date, updatedAt: new Date() })
+        .where(eq(expensePayments.id, only.id));
+    }
+  }
+}
+
+function sumOf(payments: readonly { amountCents: number }[]): number {
+  return payments.reduce((total, p) => total + p.amountCents, 0);
 }
 
 export async function deleteExpense(id: string): Promise<void> {

@@ -7,7 +7,7 @@ import {
   taxYearRange,
   type CreateTripInput,
 } from '@rental/domain';
-import { getDb } from '@/db/client';
+import { getDb, withTransaction } from '@/db/client';
 import { timeEntries, trips, type Trip } from '@/db/schema';
 import { env } from '@/env';
 import { NotFoundError } from '../errors';
@@ -36,80 +36,98 @@ export interface TripResult {
   onsiteTimeEntryId: string | null;
 }
 
-export async function createTrip(input: CreateTripInput): Promise<TripResult> {
+/**
+ * One trip form entry writes three linked records: the mileage, the drive time
+ * (pinned to travel and never eligible), and the on-site time.
+ *
+ * All three in one transaction. They previously went in sequentially and a
+ * failure part-way left orphaned time entries for the integrity check to
+ * report - acceptable only because the HTTP driver could not do better. It can
+ * now, so a half-written trip is no longer a state the database can reach.
+ */
+export async function createTrip(
+  input: CreateTripInput,
+  options: { jobId?: string | null } = {},
+): Promise<TripResult> {
   const data = createTripSchema.parse(input);
   // The trip's own date decides which year's rules the linked time entries are
   // derived under - a 31 December drive stays in that year.
   const drafts = buildTripDrafts(data, taxYearOf(data.date));
-  const db = getDb();
   const backdated = isBackdated(data.date, new Date(), env.timeZone);
+  const jobId = options.jobId ?? null;
 
-  // Write the time entries first so the trip row can point at them. If a later
-  // step fails, the orphaned entries are visible in the time log rather than
-  // silently lost - and the integrity check reports them.
-  let driveTimeEntryId: string | null = null;
-  if (drafts.driveTime) {
-    const [row] = await db
-      .insert(timeEntries)
+  const { trip, driveTimeEntryId, onsiteTimeEntryId } = await withTransaction(async (tx) => {
+    let driveTimeEntryId: string | null = null;
+    if (drafts.driveTime) {
+      const [row] = await tx
+        .insert(timeEntries)
+        .values({
+          date: drafts.driveTime.date,
+          actorId: drafts.driveTime.actorId,
+          enterpriseId: drafts.driveTime.enterpriseId,
+          propertyId: drafts.driveTime.propertyId,
+          jobId,
+          minutes: drafts.driveTime.minutes,
+          category: drafts.driveTime.category,
+          description: drafts.driveTime.description,
+          shEligible: drafts.driveTime.shEligible,
+          shEligibleReason: 'category_not_eligible',
+          rulesVersion: drafts.driveTime.rulesVersion,
+          isProvisional: false,
+          source: drafts.driveTime.source,
+          isBackdated: backdated,
+        })
+        .returning({ id: timeEntries.id });
+      driveTimeEntryId = row?.id ?? null;
+    }
+
+    let onsiteTimeEntryId: string | null = null;
+    if (drafts.onsiteTime) {
+      const [row] = await tx
+        .insert(timeEntries)
+        .values({
+          date: drafts.onsiteTime.date,
+          actorId: drafts.onsiteTime.actorId,
+          enterpriseId: drafts.onsiteTime.enterpriseId,
+          propertyId: drafts.onsiteTime.propertyId,
+          jobId,
+          minutes: drafts.onsiteTime.minutes,
+          category: drafts.onsiteTime.category,
+          description: drafts.onsiteTime.description,
+          shEligible: drafts.onsiteTime.shEligible,
+          shEligibleReason: drafts.onsiteTime.shEligible
+            ? 'category_eligible'
+            : 'linked_capital_improvement',
+          rulesVersion: drafts.onsiteTime.rulesVersion,
+          isProvisional: drafts.onsiteTime.isProvisional,
+          source: drafts.onsiteTime.source,
+          isBackdated: backdated,
+        })
+        .returning({ id: timeEntries.id });
+      onsiteTimeEntryId = row?.id ?? null;
+    }
+
+    const [row] = await tx
+      .insert(trips)
       .values({
-        date: drafts.driveTime.date,
-        actorId: drafts.driveTime.actorId,
-        enterpriseId: drafts.driveTime.enterpriseId,
-        propertyId: drafts.driveTime.propertyId,
-        minutes: drafts.driveTime.minutes,
-        category: drafts.driveTime.category,
-        description: drafts.driveTime.description,
-        shEligible: drafts.driveTime.shEligible,
-        shEligibleReason: 'category_not_eligible',
-        isProvisional: false,
-        source: drafts.driveTime.source,
+        date: drafts.mileage.date,
+        actorId: drafts.mileage.actorId,
+        propertyId: drafts.mileage.propertyId,
+        jobId,
+        origin: drafts.mileage.origin,
+        destination: drafts.mileage.destination,
+        destinationKind: drafts.mileage.destinationKind,
+        miles: String(drafts.mileage.miles),
+        purpose: drafts.mileage.purpose,
+        driveTimeEntryId,
+        onsiteTimeEntryId,
+        source: drafts.mileage.source,
         isBackdated: backdated,
       })
-      .returning({ id: timeEntries.id });
-    driveTimeEntryId = row?.id ?? null;
-  }
+      .returning();
 
-  let onsiteTimeEntryId: string | null = null;
-  if (drafts.onsiteTime) {
-    const [row] = await db
-      .insert(timeEntries)
-      .values({
-        date: drafts.onsiteTime.date,
-        actorId: drafts.onsiteTime.actorId,
-        enterpriseId: drafts.onsiteTime.enterpriseId,
-        propertyId: drafts.onsiteTime.propertyId,
-        minutes: drafts.onsiteTime.minutes,
-        category: drafts.onsiteTime.category,
-        description: drafts.onsiteTime.description,
-        shEligible: drafts.onsiteTime.shEligible,
-        shEligibleReason: drafts.onsiteTime.shEligible
-          ? 'category_eligible'
-          : 'linked_capital_improvement',
-        isProvisional: drafts.onsiteTime.isProvisional,
-        source: drafts.onsiteTime.source,
-        isBackdated: backdated,
-      })
-      .returning({ id: timeEntries.id });
-    onsiteTimeEntryId = row?.id ?? null;
-  }
-
-  const [trip] = await db
-    .insert(trips)
-    .values({
-      date: drafts.mileage.date,
-      actorId: drafts.mileage.actorId,
-      propertyId: drafts.mileage.propertyId,
-      origin: drafts.mileage.origin,
-      destination: drafts.mileage.destination,
-      destinationKind: drafts.mileage.destinationKind,
-      miles: String(drafts.mileage.miles),
-      purpose: drafts.mileage.purpose,
-      driveTimeEntryId,
-      onsiteTimeEntryId,
-      source: drafts.mileage.source,
-      isBackdated: backdated,
-    })
-    .returning();
+    return { trip: row, driveTimeEntryId, onsiteTimeEntryId };
+  });
 
   if (!trip) throw new Error('The trip was not saved.');
   return { trip, driveTimeEntryId, onsiteTimeEntryId };

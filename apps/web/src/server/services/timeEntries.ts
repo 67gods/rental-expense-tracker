@@ -4,6 +4,7 @@ import {
   deriveShEligible,
   isBackdated,
   recomputeEligibilityForClassificationChange,
+  RULES_VERSION,
   taxYearOf,
   taxYearRange,
   updateTimeEntrySchema,
@@ -73,6 +74,7 @@ export async function createTimeEntry(
       description: data.description,
       shEligible: eligibility.shEligible,
       shEligibleReason: eligibility.reason,
+      rulesVersion: eligibility.rulesVersion,
       isProvisional: eligibility.isProvisional,
       linkedExpenseId: context.linkedExpenseId ?? null,
       source: data.source,
@@ -119,6 +121,7 @@ export async function updateTimeEntry(input: UpdateTimeEntryInput): Promise<Time
       description: data.description ?? existing.description,
       shEligible: eligibility.shEligible,
       shEligibleReason: eligibility.reason,
+      rulesVersion: eligibility.rulesVersion,
       isProvisional: eligibility.isProvisional,
       // isBackdated compares against the ORIGINAL creation instant, so editing
       // an old entry today does not relabel it as written on the day.
@@ -230,7 +233,16 @@ export async function syncEligibilityForExpense(
       const reason = changes.find((c) => ids.includes(c.id))?.reason ?? 'category_eligible';
       await db
         .update(timeEntries)
-        .set({ shEligible, isProvisional, shEligibleReason: reason, updatedAt: now })
+        .set({
+          shEligible,
+          isProvisional,
+          shEligibleReason: reason,
+          // Restamped, because the cache has just been rewritten. Leaving the
+          // old stamp would describe these rows as derived under a rule set
+          // they were not.
+          rulesVersion: RULES_VERSION,
+          updatedAt: now,
+        })
         .where(inArray(timeEntries.id, ids));
     }
   }

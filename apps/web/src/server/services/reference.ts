@@ -1,4 +1,4 @@
-import { and, asc, eq, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, ne, sql } from 'drizzle-orm';
 import {
   canAssignPropertyToEnterprise,
   createActorSchema,
@@ -7,6 +7,7 @@ import {
   evaluateEnterpriseComposition,
   isBackdated,
   taxYearRange,
+  todayInZone,
   updateActorSchema,
   updatePropertySchema,
   type CreateActorInput,
@@ -14,15 +15,17 @@ import {
   type CreateRentReceiptInput,
   type DomainProperty,
 } from '@rental/domain';
-import { getDb } from '@/db/client';
+import { getDb, withTransaction } from '@/db/client';
 import {
   actors,
   enterprises,
   properties,
+  propertyManagementPeriods,
   rentReceipts,
   type Actor,
   type Enterprise,
   type Property,
+  type PropertyManagementPeriod,
   type RentReceipt,
 } from '@/db/schema';
 import { env } from '@/env';
@@ -61,6 +64,37 @@ export async function getProperty(id: string): Promise<Property> {
   return row;
 }
 
+/** The purchase and in-service facts, shared by create and update. */
+function propertyFactColumns(data: {
+  placedInServiceDate?: string | null;
+  placedInServiceEvidence?: string | null;
+  firstTenantDate?: string | null;
+  purchasePriceCents?: number | null;
+  closingCostsCents?: number | null;
+  landValueCents?: number | null;
+  wasPersonalResidence?: boolean;
+  convertedToRentalDate?: string | null;
+  fmvAtConversionCents?: number | null;
+  soldDate?: string | null;
+  salePriceCents?: number | null;
+  section469Activity?: string | null;
+}) {
+  return {
+    placedInServiceDate: data.placedInServiceDate ?? null,
+    placedInServiceEvidence: data.placedInServiceEvidence ?? null,
+    firstTenantDate: data.firstTenantDate ?? null,
+    purchasePriceCents: data.purchasePriceCents ?? null,
+    closingCostsCents: data.closingCostsCents ?? null,
+    landValueCents: data.landValueCents ?? null,
+    wasPersonalResidence: data.wasPersonalResidence ?? false,
+    convertedToRentalDate: data.convertedToRentalDate ?? null,
+    fmvAtConversionCents: data.fmvAtConversionCents ?? null,
+    soldDate: data.soldDate ?? null,
+    salePriceCents: data.salePriceCents ?? null,
+    section469Activity: data.section469Activity ?? null,
+  };
+}
+
 export async function createProperty(input: CreatePropertyInput): Promise<Property> {
   const data = createPropertySchema.parse(input);
   await assertEnterpriseAccepts(data.enterpriseId);
@@ -77,10 +111,16 @@ export async function createProperty(input: CreatePropertyInput): Promise<Proper
       isSelfManaged: data.isSelfManaged,
       isTripleNet: data.isTripleNet,
       hadPersonalUse: data.hadPersonalUse,
+      ...propertyFactColumns(data),
     })
     .returning();
 
   if (!row) throw new Error('The property was not saved.');
+
+  if (data.managedByActorId) {
+    await setManager(row.id, data.managedByActorId, data.acquiredDate ?? undefined);
+  }
+
   return row;
 }
 
@@ -94,26 +134,152 @@ export async function updateProperty(
     await assertEnterpriseAccepts(data.enterpriseId);
   }
 
+  // `undefined` means "not sent in this patch, keep it"; `null` means "cleared".
+  const keep = <T>(sent: T | undefined, current: T): T => (sent === undefined ? current : sent);
+
   const [row] = await getDb()
     .update(properties)
     .set({
       enterpriseId: data.enterpriseId ?? existing.enterpriseId,
       nickname: data.nickname ?? existing.nickname,
       address: data.address ?? existing.address,
-      acquiredDate: data.acquiredDate === undefined ? existing.acquiredDate : data.acquiredDate,
+      acquiredDate: keep(data.acquiredDate, existing.acquiredDate),
       unadjustedBasisCents: data.unadjustedBasisCents ?? existing.unadjustedBasisCents,
       ownershipPct:
         data.ownershipPct === undefined ? existing.ownershipPct : String(data.ownershipPct),
       isSelfManaged: data.isSelfManaged ?? existing.isSelfManaged,
       isTripleNet: data.isTripleNet ?? existing.isTripleNet,
       hadPersonalUse: data.hadPersonalUse ?? existing.hadPersonalUse,
+
+      placedInServiceDate: keep(data.placedInServiceDate, existing.placedInServiceDate),
+      placedInServiceEvidence: keep(
+        data.placedInServiceEvidence,
+        existing.placedInServiceEvidence,
+      ),
+      firstTenantDate: keep(data.firstTenantDate, existing.firstTenantDate),
+      purchasePriceCents: keep(data.purchasePriceCents, existing.purchasePriceCents),
+      closingCostsCents: keep(data.closingCostsCents, existing.closingCostsCents),
+      landValueCents: keep(data.landValueCents, existing.landValueCents),
+      wasPersonalResidence: data.wasPersonalResidence ?? existing.wasPersonalResidence,
+      convertedToRentalDate: keep(data.convertedToRentalDate, existing.convertedToRentalDate),
+      fmvAtConversionCents: keep(data.fmvAtConversionCents, existing.fmvAtConversionCents),
+      soldDate: keep(data.soldDate, existing.soldDate),
+      salePriceCents: keep(data.salePriceCents, existing.salePriceCents),
+      section469Activity: keep(data.section469Activity, existing.section469Activity),
+
       updatedAt: new Date(),
     })
     .where(eq(properties.id, data.id))
     .returning();
 
   if (!row) throw new NotFoundError('That property no longer exists.');
+
+  if (data.managedByActorId !== undefined && data.managedByActorId !== null) {
+    await setManager(row.id, data.managedByActorId);
+  }
+
   return row;
+}
+
+// --- Management history -----------------------------------------------------
+
+export async function listManagementPeriods(
+  propertyId: string,
+): Promise<PropertyManagementPeriod[]> {
+  return getDb()
+    .select()
+    .from(propertyManagementPeriods)
+    .where(eq(propertyManagementPeriods.propertyId, propertyId))
+    .orderBy(desc(propertyManagementPeriods.startDate));
+}
+
+/** Who manages each property right now, from the open period. */
+export async function currentManagers(): Promise<Map<string, string | null>> {
+  const rows = await getDb()
+    .select({
+      propertyId: propertyManagementPeriods.propertyId,
+      managerActorId: propertyManagementPeriods.managerActorId,
+    })
+    .from(propertyManagementPeriods)
+    .where(isNull(propertyManagementPeriods.endDate));
+  return new Map(rows.map((r) => [r.propertyId, r.managerActorId]));
+}
+
+/**
+ * Changes who manages a property: closes the open period and opens a new one.
+ *
+ * This is the whole interaction behind the `Managed by` dropdown. The owner
+ * picks a name; the history keeps itself. Both writes are one transaction,
+ * because a closed period with no replacement, or two open ones, each misstate
+ * who was managing the property - and the partial unique index would reject the
+ * second anyway, leaving the first committed on its own.
+ *
+ * `actorId` is a uuid, or the literal 'self' meaning no manager.
+ */
+export async function setManager(
+  propertyId: string,
+  actorId: string,
+  startDate?: string,
+): Promise<PropertyManagementPeriod | null> {
+  const managerActorId = actorId === 'self' ? null : actorId;
+  const from = startDate ?? todayInZone(env.timeZone);
+
+  return withTransaction(async (tx) => {
+    const [open] = await tx
+      .select()
+      .from(propertyManagementPeriods)
+      .where(
+        and(
+          eq(propertyManagementPeriods.propertyId, propertyId),
+          isNull(propertyManagementPeriods.endDate),
+        ),
+      )
+      .limit(1);
+
+    // Already the arrangement in force. Recording a zero-length change would
+    // add a row that says nothing happened.
+    if (open && open.managerActorId === managerActorId) return open;
+
+    if (open) {
+      // A period that would end before it began means the dates were entered out
+      // of order; keep it non-negative rather than writing an impossible row.
+      const endDate = from < open.startDate ? open.startDate : from;
+      await tx
+        .update(propertyManagementPeriods)
+        .set({ endDate, updatedAt: new Date() })
+        .where(eq(propertyManagementPeriods.id, open.id));
+    }
+
+    const [created] = await tx
+      .insert(propertyManagementPeriods)
+      .values({ propertyId, managerActorId, startDate: from })
+      .returning();
+
+    // Kept in step so the property list badge does not contradict the history.
+    await tx
+      .update(properties)
+      .set({ isSelfManaged: managerActorId === null, updatedAt: new Date() })
+      .where(eq(properties.id, propertyId));
+
+    return created ?? null;
+  });
+}
+
+/** Properties whose management periods overlap, for the integrity audit. */
+export async function overlappingManagementPeriods(): Promise<string[]> {
+  const rows = await getDb()
+    .select({ propertyId: propertyManagementPeriods.propertyId })
+    .from(propertyManagementPeriods)
+    .where(
+      sql`EXISTS (
+        SELECT 1 FROM ${propertyManagementPeriods} other
+        WHERE other.property_id = ${propertyManagementPeriods.propertyId}
+          AND other.id <> ${propertyManagementPeriods.id}
+          AND other.start_date <= COALESCE(${propertyManagementPeriods.endDate}, DATE '9999-12-31')
+          AND COALESCE(other.end_date, DATE '9999-12-31') >= ${propertyManagementPeriods.startDate}
+      )`,
+    );
+  return [...new Set(rows.map((r) => r.propertyId))];
 }
 
 /**

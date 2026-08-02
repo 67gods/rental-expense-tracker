@@ -152,6 +152,7 @@ export async function stopTimer(
       description: data.description,
       shEligible: eligibility.shEligible,
       shEligibleReason: eligibility.reason,
+      rulesVersion: eligibility.rulesVersion,
       isProvisional: eligibility.isProvisional,
       source: 'timer',
       isBackdated: date < todayInZone(env.timeZone, now),
