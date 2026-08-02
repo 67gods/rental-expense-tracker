@@ -8,6 +8,13 @@
       "when": 1785678493564,
       "tag": "0000_third_nick_fury",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785713872721,
+      "tag": "0001_workable_vindicator",
+      "breakpoints": true
     }
   ]
 }
