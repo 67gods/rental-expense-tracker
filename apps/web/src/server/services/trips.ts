@@ -3,6 +3,7 @@ import {
   buildTripDrafts,
   createTripSchema,
   isBackdated,
+  taxYearOf,
   taxYearRange,
   type CreateTripInput,
 } from '@rental/domain';
@@ -37,7 +38,9 @@ export interface TripResult {
 
 export async function createTrip(input: CreateTripInput): Promise<TripResult> {
   const data = createTripSchema.parse(input);
-  const drafts = buildTripDrafts(data);
+  // The trip's own date decides which year's rules the linked time entries are
+  // derived under - a 31 December drive stays in that year.
+  const drafts = buildTripDrafts(data, taxYearOf(data.date));
   const db = getDb();
   const backdated = isBackdated(data.date, new Date(), env.timeZone);
 

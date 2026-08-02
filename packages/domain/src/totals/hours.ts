@@ -8,7 +8,7 @@
  */
 
 import { getHourCategory, type HourCategoryId } from '../constants/hourCategories';
-import { DEFAULT_THRESHOLDS, type ThresholdSet } from '../constants/thresholds';
+import { thresholdsFor } from '../constants/thresholds';
 
 /** The minimum a rollup needs to know about a time entry. */
 export interface HoursRollupEntry {
@@ -139,12 +139,17 @@ export interface SafeHarborProgress extends HoursTotals {
 /**
  * Progress toward the documented-hours target for an enterprise (§5.4).
  * Returns both hour figures; the caller must render both (§10).
+ *
+ * The target is read for the given tax year rather than from a constant: it is
+ * a rule, and a rule that cannot say which year it belongs to is the bug the
+ * year-keyed threshold table exists to prevent.
  */
 export function safeHarborProgress(
   entries: readonly HoursRollupEntry[],
-  options: HoursRollupOptions & { thresholds?: ThresholdSet } = {},
+  taxYear: number,
+  options: HoursRollupOptions = {},
 ): SafeHarborProgress {
-  const thresholds = options.thresholds ?? DEFAULT_THRESHOLDS;
+  const thresholds = thresholdsFor(taxYear);
   const totals = rollUpHours(entries, options);
   const targetHours = thresholds.safeHarborHourTarget;
   const eligibleHours = minutesToHours(totals.eligibleMinutes);

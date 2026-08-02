@@ -4,6 +4,7 @@ import {
   isHourCategoryId,
   startTimerSchema,
   stopTimerSchema,
+  taxYearOf,
   todayInZone,
   type StartTimerInput,
   type StopTimerInput,
@@ -133,8 +134,11 @@ export async function stopTimer(
   // Deliberately not routed through createTimeEntry: eligibility still comes
   // from the shared rule, but the date must be the day the work STARTED, which
   // matters for a session that ran across midnight.
-  const eligibility = deriveShEligible({ category });
   const date = todayInZone(env.timeZone, timer.startedAt);
+  // Same reason the date is the start day: a timer started on 31 December and
+  // stopped on 1 January belongs to the year it started in, under that year's
+  // rules.
+  const eligibility = deriveShEligible({ category }, taxYearOf(date));
 
   const [entry] = await db
     .insert(timeEntries)

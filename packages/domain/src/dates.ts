@@ -67,11 +67,23 @@ export interface DateRange {
   end: string;
 }
 
-/** The full calendar year as an inclusive date range, for report filters. */
-export function taxYearRange(year: number): DateRange {
+/**
+ * Rejects anything that is not a usable four-digit tax year.
+ *
+ * Every rule in this package takes a tax year, so this is the one guard that
+ * stops `undefined` or a stray `0` arriving as a year and producing an answer
+ * that looks computed but means nothing.
+ */
+export function assertTaxYear(year: number): number {
   if (!Number.isInteger(year) || year < 1900 || year > 2999) {
     throw new DateError(`Not a usable tax year: ${year}`);
   }
+  return year;
+}
+
+/** The full calendar year as an inclusive date range, for report filters. */
+export function taxYearRange(year: number): DateRange {
+  assertTaxYear(year);
   return { start: `${year}-01-01`, end: `${year}-12-31` };
 }
 

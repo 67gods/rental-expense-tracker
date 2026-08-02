@@ -51,6 +51,7 @@ export async function getDashboardData(
       propertyId: e.propertyId,
       date: e.date,
     })),
+    taxYear,
     { excludedPropertyIds: excluded },
   );
 
@@ -80,7 +81,7 @@ export async function getDashboardData(
     ytdIncomeCents: sumCents(rentRows.map((r) => r.amountCents)),
     needsReviewCount,
     provisionalCount,
-    w9Warnings: contractorW9Warnings(contractorTotals, asOf),
+    w9Warnings: contractorW9Warnings(contractorTotals, asOf, taxYear),
     contractorTotals,
     excludedPropertyIds: excluded,
     taxYear,

@@ -1,12 +1,20 @@
 /**
- * Statutory thresholds used by the flagging rules.
+ * Statutory thresholds, keyed by tax year.
  *
- * These are the numbers the app compares against. It never decides what they
- * mean - a threshold being crossed produces a flag for the CPA, never an
- * automatic classification (brief §1, §5.3).
+ * These are the numbers the flagging rules compare against. The app never
+ * decides what they mean - a threshold being crossed produces a flag for the
+ * CPA, never an automatic classification (brief §1, §5.3).
  *
- * They are exposed as an overridable set rather than hard-coded at the call
- * site so a future year's figures can be supplied without editing rule code.
+ * WHY A YEAR DIMENSION
+ *
+ * A stored row holds a fact; a threshold is a rule, and a rule is only true for
+ * a year. The 1099-NEC / 1099-MISC reporting threshold was $600 through 2025
+ * and is $2,000 for payments made after 31 December 2025 under the One Big
+ * Beautiful Bill Act, indexed for inflation after that. A single global
+ * constant would have applied 2025's answer to 2026 silently and produced a
+ * wrong 1099 with nothing to indicate it.
+ *
+ * So every figure lives under a year, and `thresholdsFor` refuses to guess.
  */
 
 export interface ThresholdSet {
@@ -31,7 +39,17 @@ export interface ThresholdSet {
   w9WarningStartMonth: number;
 }
 
-export const DEFAULT_THRESHOLDS: ThresholdSet = {
+/**
+ * Bumped whenever any figure below changes or a rule's shape changes.
+ *
+ * Stamped onto derived values that are cached in the database, so a cache
+ * computed under an older rule set is detectable rather than believed. See
+ * `time_entries.rules_version`.
+ */
+export const RULES_VERSION = '2026.1';
+
+/** Figures shared by every year so far. Split out when one of them moves. */
+const COMMON = {
   safeHarborHourTarget: 250,
 
   deMinimisInvoiceCents: 250_000, // $2,500
@@ -41,13 +59,52 @@ export const DEFAULT_THRESHOLDS: ThresholdSet = {
   smallTaxpayerCapCents: 1_000_000, // $10,000
   smallTaxpayerGrossReceiptsLimitCents: 1_000_000_000, // $10,000,000
 
-  // The brief says "over $600". This uses at-or-above $600 instead, which flags
-  // a contractor sitting exactly on the line. Over-flagging costs a glance;
+  // The brief says "over $600". This uses at-or-above instead, which flags a
+  // contractor sitting exactly on the line. Over-flagging costs a glance;
   // under-flagging costs a missing 1099. Deliberate, and covered by a test.
-  w9ReportingThresholdCents: 60_000, // $600
-
   w9WarningStartMonth: 10, // October
+} as const;
+
+export const THRESHOLDS_BY_YEAR: Readonly<Record<number, ThresholdSet>> = {
+  2024: { ...COMMON, w9ReportingThresholdCents: 60_000 },
+  2025: { ...COMMON, w9ReportingThresholdCents: 60_000 }, // $600
+  2026: { ...COMMON, w9ReportingThresholdCents: 200_000 }, // $2,000 - OBBBA
+  2027: { ...COMMON, w9ReportingThresholdCents: 200_000 }, // pending indexation
 };
 
-/** Convenience alias for the most-referenced figure in the app. */
-export const SAFE_HARBOR_HOUR_TARGET = DEFAULT_THRESHOLDS.safeHarborHourTarget;
+export class UnknownTaxYearError extends Error {
+  override readonly name = 'UnknownTaxYearError';
+  constructor(public readonly taxYear: number) {
+    super(
+      `No thresholds recorded for tax year ${taxYear}. Add it to THRESHOLDS_BY_YEAR ` +
+        `in packages/domain/src/constants/thresholds.ts. This throws rather than ` +
+        `reusing an adjacent year, because silently applying the wrong year's ` +
+        `figure is the failure this table exists to prevent.`,
+    );
+  }
+}
+
+/**
+ * The thresholds in force for a tax year.
+ *
+ * Never falls back to the nearest year. A missing year is a gap in the app's
+ * knowledge, and guessing would produce a confident wrong number - which is
+ * worse than an error, because nobody checks a number that looks fine.
+ */
+export function thresholdsFor(taxYear: number): ThresholdSet {
+  const set = THRESHOLDS_BY_YEAR[taxYear];
+  if (!set) throw new UnknownTaxYearError(taxYear);
+  return set;
+}
+
+/** Whether figures have been recorded for a year, without throwing. */
+export function hasThresholdsFor(taxYear: number): boolean {
+  return Object.hasOwn(THRESHOLDS_BY_YEAR, taxYear);
+}
+
+/** Years covered, ascending. A test asserts this reaches at least next year. */
+export function knownTaxYears(): number[] {
+  return Object.keys(THRESHOLDS_BY_YEAR)
+    .map(Number)
+    .sort((a, b) => a - b);
+}

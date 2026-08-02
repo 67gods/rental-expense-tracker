@@ -50,7 +50,12 @@ export function TimeEntryForm({
         </p>
       ) : null}
 
-      <CategoryPicker defaultValue={defaults.category} />
+      {/* The year comes from the entry's own date, so an entry backdated into
+          last year is explained under last year's rules. */}
+      <CategoryPicker
+        defaultValue={defaults.category}
+        taxYear={Number(defaults.date.slice(0, 4))}
+      />
       <MinutePicker defaultValue={defaults.minutes} />
 
       <label className="field">

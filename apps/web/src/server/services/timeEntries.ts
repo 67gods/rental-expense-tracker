@@ -4,6 +4,7 @@ import {
   deriveShEligible,
   isBackdated,
   recomputeEligibilityForClassificationChange,
+  taxYearOf,
   taxYearRange,
   updateTimeEntrySchema,
   type CapitalClassification,
@@ -47,10 +48,16 @@ export async function createTimeEntry(
     ? await classificationOf(context.linkedExpenseId)
     : (data.linkedCapitalClassification ?? null);
 
-  const eligibility = deriveShEligible({
-    category: data.category,
-    linkedCapitalClassification: classification,
-  });
+  // The year comes from the entry's own date, never from today. Work done on
+  // 30 December and logged in January is judged under the rules of the year it
+  // happened in, which is the whole reason rules are keyed by year.
+  const eligibility = deriveShEligible(
+    {
+      category: data.category,
+      linkedCapitalClassification: classification,
+    },
+    taxYearOf(data.date),
+  );
 
   const now = new Date();
   const [row] = await db
@@ -90,12 +97,15 @@ export async function updateTimeEntry(input: UpdateTimeEntryInput): Promise<Time
     ? await classificationOf(existing.linkedExpenseId)
     : (data.linkedCapitalClassification ?? null);
 
-  const eligibility = deriveShEligible({
-    category,
-    linkedCapitalClassification: classification,
-  });
-
   const date = data.date ?? existing.date;
+
+  const eligibility = deriveShEligible(
+    {
+      category,
+      linkedCapitalClassification: classification,
+    },
+    taxYearOf(date),
+  );
 
   const [row] = await db
     .update(timeEntries)
@@ -180,6 +190,7 @@ export async function syncEligibilityForExpense(
   const linked = await db
     .select({
       id: timeEntries.id,
+      date: timeEntries.date,
       category: timeEntries.category,
       shEligible: timeEntries.shEligible,
       isProvisional: timeEntries.isProvisional,
@@ -189,7 +200,21 @@ export async function syncEligibilityForExpense(
 
   if (linked.length === 0) return 0;
 
-  const changes = recomputeEligibilityForClassificationChange(linked, classification);
+  // A single invoice can carry time entries from more than one year - an
+  // improvement started in December and finished in January is ordinary. Each
+  // entry is therefore recomputed under the rules of its own year rather than
+  // under one year picked for the whole batch.
+  const byYear = new Map<number, typeof linked>();
+  for (const entry of linked) {
+    const year = taxYearOf(entry.date);
+    const bucket = byYear.get(year);
+    if (bucket) bucket.push(entry);
+    else byYear.set(year, [entry]);
+  }
+
+  const changes = [...byYear.entries()].flatMap(([year, entries]) =>
+    recomputeEligibilityForClassificationChange(entries, classification, year),
+  );
   if (changes.length === 0) return 0;
 
   // Grouped into one statement per outcome rather than one per row: at most

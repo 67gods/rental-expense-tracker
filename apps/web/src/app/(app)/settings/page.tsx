@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { SAFE_HARBOR_HOUR_TARGET } from '@rental/domain';
+import { formatCents, RULES_VERSION, thresholdsFor } from '@rental/domain';
 import { requireUser } from '@/lib/session';
 import { runIntegrityChecks } from '@/db/integrity';
 
@@ -14,6 +14,7 @@ export const metadata = { title: 'Settings' };
 export default async function SettingsPage() {
   const user = await requireUser();
   const findings = await runIntegrityChecks();
+  const thresholds = thresholdsFor(user.taxYear);
 
   const errors = findings.filter((f) => f.severity === 'error');
   const warnings = findings.filter((f) => f.severity === 'warning');
@@ -43,10 +44,6 @@ export default async function SettingsPage() {
             <dd className="font-semibold">{user.timeZone}</dd>
           </div>
           <div className="flex justify-between gap-3">
-            <dt className="hint">Hours target</dt>
-            <dd className="tnum font-semibold">{SAFE_HARBOR_HOUR_TARGET}</dd>
-          </div>
-          <div className="flex justify-between gap-3">
             <dt className="hint">Signed in as</dt>
             <dd className="font-semibold">{user.email}</dd>
           </div>
@@ -55,6 +52,38 @@ export default async function SettingsPage() {
           Timezone decides what &ldquo;today&rdquo; and &ldquo;this tax year&rdquo; mean.
           It is set once at install, because changing it later would move entries near
           midnight between days. Set it with APP_TIMEZONE.
+        </p>
+      </section>
+
+      <section className="card card-pad">
+        <h2 className="section-title">Figures in force for {user.taxYear}</h2>
+        <dl className="mt-2 grid gap-2 text-sm">
+          <div className="flex justify-between gap-3">
+            <dt className="hint">Hours target</dt>
+            <dd className="tnum font-semibold">{thresholds.safeHarborHourTarget}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="hint">1099 reporting threshold</dt>
+            <dd className="tnum font-semibold">
+              {formatCents(thresholds.w9ReportingThresholdCents)}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="hint">De minimis per invoice</dt>
+            <dd className="tnum font-semibold">
+              {formatCents(thresholds.deMinimisInvoiceCents)}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="hint">Rule set</dt>
+            <dd className="tnum font-semibold">{RULES_VERSION}</dd>
+          </div>
+        </dl>
+        <p className="hint mt-3">
+          These belong to {user.taxYear} and are not carried into other years. The 1099
+          threshold was $600 through 2025 and is $2,000 from 2026, so a report run for a
+          past year applies that year&rsquo;s figure rather than today&rsquo;s. Your CPA
+          decides what any of it means; this app only records what happened.
         </p>
       </section>
 

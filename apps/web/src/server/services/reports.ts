@@ -291,7 +291,11 @@ export async function contractorCsv(taxYear: number): Promise<string> {
     taxYear,
   );
 
-  const needsW9 = new Set(contractorW9Warnings(totals, new Date()).map((w) => w.actorId));
+  // The report's own year, not the current one. Running the 2025 report in
+  // 2026 must apply 2025's $600 threshold, not 2026's $2,000.
+  const needsW9 = new Set(
+    contractorW9Warnings(totals, new Date(), taxYear).map((w) => w.actorId),
+  );
 
   return toCsv(totals, [
     { header: 'Contractor', value: (t) => t.name },

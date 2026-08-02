@@ -13,7 +13,14 @@ import { PropertyPicker, SubmitButton, type Option } from './Pickers';
  * did - and asking up front is friction at the exact moment the timer needs to
  * be easy to start.
  */
-export function TimerStartForm({ properties }: { properties: Option[] }) {
+export function TimerStartForm({
+  properties,
+  taxYear,
+}: {
+  properties: Option[];
+  /** A timer is always started now, so this is the current tax year. */
+  taxYear: number;
+}) {
   const [state, formAction] = useActionState(startTimerAction, EMPTY_FORM_STATE);
 
   return (
@@ -24,7 +31,7 @@ export function TimerStartForm({ properties }: { properties: Option[] }) {
         </p>
       ) : null}
 
-      <CategoryPicker />
+      <CategoryPicker taxYear={taxYear} />
       <PropertyPicker options={properties} />
 
       <label className="field">

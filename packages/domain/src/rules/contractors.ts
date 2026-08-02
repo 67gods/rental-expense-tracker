@@ -5,10 +5,15 @@
  * without a W-9 on file becomes a persistent dashboard warning from October
  * onward - late enough not to nag in the spring, early enough to still chase
  * the paperwork before year end.
+ *
+ * The threshold is read per tax year, never from a global default. It was $600
+ * through 2025 and is $2,000 for payments made after 31 December 2025 under
+ * OBBBA. Applying one year's figure to another year's payments is exactly how
+ * a household files a 1099 it did not owe, or misses one it did.
  */
 
 import { formatCents } from '../money';
-import { DEFAULT_THRESHOLDS, type ThresholdSet } from '../constants/thresholds';
+import { thresholdsFor } from '../constants/thresholds';
 
 export type ContractorWarningSeverity = 'info' | 'warning';
 
@@ -83,8 +88,12 @@ export function contractorYearTotals(
 export function contractorW9Warnings(
   totals: readonly ContractorYearTotal[],
   asOf: Date,
-  thresholds: ThresholdSet = DEFAULT_THRESHOLDS,
+  taxYear: number,
 ): ContractorWarning[] {
+  // No default argument. The reporting threshold moved from $600 to $2,000
+  // between 2025 and 2026, so a caller that does not say which year it means
+  // is a bug, and it should be a compile error rather than a quiet answer.
+  const thresholds = thresholdsFor(taxYear);
   const month = asOf.getMonth() + 1; // getMonth is zero-based
   const isPersistent = month >= thresholds.w9WarningStartMonth;
 
@@ -104,13 +113,13 @@ export function contractorW9Warnings(
     .sort((a, b) => b.paidCents - a.paidCents);
 }
 
-/** Whether a contractor's paid total has reached the reporting threshold. */
+/** Whether a contractor's paid total has reached that year's reporting threshold. */
 export function needsW9(
   paidCents: number,
   w9OnFile: boolean,
-  thresholds: ThresholdSet = DEFAULT_THRESHOLDS,
+  taxYear: number,
 ): boolean {
-  return !w9OnFile && paidCents >= thresholds.w9ReportingThresholdCents;
+  return !w9OnFile && paidCents >= thresholdsFor(taxYear).w9ReportingThresholdCents;
 }
 
 function yearOf(isoDate: string): number {

@@ -91,6 +91,8 @@ export interface TimeEntryDraft {
   shEligible: boolean;
   isProvisional: boolean;
   source: EntrySource;
+  /** The rule set the eligibility above was derived under. */
+  rulesVersion: string;
 }
 
 export interface TripDrafts {
@@ -105,7 +107,7 @@ export interface TripDrafts {
  * Builds the three drafts for one trip. The caller persists them in a single
  * transaction and links the two time entries back onto the trip row.
  */
-export function buildTripDrafts(input: TripInput): TripDrafts {
+export function buildTripDrafts(input: TripInput, taxYear: number): TripDrafts {
   if (!input.purpose?.trim()) {
     throw new TripError(
       'A mileage record needs a business purpose. "Trip to property" is not enough - say what you went to do.',
@@ -140,7 +142,7 @@ export function buildTripDrafts(input: TripInput): TripDrafts {
   if (driveMinutes > 0) {
     // Drive time is pinned to travel and is never eligible, regardless of what
     // the trip was for. Not a user choice.
-    const eligibility = deriveShEligible({ category: DRIVE_TIME_CATEGORY });
+    const eligibility = deriveShEligible({ category: DRIVE_TIME_CATEGORY }, taxYear);
     driveTime = {
       date: input.date,
       actorId: input.actorId,
@@ -152,6 +154,7 @@ export function buildTripDrafts(input: TripInput): TripDrafts {
       shEligible: eligibility.shEligible,
       isProvisional: false,
       source,
+      rulesVersion: eligibility.rulesVersion,
     };
   }
 
@@ -181,10 +184,13 @@ export function buildTripDrafts(input: TripInput): TripDrafts {
       );
     }
 
-    const eligibility = deriveShEligible({
-      category,
-      linkedCapitalClassification: input.linkedCapitalClassification ?? null,
-    });
+    const eligibility = deriveShEligible(
+      {
+        category,
+        linkedCapitalClassification: input.linkedCapitalClassification ?? null,
+      },
+      taxYear,
+    );
 
     onsiteTime = {
       date: input.date,
@@ -197,6 +203,7 @@ export function buildTripDrafts(input: TripInput): TripDrafts {
       shEligible: eligibility.shEligible,
       isProvisional: eligibility.isProvisional,
       source,
+      rulesVersion: eligibility.rulesVersion,
     };
   }
 

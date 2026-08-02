@@ -23,10 +23,18 @@ export function CategoryPicker({
   name = 'category',
   defaultValue,
   onChange,
+  taxYear,
 }: {
   name?: string;
   defaultValue?: string;
   onChange?: (categoryId: string) => void;
+  /**
+   * The year the work belongs to, which decides which rules the explanation
+   * below is stated under. Required rather than defaulted: a hint about
+   * eligibility that cannot say which year it means is a hint worth less than
+   * no hint at all.
+   */
+  taxYear: number;
 }) {
   const categories = useMemo(() => listHourCategories(), []);
   const [selected, setSelected] = useState<string>(defaultValue ?? '');
@@ -80,7 +88,7 @@ export function CategoryPicker({
 
       {selectedCategory ? (
         <p className="hint mt-2">
-          {deriveShEligible({ category: selectedCategory.id }).explanation}
+          {deriveShEligible({ category: selectedCategory.id }, taxYear).explanation}
         </p>
       ) : null}
     </div>

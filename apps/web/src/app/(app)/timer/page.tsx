@@ -33,6 +33,7 @@ export default async function TimerPage() {
 
       <TimerStartForm
         properties={properties.map((p) => ({ id: p.id, label: p.nickname }))}
+        taxYear={user.taxYear}
       />
     </div>
   );

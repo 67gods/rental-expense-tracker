@@ -3,12 +3,31 @@
  *
  * This is the single place eligibility is decided. Both clients call it; the
  * server calls it before writing; nothing else may set `sh_eligible`.
+ *
+ * WHY IT TAKES A TAX YEAR
+ *
+ * Eligibility is a rule, not a fact, and a rule is only true for a year. What a
+ * safe harbor counts as qualifying work can be amended, and a value derived
+ * under one year's reading must never be silently reused under another's. The
+ * year is threaded now, so the day a category's treatment changes it is a data
+ * edit here rather than a hunt through every call site.
+ *
+ * The result is also stamped with `RULES_VERSION`. Callers that cache it - the
+ * `sh_eligible` column exists precisely so lists do not recompute per row - can
+ * then tell a stale cache from a current one instead of trusting it.
+ *
+ * Deliberately does NOT call `thresholdsFor()`: a category's treatment is not a
+ * threshold, and blocking someone from logging their hours because nobody has
+ * filled in next year's figures yet would be a usability failure. Year coverage
+ * is enforced by a test, not by refusing the entry.
  */
 
 import {
   getHourCategory,
   type HourCategoryId,
 } from '../constants/hourCategories';
+import { RULES_VERSION } from '../constants/thresholds';
+import { assertTaxYear } from '../dates';
 import type { CapitalClassification } from '../types';
 
 export type EligibilityReason =
@@ -41,6 +60,8 @@ export interface EligibilityResult {
   isProvisional: boolean;
   /** Plain-language sentence for the UI. Contains no tax advice. */
   explanation: string;
+  /** The rule set this answer was derived under. Stamped onto cached copies. */
+  rulesVersion: string;
 }
 
 /**
@@ -52,7 +73,14 @@ export interface EligibilityResult {
  * own. Sourcing a contractor for a roof replacement is excluded; sourcing one
  * for a drywall patch is not. Same category, different answer.
  */
-export function deriveShEligible(input: EligibilityInput): EligibilityResult {
+export function deriveShEligible(
+  input: EligibilityInput,
+  taxYear: number,
+): EligibilityResult {
+  // Rejects 0, 12.5, and NaN. The year has to be a real one for the answer to
+  // mean anything, even though today every year reads the same table.
+  assertTaxYear(taxYear);
+
   // Throws on an unknown category rather than defaulting. A typo must not
   // silently produce a number that looks like a real hours total.
   const category = getHourCategory(input.category);
@@ -65,6 +93,7 @@ export function deriveShEligible(input: EligibilityInput): EligibilityResult {
       isProvisional: false,
       explanation:
         'Not counted as eligible: this time is linked to work classified as a capital improvement.',
+      rulesVersion: RULES_VERSION,
     };
   }
 
@@ -74,6 +103,7 @@ export function deriveShEligible(input: EligibilityInput): EligibilityResult {
       reason: 'category_not_eligible',
       isProvisional: false,
       explanation: `Not counted as eligible: "${category.label}" is logged but does not qualify.`,
+      rulesVersion: RULES_VERSION,
     };
   }
 
@@ -88,6 +118,7 @@ export function deriveShEligible(input: EligibilityInput): EligibilityResult {
     explanation: isProvisional
       ? `Counted as eligible for now: "${category.label}". The linked work still needs a repair-or-improvement answer, which could change this.`
       : `Counted as eligible: "${category.label}".`,
+    rulesVersion: RULES_VERSION,
   };
 }
 
@@ -101,19 +132,30 @@ export function recomputeEligibilityForClassificationChange<
 >(
   entries: readonly T[],
   newClassification: CapitalClassification | null,
-): { id: string; shEligible: boolean; isProvisional: boolean; reason: EligibilityReason }[] {
+  taxYear: number,
+): {
+  id: string;
+  shEligible: boolean;
+  isProvisional: boolean;
+  reason: EligibilityReason;
+  rulesVersion: string;
+}[] {
   const changed: {
     id: string;
     shEligible: boolean;
     isProvisional: boolean;
     reason: EligibilityReason;
+    rulesVersion: string;
   }[] = [];
 
   for (const entry of entries) {
-    const next = deriveShEligible({
-      category: entry.category,
-      linkedCapitalClassification: newClassification,
-    });
+    const next = deriveShEligible(
+      {
+        category: entry.category,
+        linkedCapitalClassification: newClassification,
+      },
+      taxYear,
+    );
     if (
       next.shEligible !== entry.shEligible ||
       next.isProvisional !== entry.isProvisional
@@ -123,6 +165,7 @@ export function recomputeEligibilityForClassificationChange<
         shEligible: next.shEligible,
         isProvisional: next.isProvisional,
         reason: next.reason,
+        rulesVersion: next.rulesVersion,
       });
     }
   }

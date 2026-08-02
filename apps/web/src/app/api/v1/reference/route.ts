@@ -1,9 +1,15 @@
 import {
+  COST_TREATMENTS,
+  CPA_FIGURE_KINDS,
   DESTINATION_KINDS,
+  DOCUMENT_SOURCES,
   listHourCategories,
   listScheduleECategories,
+  PAYMENT_METHODS,
+  PLACED_IN_SERVICE_EVIDENCE,
+  RECONCILIATION_KINDS,
   RENT_SOURCES,
-  SAFE_HARBOR_HOUR_TARGET,
+  thresholdsFor,
 } from '@rental/domain';
 import { ok, route } from '@/server/http';
 import {
@@ -47,6 +53,16 @@ export const GET = route(async (user) => {
     scheduleECategories: listScheduleECategories(),
     destinationKinds: DESTINATION_KINDS,
     rentSources: RENT_SOURCES,
-    safeHarborHourTarget: SAFE_HARBOR_HOUR_TARGET,
+    documentSources: DOCUMENT_SOURCES,
+    paymentMethods: PAYMENT_METHODS,
+    placedInServiceEvidence: PLACED_IN_SERVICE_EVIDENCE,
+    cpaFigureKinds: CPA_FIGURE_KINDS,
+    reconciliationKinds: RECONCILIATION_KINDS,
+    costTreatments: COST_TREATMENTS,
+    // Sent as the whole set for the user's year rather than one bare number.
+    // A client that caches this offline must cache the year alongside it, or it
+    // will happily apply a stale threshold on 1 January.
+    taxYearThresholds: thresholdsFor(user.taxYear),
+    safeHarborHourTarget: thresholdsFor(user.taxYear).safeHarborHourTarget,
   });
 });

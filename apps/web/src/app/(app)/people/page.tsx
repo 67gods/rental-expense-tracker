@@ -40,7 +40,9 @@ export default async function PeoplePage() {
     user.taxYear,
   );
   const totalsById = new Map(totals.map((t) => [t.actorId, t]));
-  const warned = new Set(contractorW9Warnings(totals, new Date()).map((w) => w.actorId));
+  const warned = new Set(
+    contractorW9Warnings(totals, new Date(), user.taxYear).map((w) => w.actorId),
+  );
 
   const people = actors.filter((a) => a.type !== 'contractor');
 

@@ -92,10 +92,13 @@ describe('§5.4 hours on excluded properties', () => {
 
 describe('§5.4 progress toward the documented-hours target', () => {
   it('measures eligible hours against the target, not total hours', () => {
-    const progress = safeHarborProgress([
-      entry({ minutes: 200 * 60, shEligible: true }),
-      entry({ minutes: 100 * 60, category: 'travel', shEligible: false }),
-    ]);
+    const progress = safeHarborProgress(
+      [
+        entry({ minutes: 200 * 60, shEligible: true }),
+        entry({ minutes: 100 * 60, category: 'travel', shEligible: false }),
+      ],
+      2025,
+    );
 
     expect(progress.totalHours).toBe(300);
     expect(progress.eligibleHours).toBe(200);
@@ -106,7 +109,7 @@ describe('§5.4 progress toward the documented-hours target', () => {
   });
 
   it('marks the target met and stops counting past 100 percent', () => {
-    const progress = safeHarborProgress([entry({ minutes: 300 * 60 })]);
+    const progress = safeHarborProgress([entry({ minutes: 300 * 60 })], 2025);
     expect(progress.targetMet).toBe(true);
     expect(progress.pctOfTarget).toBe(100);
     expect(progress.remainingHours).toBe(0);
@@ -115,9 +118,10 @@ describe('§5.4 progress toward the documented-hours target', () => {
   });
 
   it('does not reach the target on ineligible hours alone', () => {
-    const progress = safeHarborProgress([
-      entry({ minutes: 400 * 60, category: 'capital_improvement', shEligible: false }),
-    ]);
+    const progress = safeHarborProgress(
+      [entry({ minutes: 400 * 60, category: 'capital_improvement', shEligible: false })],
+      2025,
+    );
     expect(progress.totalHours).toBe(400);
     expect(progress.eligibleHours).toBe(0);
     expect(progress.targetMet).toBe(false);

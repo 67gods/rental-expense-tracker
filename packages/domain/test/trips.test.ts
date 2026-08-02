@@ -9,6 +9,11 @@ import {
 } from '../src/rules/trips';
 import type { DestinationKind } from '../src/types';
 
+/** Trip mechanics do not vary by year; the year is bound once here. */
+const TAX_YEAR = 2025;
+const build = (input: Parameters<typeof buildTripDrafts>[0]) =>
+  buildTripDrafts(input, TAX_YEAR);
+
 const trip = (over: Partial<TripInput> = {}): TripInput => ({
   date: '2026-03-14',
   actorId: 'actor-1',
@@ -24,7 +29,7 @@ const trip = (over: Partial<TripInput> = {}): TripInput => ({
 
 describe('§5.5 a trip produces up to three linked records', () => {
   it('produces mileage, drive time, and on-site time', () => {
-    const drafts = buildTripDrafts(
+    const drafts = build(
       trip({
         driveMinutes: 40,
         onsiteMinutes: 75,
@@ -38,13 +43,13 @@ describe('§5.5 a trip produces up to three linked records', () => {
   });
 
   it('always logs drive time as travel and never as eligible', () => {
-    const drafts = buildTripDrafts(trip({ driveMinutes: 40 }));
+    const drafts = build(trip({ driveMinutes: 40 }));
     expect(drafts.driveTime?.category).toBe('travel');
     expect(drafts.driveTime?.shEligible).toBe(false);
   });
 
   it('keeps the productive on-site time eligible and separate from the drive', () => {
-    const drafts = buildTripDrafts(
+    const drafts = build(
       trip({
         driveMinutes: 40,
         onsiteMinutes: 75,
@@ -58,18 +63,18 @@ describe('§5.5 a trip produces up to three linked records', () => {
   });
 
   it('omits drive time when none was recorded', () => {
-    const drafts = buildTripDrafts(trip({ driveMinutes: 0 }));
+    const drafts = build(trip({ driveMinutes: 0 }));
     expect(drafts.driveTime).toBeNull();
   });
 
   it('omits on-site time when the stop had none worth logging', () => {
-    const drafts = buildTripDrafts(trip({ driveMinutes: 30, onsiteMinutes: null }));
+    const drafts = build(trip({ driveMinutes: 30, onsiteMinutes: null }));
     expect(drafts.onsiteTime).toBeNull();
     expect(drafts.mileage).toBeTruthy();
   });
 
   it('carries the trip purpose into the drive-time description', () => {
-    const drafts = buildTripDrafts(trip({ driveMinutes: 30 }));
+    const drafts = build(trip({ driveMinutes: 30 }));
     expect(drafts.driveTime?.description).toContain('Replace the kitchen faucet washer');
     expect(drafts.driveTime?.description).toContain('Maple St');
   });
@@ -81,7 +86,7 @@ describe('§5.5 a hardware store stop never defaults to travel', () => {
   });
 
   it('produces eligible on-site time for a hardware store run', () => {
-    const drafts = buildTripDrafts(
+    const drafts = build(
       trip({
         destination: 'Home Depot',
         destinationKind: 'hardware_store',
@@ -110,7 +115,7 @@ describe('§5.5 a hardware store stop never defaults to travel', () => {
   it('refuses to guess for an unclassified destination', () => {
     expect(defaultOnsiteCategory('other')).toBeNull();
     expect(() =>
-      buildTripDrafts(
+      build(
         trip({
           destinationKind: 'other' as DestinationKind,
           onsiteMinutes: 30,
@@ -122,7 +127,7 @@ describe('§5.5 a hardware store stop never defaults to travel', () => {
 
   it('rejects on-site time logged as travel, which would discard eligible work', () => {
     expect(() =>
-      buildTripDrafts(
+      build(
         trip({
           onsiteMinutes: 30,
           onsiteCategory: 'travel',
@@ -133,7 +138,7 @@ describe('§5.5 a hardware store stop never defaults to travel', () => {
   });
 
   it('lets the user override the default category', () => {
-    const drafts = buildTripDrafts(
+    const drafts = build(
       trip({
         destinationKind: 'hardware_store',
         onsiteMinutes: 20,
@@ -147,7 +152,7 @@ describe('§5.5 a hardware store stop never defaults to travel', () => {
 
 describe('§5.2 applies to on-site time too', () => {
   it('excludes on-site time linked to a capital improvement', () => {
-    const drafts = buildTripDrafts(
+    const drafts = build(
       trip({
         onsiteMinutes: 90,
         onsiteDescription: 'Walked the roof with the contractor',
@@ -158,7 +163,7 @@ describe('§5.2 applies to on-site time too', () => {
   });
 
   it('marks on-site time provisional while the work is unclassified', () => {
-    const drafts = buildTripDrafts(
+    const drafts = build(
       trip({
         onsiteMinutes: 90,
         onsiteDescription: 'Assessed the water damage',
@@ -172,28 +177,28 @@ describe('§5.2 applies to on-site time too', () => {
 
 describe('§5.5 a mileage record must be defensible', () => {
   it('requires a business purpose', () => {
-    expect(() => buildTripDrafts(trip({ purpose: '   ' }))).toThrow(TripError);
-    expect(() => buildTripDrafts(trip({ purpose: '' }))).toThrow(/business purpose/);
+    expect(() => build(trip({ purpose: '   ' }))).toThrow(TripError);
+    expect(() => build(trip({ purpose: '' }))).toThrow(/business purpose/);
   });
 
   it('requires a start and a destination', () => {
-    expect(() => buildTripDrafts(trip({ origin: '' }))).toThrow(/starting point/);
-    expect(() => buildTripDrafts(trip({ destination: '' }))).toThrow(/destination/);
+    expect(() => build(trip({ origin: '' }))).toThrow(/starting point/);
+    expect(() => build(trip({ destination: '' }))).toThrow(/destination/);
   });
 
   it('requires positive miles', () => {
-    expect(() => buildTripDrafts(trip({ miles: 0 }))).toThrow(/positive/);
-    expect(() => buildTripDrafts(trip({ miles: -5 }))).toThrow(/positive/);
+    expect(() => build(trip({ miles: 0 }))).toThrow(/positive/);
+    expect(() => build(trip({ miles: -5 }))).toThrow(/positive/);
   });
 
   it('requires a description for on-site time - a category alone is not a record', () => {
     expect(() =>
-      buildTripDrafts(trip({ onsiteMinutes: 60, onsiteDescription: '  ' })),
+      build(trip({ onsiteMinutes: 60, onsiteDescription: '  ' })),
     ).toThrow(/Describe what you did/);
   });
 
   it('trims stray whitespace out of the stored record', () => {
-    const drafts = buildTripDrafts(
+    const drafts = build(
       trip({ origin: '  Home  ', destination: ' Maple St ', purpose: ' Fix sink ' }),
     );
     expect(drafts.mileage.origin).toBe('Home');

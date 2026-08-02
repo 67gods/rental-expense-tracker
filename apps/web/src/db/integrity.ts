@@ -14,6 +14,7 @@ import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import {
   deriveShEligible,
   evaluateEnterpriseComposition,
+  taxYearOf,
   validateEnterpriseComposition,
 } from '@rental/domain';
 import { getDb } from './client';
@@ -64,6 +65,7 @@ export async function runIntegrityChecks(): Promise<IntegrityFinding[]> {
   const entries = await db
     .select({
       id: timeEntries.id,
+      date: timeEntries.date,
       category: timeEntries.category,
       shEligible: timeEntries.shEligible,
       linkedExpenseId: timeEntries.linkedExpenseId,
@@ -75,7 +77,14 @@ export async function runIntegrityChecks(): Promise<IntegrityFinding[]> {
   let unknownCategory = 0;
   for (const entry of entries) {
     try {
-      if (deriveShEligible({ category: entry.category }).shEligible !== entry.shEligible) {
+      // Re-derived under the rules of the entry's own year. Checking a 2025 row
+      // against 2026's rules would report drift that is not drift, and would
+      // train the reader to ignore this finding.
+      const current = deriveShEligible(
+        { category: entry.category },
+        taxYearOf(entry.date),
+      );
+      if (current.shEligible !== entry.shEligible) {
         mismatched += 1;
       }
     } catch {
