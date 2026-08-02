@@ -1,0 +1,152 @@
+'use client';
+
+import { useActionState, useState } from 'react';
+import { useFormStatus } from 'react-dom';
+import { getScheduleECategory, listScheduleECategories } from '@rental/domain';
+import { saveExpenseAction } from '@/app/actions/capture';
+import { EMPTY_FORM_STATE } from '@/app/actions/timeEntries';
+import { ReceiptUpload } from './ReceiptUpload';
+import { ActorPicker, PropertyPicker, SelectField, SubmitButton, type Option } from './Pickers';
+
+/**
+ * Expense entry.
+ *
+ * The repair-versus-improvement prompt that §5.3 describes is milestone 2. What
+ * this form does now is flag - honestly - which lines will need that answer, so
+ * the user knows an entry is not finished rather than believing it is.
+ */
+export function ExpenseForm({
+  today,
+  actorId,
+  properties,
+  people,
+  contractors,
+}: {
+  today: string;
+  actorId: string;
+  properties: Option[];
+  people: Option[];
+  contractors: Option[];
+}) {
+  const [state, formAction] = useActionState(saveExpenseAction, EMPTY_FORM_STATE);
+  const [category, setCategory] = useState('');
+
+  const needsClassification = category
+    ? safeTriggersPrompt(category)
+    : false;
+
+  return (
+    <form action={formAction} className="grid gap-1">
+      {state.message ? (
+        <p role="alert" className="error-text mb-2">
+          {state.message}
+        </p>
+      ) : null}
+
+      <label className="field">
+        <span className="label">How much?</span>
+        <input
+          className="input tnum"
+          name="amount"
+          inputMode="decimal"
+          autoComplete="off"
+          placeholder="124.99"
+          required
+        />
+        {state.fields?.amount ? <span className="error-text">{state.fields.amount}</span> : null}
+      </label>
+
+      <label className="field">
+        <span className="label">Paid to</span>
+        <input
+          className="input"
+          name="vendor"
+          required
+          maxLength={200}
+          placeholder="Home Depot"
+          autoComplete="off"
+        />
+      </label>
+
+      <div className="field">
+        <label className="label" htmlFor="scheduleECategory">
+          Which Schedule E line?
+        </label>
+        <select
+          id="scheduleECategory"
+          className="select"
+          name="scheduleECategory"
+          required
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+        >
+          <option value="">Choose…</option>
+          {listScheduleECategories().map((line) => (
+            <option key={line.id} value={line.id}>
+              {line.line}. {line.label}
+            </option>
+          ))}
+        </select>
+        {category ? <span className="hint">{safeHelper(category)}</span> : null}
+        {needsClassification ? (
+          <p className="hint mt-2 rounded-lg border border-[color:var(--color-flag-500)] bg-[color:var(--color-flag-50)] p-2.5 text-[color:var(--color-flag-700)]">
+            This is spend on physical work, so it needs a repair-or-improvement
+            answer before year end. It will sit in the review list until then.
+          </p>
+        ) : null}
+      </div>
+
+      <PropertyPicker
+        options={properties}
+        label="Which property?"
+        allowNone={false}
+        required
+      />
+
+      <SelectField
+        name="contractorActorId"
+        label="Paid a contractor? (optional)"
+        options={contractors}
+        placeholder="Not a contractor"
+        hint="Naming them here keeps their yearly total running, so the W-9 warning can fire before October."
+      />
+
+      <ReceiptUpload />
+
+      <label className="field">
+        <span className="label">When?</span>
+        <input className="input" type="date" name="date" defaultValue={today} required />
+      </label>
+
+      <label className="field">
+        <span className="label">Notes (optional)</span>
+        <textarea className="textarea" name="notes" maxLength={2000} />
+      </label>
+
+      <ActorPicker options={people} defaultValue={actorId} />
+
+      <Submit />
+    </form>
+  );
+}
+
+function Submit() {
+  const { pending } = useFormStatus();
+  return <SubmitButton pending={pending}>Save expense</SubmitButton>;
+}
+
+function safeTriggersPrompt(id: string): boolean {
+  try {
+    return getScheduleECategory(id).triggersCapitalPrompt;
+  } catch {
+    return false;
+  }
+}
+
+function safeHelper(id: string): string {
+  try {
+    return getScheduleECategory(id).helper;
+  } catch {
+    return '';
+  }
+}
