@@ -89,12 +89,12 @@ export const createTimeEntrySchema = z.object({
   linkedCapitalClassification: capitalClassificationSchema.nullable().optional().default(null),
   source: z.enum(['manual', 'timer', 'geofence', 'imported']).optional().default('manual'),
 });
-export type CreateTimeEntryInput = z.infer<typeof createTimeEntrySchema>;
+export type CreateTimeEntryInput = z.input<typeof createTimeEntrySchema>;
 
 export const updateTimeEntrySchema = createTimeEntrySchema.partial().extend({
   id: uuid,
 });
-export type UpdateTimeEntryInput = z.infer<typeof updateTimeEntrySchema>;
+export type UpdateTimeEntryInput = z.input<typeof updateTimeEntrySchema>;
 
 // --- Expenses --------------------------------------------------------------
 
@@ -130,7 +130,7 @@ export const createExpenseSchema = z
     message: 'Pick a property, or set up a split across several.',
     path: ['propertyId'],
   });
-export type CreateExpenseInput = z.infer<typeof createExpenseSchema>;
+export type CreateExpenseInput = z.input<typeof createExpenseSchema>;
 
 export const updateExpenseSchema = z.object({
   id: uuid,
@@ -148,7 +148,7 @@ export const updateExpenseSchema = z.object({
   notes: optionalText(),
   allocationRule: allocationRuleSchema.nullable().optional(),
 });
-export type UpdateExpenseInput = z.infer<typeof updateExpenseSchema>;
+export type UpdateExpenseInput = z.input<typeof updateExpenseSchema>;
 
 // --- Rent income -----------------------------------------------------------
 
@@ -160,7 +160,7 @@ export const createRentReceiptSchema = z.object({
   source: rentSourceSchema.optional().default('property_manager'),
   notes: optionalText(),
 });
-export type CreateRentReceiptInput = z.infer<typeof createRentReceiptSchema>;
+export type CreateRentReceiptInput = z.input<typeof createRentReceiptSchema>;
 
 export const updateRentReceiptSchema = createRentReceiptSchema.partial().extend({
   id: uuid,
@@ -188,7 +188,7 @@ export const createTripSchema = z.object({
   linkedCapitalClassification: capitalClassificationSchema.nullable().optional().default(null),
   source: z.enum(['manual', 'timer', 'geofence', 'imported']).optional().default('manual'),
 });
-export type CreateTripInput = z.infer<typeof createTripSchema>;
+export type CreateTripInput = z.input<typeof createTripSchema>;
 
 // --- Properties, enterprises, actors ---------------------------------------
 
@@ -209,7 +209,7 @@ export const createPropertySchema = z.object({
   isTripleNet: z.boolean().optional().default(false),
   hadPersonalUse: z.boolean().optional().default(false),
 });
-export type CreatePropertyInput = z.infer<typeof createPropertySchema>;
+export type CreatePropertyInput = z.input<typeof createPropertySchema>;
 
 export const updatePropertySchema = createPropertySchema.partial().extend({ id: uuid });
 
@@ -221,7 +221,7 @@ export const createActorSchema = z.object({
   taxIdCollected: z.boolean().optional().default(false),
   notes: optionalText(),
 });
-export type CreateActorInput = z.infer<typeof createActorSchema>;
+export type CreateActorInput = z.input<typeof createActorSchema>;
 
 export const updateActorSchema = createActorSchema.partial().extend({ id: uuid });
 
@@ -234,7 +234,7 @@ export const startTimerSchema = z.object({
   category: hourCategorySchema,
   description: z.string().trim().max(1000).optional().default(''),
 });
-export type StartTimerInput = z.infer<typeof startTimerSchema>;
+export type StartTimerInput = z.input<typeof startTimerSchema>;
 
 export const stopTimerSchema = z.object({
   id: uuid,
@@ -247,7 +247,7 @@ export const stopTimerSchema = z.object({
   category: hourCategorySchema.optional(),
   propertyId: uuid.nullable().optional(),
 });
-export type StopTimerInput = z.infer<typeof stopTimerSchema>;
+export type StopTimerInput = z.input<typeof stopTimerSchema>;
 
 // --- Reports ---------------------------------------------------------------
 
