@@ -21,6 +21,10 @@ export * from './rules/enterprise';
 export * from './rules/allocation';
 export * from './rules/contractors';
 export * from './rules/trips';
+export * from './rules/payments';
+export * from './rules/placedInService';
+export * from './rules/reconciliation';
+export * from './rules/jobs';
 
 export * from './totals/hours';
 
