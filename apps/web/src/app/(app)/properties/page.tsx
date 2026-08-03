@@ -1,7 +1,12 @@
 import Link from 'next/link';
 import { evaluatePropertyMembership, formatCents } from '@rental/domain';
 import { requireUser } from '@/lib/session';
-import { listProperties, toDomainProperties } from '@/server/services/reference';
+import {
+  currentManagers,
+  listProperties,
+  listPropertyManagers,
+  toDomainProperties,
+} from '@/server/services/reference';
 import { PropertyForm } from '@/components/PropertyForm';
 
 export const metadata = { title: 'Properties' };
@@ -13,8 +18,13 @@ export default async function PropertiesPage({
 }) {
   const user = await requireUser();
   const params = await searchParams;
-  const properties = await listProperties();
+  const [properties, managerActors, managers] = await Promise.all([
+    listProperties(),
+    listPropertyManagers(),
+    currentManagers(),
+  ]);
   const domain = toDomainProperties(properties);
+  const managerNames = new Map(managerActors.map((a) => [a.id, a.name]));
 
   return (
     <div className="grid gap-4">
@@ -40,15 +50,26 @@ export default async function PropertiesPage({
               },
             );
 
+            // The open management period wins over the boolean when there is
+            // one. `is_self_managed` is still the answer for a property whose
+            // arrangement has never changed and so has no periods at all.
+            const managerActorId = managers.get(property.id);
+            const managerName = managerActorId ? managerNames.get(managerActorId) : null;
+
             return (
               <li key={property.id} className="row">
                 <div className="row-main">
                   <p className="row-title">{property.nickname}</p>
                   <p className="row-meta">{property.address}</p>
                   <p className="mt-1 flex flex-wrap gap-1.5">
-                    {property.isSelfManaged ? (
+                    {managerName ? (
+                      <span className="badge badge-not-eligible">Managed by {managerName}</span>
+                    ) : property.isSelfManaged ? (
                       <span className="badge badge-not-eligible">Self-managed</span>
                     ) : null}
+                    {property.placedInServiceDate ? null : (
+                      <span className="badge badge-flag">No in-service date</span>
+                    )}
                     {membership.included ? null : (
                       <span className="badge badge-flag">Outside the enterprise this year</span>
                     )}
@@ -88,7 +109,10 @@ export default async function PropertiesPage({
       <details className="card card-pad" open={properties.length === 0 || params.add === '1'}>
         <summary className="cursor-pointer text-sm font-semibold">Add a property</summary>
         <div className="mt-4">
-          <PropertyForm enterpriseId={user.enterprise.id} />
+          <PropertyForm
+            enterpriseId={user.enterprise.id}
+            managers={managerActors.map((a) => ({ id: a.id, name: a.name }))}
+          />
         </div>
       </details>
     </div>

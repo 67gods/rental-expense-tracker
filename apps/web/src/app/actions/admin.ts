@@ -1,7 +1,11 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { parseAmountToCents } from '@rental/domain';
+import {
+  parseAmountToCents,
+  PLACED_IN_SERVICE_EVIDENCE,
+  type PlacedInServiceEvidence,
+} from '@rental/domain';
 import { requireUser } from '@/lib/session';
 import { toErrorPayload } from '@/server/errors';
 import {
@@ -22,19 +26,29 @@ export async function savePropertyAction(
     const user = await requireUser();
     const id = str(formData, 'id');
 
-    let unadjustedBasisCents = 0;
-    const basisRaw = str(formData, 'unadjustedBasis');
-    if (basisRaw) {
-      try {
-        unadjustedBasisCents = parseAmountToCents(basisRaw);
-      } catch (error) {
-        return {
-          ok: false,
-          message: error instanceof Error ? error.message : 'Check the basis figure.',
-          fields: { unadjustedBasis: 'Check this' },
-        };
-      }
+    // Every money box is parsed before anything is written, and all the
+    // complaints come back at once. Reporting them one at a time would mean
+    // three round trips to fix three typos in a section entered once a decade.
+    const money = new MoneyFields(formData);
+    const unadjustedBasisCents = money.optional('unadjustedBasis') ?? 0;
+    const purchasePriceCents = money.optional('purchasePrice');
+    const closingCostsCents = money.optional('closingCosts');
+    const landValueCents = money.optional('landValue');
+    const fmvAtConversionCents = money.optional('fmvAtConversion');
+    const salePriceCents = money.optional('salePrice');
+
+    if (money.hasErrors) {
+      return {
+        ok: false,
+        message: 'Check the amounts marked below. Nothing else on the form is a problem.',
+        fields: money.errors,
+      };
     }
+
+    // 'self' is how the dropdown says "no manager" without inventing a uuid.
+    // The service turns it into a null manager on a new period; the boolean is
+    // set here as well so the property row is right even before that runs.
+    const managedByActorId = str(formData, 'managedByActorId') || 'self';
 
     const payload = {
       enterpriseId: str(formData, 'enterpriseId') || user.enterprise.id,
@@ -43,11 +57,29 @@ export async function savePropertyAction(
       acquiredDate: str(formData, 'acquiredDate') || null,
       unadjustedBasisCents,
       ownershipPct: Number(str(formData, 'ownershipPct') || '100'),
-      isSelfManaged: formData.get('isSelfManaged') === 'on',
+      isSelfManaged: managedByActorId === 'self',
+      managedByActorId,
       // §5.4: either of these removes the property from its enterprise for the
       // year, so they are plain checkboxes on the record rather than buried.
       isTripleNet: formData.get('isTripleNet') === 'on',
       hadPersonalUse: formData.get('hadPersonalUse') === 'on',
+
+      // Purchase and CPA details. All optional, and none of it can block the
+      // save - a property with a nickname and an address is a valid property,
+      // and a half-remembered land value must never be the reason one does not
+      // get created.
+      placedInServiceDate: str(formData, 'placedInServiceDate') || null,
+      placedInServiceEvidence: evidence(str(formData, 'placedInServiceEvidence')),
+      firstTenantDate: str(formData, 'firstTenantDate') || null,
+      purchasePriceCents,
+      closingCostsCents,
+      landValueCents,
+      wasPersonalResidence: formData.get('wasPersonalResidence') === 'on',
+      convertedToRentalDate: str(formData, 'convertedToRentalDate') || null,
+      fmvAtConversionCents,
+      soldDate: str(formData, 'soldDate') || null,
+      salePriceCents,
+      section469Activity: str(formData, 'section469Activity') || null,
     };
 
     if (id) {
@@ -57,12 +89,48 @@ export async function savePropertyAction(
     }
 
     revalidatePath('/properties');
+    if (id) revalidatePath(`/properties/${id}`);
     revalidatePath('/');
     return { ok: true, saved: id ? 'Property updated.' : 'Property added.' };
   } catch (error) {
     const payload = toErrorPayload(error);
     return { ok: false, message: payload.message, fields: payload.fields };
   }
+}
+
+/**
+ * Parses the optional money boxes, collecting every complaint before failing.
+ *
+ * An empty box reads as null, not zero. "Not recorded" and "recorded as
+ * nothing" are different facts, and a land value of $0 would be a claim the
+ * owner never made.
+ */
+class MoneyFields {
+  readonly errors: Record<string, string> = {};
+
+  constructor(private readonly formData: FormData) {}
+
+  get hasErrors(): boolean {
+    return Object.keys(this.errors).length > 0;
+  }
+
+  optional(key: string): number | null {
+    const raw = str(this.formData, key);
+    if (!raw) return null;
+    try {
+      return parseAmountToCents(raw);
+    } catch (error) {
+      this.errors[key] = error instanceof Error ? error.message : 'Check this figure.';
+      return null;
+    }
+  }
+}
+
+/** Blank means "not recorded", which the schema wants as null rather than ''. */
+function evidence(value: string): PlacedInServiceEvidence | null {
+  return PLACED_IN_SERVICE_EVIDENCE.some((option) => option.id === value)
+    ? (value as PlacedInServiceEvidence)
+    : null;
 }
 
 export async function saveActorAction(

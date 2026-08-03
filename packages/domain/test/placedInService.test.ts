@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   costTreatmentFor,
   costTreatmentLabel,
+  propertyDateProblems,
   splitByCostTreatment,
 } from '../src/rules/placedInService';
 
@@ -108,5 +109,67 @@ describe('splitByCostTreatment', () => {
     const { operating, acquisition } = splitByCostTreatment([], PLACED_IN_SERVICE);
     expect(operating).toEqual([]);
     expect(acquisition).toEqual([]);
+  });
+});
+
+describe('property dates that cannot all be true', () => {
+  it('accepts the ordinary shape: bought, then made available', () => {
+    expect(
+      propertyDateProblems({
+        acquiredDate: '2025-11-17',
+        placedInServiceDate: '2025-12-02',
+      }),
+    ).toEqual([]);
+  });
+
+  it('refuses a property listed for rent before it was owned', () => {
+    const problems = propertyDateProblems({
+      acquiredDate: '2025-11-17',
+      placedInServiceDate: '2025-10-01',
+    });
+    expect(problems).toHaveLength(1);
+    expect(problems[0]?.field).toBe('placedInServiceDate');
+  });
+
+  it('allows exactly that on a property that was a home first', () => {
+    expect(
+      propertyDateProblems({
+        acquiredDate: '2025-11-17',
+        placedInServiceDate: '2025-10-01',
+        wasPersonalResidence: true,
+      }),
+    ).toEqual([]);
+  });
+
+  it('refuses a sale before the purchase', () => {
+    const problems = propertyDateProblems({
+      acquiredDate: '2025-11-17',
+      soldDate: '2025-06-01',
+    });
+    expect(problems.map((p) => p.field)).toEqual(['soldDate']);
+  });
+
+  it('reports both at once rather than stopping at the first', () => {
+    const problems = propertyDateProblems({
+      acquiredDate: '2025-11-17',
+      placedInServiceDate: '2025-10-01',
+      soldDate: '2025-06-01',
+    });
+    expect(problems.map((p) => p.field).sort()).toEqual(['placedInServiceDate', 'soldDate']);
+  });
+
+  it('says nothing when the dates it compares are missing', () => {
+    expect(propertyDateProblems({})).toEqual([]);
+    expect(propertyDateProblems({ placedInServiceDate: '2025-12-02' })).toEqual([]);
+    expect(propertyDateProblems({ acquiredDate: '2025-11-17' })).toEqual([]);
+  });
+
+  it('accepts the same day for both - available the day it was bought', () => {
+    expect(
+      propertyDateProblems({
+        acquiredDate: '2025-11-17',
+        placedInServiceDate: '2025-11-17',
+      }),
+    ).toEqual([]);
   });
 });

@@ -6,6 +6,7 @@ import {
   createRentReceiptSchema,
   evaluateEnterpriseComposition,
   isBackdated,
+  propertyDateProblems,
   taxYearRange,
   todayInZone,
   updateActorSchema,
@@ -136,6 +137,24 @@ export async function updateProperty(
 
   // `undefined` means "not sent in this patch, keep it"; `null` means "cleared".
   const keep = <T>(sent: T | undefined, current: T): T => (sent === undefined ? current : sent);
+
+  // The same date checks the create schema runs, asked again over the merged
+  // result. A partial schema cannot ask them: a patch that moves only the
+  // acquisition date never sees the in-service date it might now contradict.
+  // Without this, create refuses a date pair that update accepts.
+  const problems = propertyDateProblems({
+    acquiredDate: keep(data.acquiredDate, existing.acquiredDate),
+    placedInServiceDate: keep(data.placedInServiceDate, existing.placedInServiceDate),
+    soldDate: keep(data.soldDate, existing.soldDate),
+    wasPersonalResidence: data.wasPersonalResidence ?? existing.wasPersonalResidence,
+  });
+  if (problems.length > 0) {
+    const first = problems[0]!;
+    throw new ValidationError(
+      first.message,
+      Object.fromEntries(problems.map((p) => [p.field, p.message])),
+    );
+  }
 
   const [row] = await getDb()
     .update(properties)
@@ -335,6 +354,27 @@ export async function listPeople(): Promise<Actor[]> {
     .select()
     .from(actors)
     .where(and(eq(actors.isArchived, false), ne(actors.type, 'contractor')))
+    .orderBy(asc(actors.name));
+}
+
+/**
+ * Who can appear in the `Managed by` dropdown.
+ *
+ * Property managers, plus anyone recorded as 'other' - a management company
+ * entered before the type existed should still be pickable, and the cost of
+ * being wrong here is a name in a list rather than a wrong number.
+ */
+export async function listPropertyManagers(): Promise<Actor[]> {
+  const db = getDb();
+  return db
+    .select()
+    .from(actors)
+    .where(
+      and(
+        eq(actors.isArchived, false),
+        sql`${actors.type} IN ('pm', 'other')`,
+      ),
+    )
     .orderBy(asc(actors.name));
 }
 

@@ -80,6 +80,59 @@ export function costTreatmentFor(
   };
 }
 
+/**
+ * Dates on a property that cannot all be true at once.
+ *
+ * Not tax rules - arithmetic. A property listed for rent before it was owned,
+ * or sold before it was bought, is a typo, and catching it is worth doing
+ * because a wrong in-service date starts depreciation in the wrong year.
+ *
+ * Lives here rather than in the create schema so both write paths ask the same
+ * question. The schema refines a whole new property; the update service asks
+ * again after merging the patch over what is already stored, which a partial
+ * schema cannot do - it never sees the fields the patch left out.
+ */
+export interface PropertyDateFacts {
+  acquiredDate?: string | null;
+  placedInServiceDate?: string | null;
+  soldDate?: string | null;
+  wasPersonalResidence?: boolean;
+}
+
+export interface PropertyDateProblem {
+  /** The form field to attach the message to. */
+  field: 'soldDate' | 'placedInServiceDate';
+  message: string;
+}
+
+export function propertyDateProblems(facts: PropertyDateFacts): PropertyDateProblem[] {
+  const problems: PropertyDateProblem[] = [];
+
+  if (facts.soldDate && facts.acquiredDate && facts.soldDate < facts.acquiredDate) {
+    problems.push({
+      field: 'soldDate',
+      message: 'A property cannot be sold before it was acquired.',
+    });
+  }
+
+  // Waived for a property that was a home first: there, being available to rent
+  // before the rental period started is the normal shape of the record.
+  if (
+    facts.placedInServiceDate &&
+    facts.acquiredDate &&
+    !facts.wasPersonalResidence &&
+    facts.placedInServiceDate < facts.acquiredDate
+  ) {
+    problems.push({
+      field: 'placedInServiceDate',
+      message:
+        'The placed-in-service date is before the acquisition date. That is only expected on a property you lived in first - tick "was my home" if so.',
+    });
+  }
+
+  return problems;
+}
+
 /** Convenience for callers that only want the label. */
 export function costTreatmentLabel(
   recordDate: string,

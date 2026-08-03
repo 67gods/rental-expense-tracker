@@ -17,6 +17,7 @@ import {
   reconciliationKind,
 } from './constants/captureLists';
 import { isIsoDate } from './dates';
+import { propertyDateProblems } from './rules/placedInService';
 
 const isoDate = z
   .string()
@@ -307,24 +308,20 @@ export const createPropertySchema = z
       .optional()
       .default(null),
   })
-  .refine((v) => !v.soldDate || !v.acquiredDate || v.soldDate >= v.acquiredDate, {
-    message: 'A property cannot be sold before it was acquired.',
-    path: ['soldDate'],
-  })
-  .refine(
-    // Not a tax rule - just arithmetic. A property listed for rent before it was
-    // owned is a typo, and catching it here saves a wrong depreciation start.
-    (v) =>
-      !v.placedInServiceDate ||
-      !v.acquiredDate ||
-      v.wasPersonalResidence ||
-      v.placedInServiceDate >= v.acquiredDate,
-    {
-      message:
-        'The placed-in-service date is before the acquisition date. That is only expected on a property you lived in first - tick "was my home" if so.',
-      path: ['placedInServiceDate'],
-    },
-  );
+  // Delegated to `propertyDateProblems` rather than restated here, because the
+  // update path has to ask the same question after merging a patch over the
+  // stored row - something a partial schema cannot do, since it never sees the
+  // fields the patch left out. Two copies of the rule would eventually be two
+  // different rules.
+  .superRefine((v, ctx) => {
+    for (const problem of propertyDateProblems(v)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: problem.message,
+        path: [problem.field],
+      });
+    }
+  });
 export type CreatePropertyInput = z.input<typeof createPropertySchema>;
 
 /**
