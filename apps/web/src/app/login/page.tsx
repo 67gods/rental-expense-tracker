@@ -35,10 +35,7 @@ export default async function LoginPage({
         </p>
 
         {error ? (
-          <p
-            role="alert"
-            className="mt-4 rounded-lg border border-[color:var(--color-alert-500)] bg-[color:var(--color-alert-50)] p-3 text-sm text-[color:var(--color-alert-700)]"
-          >
+          <p role="alert" className="note note-neg">
             {error}
           </p>
         ) : null}

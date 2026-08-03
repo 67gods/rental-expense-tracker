@@ -102,7 +102,7 @@ export function ExpenseForm({
         </select>
         {category ? <span className="hint">{safeHelper(category)}</span> : null}
         {needsClassification ? (
-          <p className="hint mt-2 rounded-lg border border-[color:var(--color-flag-500)] bg-[color:var(--color-flag-50)] p-2.5 warn">
+          <p className="note note-warn">
             This is spend on physical work, so it needs a repair-or-improvement
             answer before year end. It will sit in the review list until then.
           </p>

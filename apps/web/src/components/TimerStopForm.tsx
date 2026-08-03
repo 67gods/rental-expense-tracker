@@ -58,7 +58,7 @@ export function TimerStopForm({
           {formatMinutes(measuredMinutes)}
         </p>
         {isLongRunning ? (
-          <p className="hint mt-2 rounded-lg border border-[color:var(--color-flag-500)] bg-[color:var(--color-flag-50)] p-2.5 warn">
+          <p className="note note-warn">
             This ran for a long stretch. If you stepped away, correct it to the time you
             actually worked — an inflated entry is worse than a missing one.
           </p>

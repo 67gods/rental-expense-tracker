@@ -64,10 +64,7 @@ export default async function JobPage({
       </div>
 
       {query.saved ? (
-        <p
-          role="status"
-          className="rounded-lg border border-[color:var(--color-eligible-500)] bg-[color:var(--color-eligible-50)] p-3 text-sm pos"
-        >
+        <p role="status" className="note note-pos">
           Saved and added to this job.
         </p>
       ) : null}

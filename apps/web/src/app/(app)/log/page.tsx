@@ -32,19 +32,25 @@ export default function QuickLogPage() {
     <div className="grid gap-3">
       <h1 className="text-xl font-bold tracking-tight">Log something</h1>
 
+      {/* Three peers, so none of them is the accent one. Painting all three
+          primary made a wall of blue in which nothing was the obvious tap. */}
       {ACTIONS.map((action) => (
-        <Link key={action.href} href={action.href} className="btn btn-primary">
-          <strong>{action.title}</strong>
-          <span>{action.hint}</span>
+        <Link key={action.href} href={action.href} className="choice">
+          <span className="choice-body">
+            <span className="choice-title">{action.title}</span>
+            <span className="hint">{action.hint}</span>
+          </span>
         </Link>
       ))}
 
-      <Link href="/timer" className="btn btn-block mt-2">
-        Start a timer instead
-      </Link>
-      <Link href="/log/income" className="btn btn-block">
-        Record rent received
-      </Link>
+      <div className="mt-2 grid gap-2">
+        <Link href="/timer" className="btn btn-block">
+          Start a timer instead
+        </Link>
+        <Link href="/log/income" className="btn btn-block">
+          Record rent received
+        </Link>
+      </div>
     </div>
   );
 }

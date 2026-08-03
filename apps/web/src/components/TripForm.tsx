@@ -75,13 +75,14 @@ export function TripForm({
             <button
               key={option.id}
               type="button"
-              className="btn"
+              className="choice"
               aria-pressed={kind === option.id}
               onClick={() => chooseKind(option.id)}
             >
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold">{option.label}</span>
-                <span className="hint block">{option.helper}</span>
+              <span className="choice-mark" aria-hidden="true" />
+              <span className="choice-body">
+                <span className="choice-title">{option.label}</span>
+                <span className="hint">{option.helper}</span>
               </span>
             </button>
           ))}

@@ -57,30 +57,26 @@ export function CategoryPicker({
           <button
             key={category.id}
             type="button"
-            className="btn"
+            className="choice"
             aria-pressed={selected === category.id}
             onClick={() => pick(category.id)}
           >
-            <span className="min-w-0 flex-1">
-              <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <span className="text-sm font-semibold">{category.label}</span>
-                <EligibilityBadge eligible={category.shEligible} />
+            <span className="choice-mark" aria-hidden="true" />
+            <span className="choice-body">
+              <span className="choice-title">
+                {category.label} <EligibilityBadge eligible={category.shEligible} />
               </span>
-              <span className="hint block">{category.helper}</span>
+              <span className="hint">{category.helper}</span>
             </span>
           </button>
         ))}
       </div>
 
       {selectedCategory && contrast ? (
-        <p className="hint mt-3 rounded-lg border border-[color:var(--color-flag-500)] bg-[color:var(--color-flag-50)] p-2.5 warn">
+        <p className="note note-warn">
           Not this one? <strong>{contrast.label}</strong> — {contrast.helper} That one{' '}
           {contrast.shEligible ? 'counts' : 'does not count'} toward eligible hours.{' '}
-          <button
-            type="button"
-            className="underline underline-offset-2"
-            onClick={() => pick(contrast.id)}
-          >
+          <button type="button" className="linkbtn" onClick={() => pick(contrast.id)}>
             Switch to it
           </button>
         </p>
