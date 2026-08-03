@@ -47,7 +47,7 @@ export function GroupIntoJob({
   }
 
   return (
-    <details className="card card-pad">
+    <details className="panel panel-body">
       <summary className="cursor-pointer text-sm font-semibold">Group some of these</summary>
 
       <form action={formAction} className="mt-3 grid gap-1">
@@ -57,17 +57,17 @@ export function GroupIntoJob({
           </p>
         ) : null}
         {state.saved ? (
-          <p role="status" className="mb-2 text-sm text-[color:var(--color-eligible-700)]">
+          <p role="status" className="mb-2 text-sm pos">
             {state.saved}
           </p>
         ) : null}
 
         <ul className="max-h-72 overflow-y-auto">
           {records.map((record) => (
-            <li key={record.id} className="row">
-              <label className="row-main cursor-pointer">
-                <span className="row-title">{record.title}</span>
-                <span className="row-meta">{record.meta}</span>
+            <li key={record.id} className="kv">
+              <label className="">
+                <span style={{fontWeight:500}}>{record.title}</span>
+                <span className="hint">{record.meta}</span>
               </label>
               <input
                 type="checkbox"
@@ -83,7 +83,7 @@ export function GroupIntoJob({
         </ul>
 
         <label className="field mt-2">
-          <span className="label">Add them to</span>
+          <span className="field-label">Add them to</span>
           <select
             className="select"
             name="jobId"
@@ -101,7 +101,7 @@ export function GroupIntoJob({
 
         {target === '' ? (
           <label className="field">
-            <span className="label">Call it</span>
+            <span className="field-label">Call it</span>
             <input
               className="input"
               name="newJobTitle"

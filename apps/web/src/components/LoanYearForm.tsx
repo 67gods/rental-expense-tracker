@@ -58,14 +58,14 @@ export function LoanYearForm({
         </p>
       ) : null}
       {state.saved ? (
-        <p role="status" className="mb-2 text-sm text-[color:var(--color-eligible-700)]">
+        <p role="status" className="mb-2 text-sm pos">
           {state.saved}
         </p>
       ) : null}
 
       <div className="grid gap-1 sm:grid-cols-2 sm:gap-3">
         <label className="field">
-          <span className="label">Property</span>
+          <span className="field-label">Property</span>
           <select
             className="select"
             name="propertyId"
@@ -85,7 +85,7 @@ export function LoanYearForm({
         </label>
 
         <label className="field">
-          <span className="label">Lender</span>
+          <span className="field-label">Lender</span>
           <input
             className="input"
             name="lenderName"
@@ -159,7 +159,7 @@ export function LoanYearForm({
 
           <div className="grid gap-1 sm:grid-cols-3 sm:gap-3">
             <label className="field">
-              <span className="label">Loan originated</span>
+              <span className="field-label">Loan originated</span>
               <input
                 className="input"
                 type="date"
@@ -174,9 +174,9 @@ export function LoanYearForm({
               error={state.fields?.originalPrincipal}
             />
             <label className="field">
-              <span className="label">Rate %</span>
+              <span className="field-label">Rate %</span>
               <input
-                className="input tnum"
+                className="input num"
                 name="interestRatePct"
                 inputMode="decimal"
                 defaultValue={defaults.interestRatePct ?? ''}
@@ -188,7 +188,7 @@ export function LoanYearForm({
       </details>
 
       <label className="field">
-        <span className="label">Note about the document</span>
+        <span className="field-label">Note about the document</span>
         <textarea
           className="input"
           name="documentNote"
@@ -230,7 +230,7 @@ function MoneyWithSource({
       <Money label={label} name={name} hint={boxNote} cents={cents} error={error} />
       {sourceName ? (
         <label className="field">
-          <span className="label">Read from</span>
+          <span className="field-label">Read from</span>
           <select className="select" name={sourceName} defaultValue={sourceValue ?? ''}>
             <option value="">Not recorded</option>
             {DOCUMENT_SOURCES.map((option) => (
@@ -260,9 +260,9 @@ function Money({
 }) {
   return (
     <label className="field">
-      <span className="label">{label}</span>
+      <span className="field-label">{label}</span>
       <input
-        className="input tnum"
+        className="input num"
         name={name}
         inputMode="decimal"
         defaultValue={cents == null ? '' : formatCentsPlain(cents)}

@@ -54,7 +54,7 @@ export function ReconciliationPanel({
   managers: Option[];
 }) {
   return (
-    <section className="card card-pad">
+    <section className="panel panel-body">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-base font-semibold">{view.propertyNickname}</h3>
         <ResidualBadge view={view} />
@@ -77,19 +77,19 @@ export function ReconciliationPanel({
       {view.items.length > 0 ? (
         <ul className="mt-3 grid gap-1">
           {view.items.map((item) => (
-            <li key={item.id} className="row">
-              <span className="row-main">
-                <span className="row-title">{kindLabel(item.kind)}</span>
-                {item.note ? <span className="row-meta">{item.note}</span> : null}
+            <li key={item.id} className="kv">
+              <span className="">
+                <span style={{fontWeight:500}}>{kindLabel(item.kind)}</span>
+                {item.note ? <span className="hint">{item.note}</span> : null}
                 {item.isUnusualSign ? (
-                  <span className="row-meta">
+                  <span className="hint">
                     That sign is the opposite of what this kind usually carries. Left as
                     entered — check it is what you meant.
                   </span>
                 ) : null}
               </span>
               <span className="flex shrink-0 items-center gap-2">
-                <span className="tnum text-sm font-semibold">
+                <span className="num text-sm font-semibold">
                   {formatCents(item.amountCents)}
                 </span>
                 <DeleteButton
@@ -125,13 +125,13 @@ export function ReconciliationPanel({
 
 function ResidualBadge({ view }: { view: ReconciliationView }) {
   if (view.reportedGrossCents === null) {
-    return <span className="badge badge-not-eligible">Waiting on the 1099</span>;
+    return <span className="tag tag-muted">Waiting on the 1099</span>;
   }
   if (view.isReconciled) {
-    return <span className="badge badge-eligible">Squares exactly</span>;
+    return <span className="tag tag-pos">Squares exactly</span>;
   }
   return (
-    <span className="badge badge-flag tnum">
+    <span className="tag tag-warn num">
       {formatCents(view.residualCents ?? 0)} unexplained
     </span>
   );
@@ -140,8 +140,8 @@ function ResidualBadge({ view }: { view: ReconciliationView }) {
 function Figure({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs text-[color:var(--color-muted)]">{label}</dt>
-      <dd className="tnum text-sm font-semibold">{value}</dd>
+      <dt className="text-xs muted">{label}</dt>
+      <dd className="num text-sm font-semibold">{value}</dd>
     </div>
   );
 }
@@ -169,9 +169,9 @@ function ReportedForm({
       ) : null}
 
       <label className="field">
-        <span className="label">Box 1, exactly as issued</span>
+        <span className="field-label">Box 1, exactly as issued</span>
         <input
-          className="input tnum"
+          className="input num"
           name="reportedGross"
           inputMode="decimal"
           defaultValue={
@@ -189,7 +189,7 @@ function ReportedForm({
       </label>
 
       <label className="field">
-        <span className="label">Who issued it</span>
+        <span className="field-label">Who issued it</span>
         <select className="select" name="payerActorId" defaultValue={view.payerActorId ?? ''}>
           <option value="">Not recorded</option>
           {managers.map((manager) => (
@@ -201,7 +201,7 @@ function ReportedForm({
       </label>
 
       <label className="field">
-        <span className="label">Note</span>
+        <span className="field-label">Note</span>
         <textarea
           className="input"
           name="documentNote"
@@ -233,7 +233,7 @@ function ItemForm({ view, taxYear }: { view: ReconciliationView; taxYear: number
       ) : null}
 
       <label className="field">
-        <span className="label">What happened</span>
+        <span className="field-label">What happened</span>
         <select className="select" name="kind" defaultValue="management_fee_withheld">
           {RECONCILIATION_KINDS.map((kind) => (
             <option key={kind.id} value={kind.id}>
@@ -247,9 +247,9 @@ function ItemForm({ view, taxYear }: { view: ReconciliationView; taxYear: number
       </label>
 
       <label className="field">
-        <span className="label">How much</span>
+        <span className="field-label">How much</span>
         <input
-          className="input tnum"
+          className="input num"
           name="amount"
           inputMode="decimal"
           required
@@ -265,7 +265,7 @@ function ItemForm({ view, taxYear }: { view: ReconciliationView; taxYear: number
       </label>
 
       <label className="field">
-        <span className="label">Note</span>
+        <span className="field-label">Note</span>
         <input className="input" name="note" maxLength={500} />
       </label>
 

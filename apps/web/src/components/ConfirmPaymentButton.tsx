@@ -24,7 +24,7 @@ export function ConfirmPaymentButton({
   return (
     <button
       type="button"
-      className="btn btn-ghost shrink-0 text-xs"
+      className="btn"
       disabled={pending}
       onClick={() => {
         const answer = prompt(

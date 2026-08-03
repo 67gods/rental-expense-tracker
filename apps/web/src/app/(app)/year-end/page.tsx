@@ -74,7 +74,7 @@ export default async function YearEndPage({
     <div className="grid gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-bold tracking-tight">Year-end · {taxYear}</h1>
-        <nav className="chip-row" aria-label="Tax year">
+        <nav className="seg" aria-label="Tax year">
           {years.map((year) => (
             <a
               key={year}
@@ -116,13 +116,13 @@ export default async function YearEndPage({
               );
 
               return (
-                <section key={property.id} className="card card-pad">
+                <section key={property.id} className="panel panel-body">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <h3 className="text-base font-semibold">{property.nickname}</h3>
                     {forProperty.length === 0 ? (
-                      <span className="badge badge-flag">No 1098 entered</span>
+                      <span className="tag tag-warn">No 1098 entered</span>
                     ) : (
-                      <span className="row-meta">
+                      <span className="hint">
                         {forProperty.length}{' '}
                         {forProperty.length === 1 ? 'lender' : 'lenders'}
                       </span>
@@ -146,7 +146,7 @@ export default async function YearEndPage({
                       className="mt-3 border-t border-[color:var(--border)] pt-3"
                     >
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <p className="row-title">{row.lenderName}</p>
+                        <p style={{fontWeight:500}}>{row.lenderName}</p>
                         <DeleteButton
                           what={`the ${row.lenderName} 1098 for ${taxYear}`}
                           onDelete={async () => {
@@ -289,11 +289,11 @@ export default async function YearEndPage({
         ) : (
           <div className="grid gap-2">
             {due.length > 0 ? (
-              <div className="card">
-                <p className="row">
-                  <span className="row-main">
-                    <span className="row-title">Due in {taxYear} or earlier</span>
-                    <span className="row-meta">
+              <div className="tablebox">
+                <p className="kv">
+                  <span className="">
+                    <span style={{fontWeight:500}}>Due in {taxYear} or earlier</span>
+                    <span className="hint">
                       Each of these either went out and was never confirmed — so the
                       deduction is missing from {taxYear} — or did not, and needs moving.
                     </span>
@@ -311,11 +311,11 @@ export default async function YearEndPage({
             ) : null}
 
             {upcoming.length > 0 ? (
-              <div className="card">
-                <p className="row">
-                  <span className="row-main">
-                    <span className="row-title">Coming after {taxYear}</span>
-                    <span className="row-meta">
+              <div className="tablebox">
+                <p className="kv">
+                  <span className="">
+                    <span style={{fontWeight:500}}>Coming after {taxYear}</span>
+                    <span className="hint">
                       Deductible in the year they are paid, not now. Listed so the invoice
                       they belong to is not forgotten.
                     </span>
@@ -339,12 +339,12 @@ export default async function YearEndPage({
         <h2 className="section-title mb-2">Figures from your CPA</h2>
 
         {figures.length > 0 ? (
-          <div className="card">
+          <div className="tablebox">
             {figures.map((figure) => (
-              <div key={figure.id} className="row">
-                <div className="row-main">
-                  <p className="row-title">{figure.label}</p>
-                  <p className="row-meta">
+              <div key={figure.id} className="kv">
+                <div className="">
+                  <p style={{fontWeight:500}}>{figure.label}</p>
+                  <p className="hint">
                     {figure.propertyId
                       ? (propertyNames.get(figure.propertyId) ?? 'Unknown property')
                       : 'Whole portfolio'}
@@ -354,7 +354,7 @@ export default async function YearEndPage({
                   <p className="hint">{figure.sourceNote}</p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  <span className="tnum text-sm font-semibold">
+                  <span className="num text-sm font-semibold">
                     {formatCents(figure.amountCents)}
                   </span>
                   <DeleteButton
@@ -376,7 +376,7 @@ export default async function YearEndPage({
           </p>
         )}
 
-        <details className="card card-pad mt-2" open={figures.length === 0}>
+        <details className="panel panel-body" open={figures.length === 0}>
           <summary className="cursor-pointer text-sm font-semibold">Add a figure</summary>
           <div className="mt-4">
             <CpaFigureForm taxYear={taxYear} properties={propertyOptions} />
@@ -407,18 +407,18 @@ function ScheduledRow({
   flagged?: boolean;
 }) {
   return (
-    <div className="row">
-      <div className="row-main">
-        <p className="row-title">{row.vendor}</p>
-        <p className="row-meta">
+    <div className="kv">
+      <div className="">
+        <p style={{fontWeight:500}}>{row.vendor}</p>
+        <p className="hint">
           Planned for {row.payment.paidDate} · invoice {row.invoiceDate} for{' '}
           {formatCents(row.invoiceTotalCents)}
           {propertyName ? ` · ${propertyName}` : ''}
         </p>
-        {flagged ? <span className="badge badge-flag mt-1">Needs a decision</span> : null}
+        {flagged ? <span className="tag tag-warn mt-1">Needs a decision</span> : null}
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <span className="tnum text-sm font-semibold">{formatCents(row.payment.amountCents)}</span>
+        <span className="num text-sm font-semibold">{formatCents(row.payment.amountCents)}</span>
         <ConfirmPaymentButton paymentId={row.payment.id} plannedDate={row.payment.paidDate} />
       </div>
     </div>
@@ -436,10 +436,10 @@ function Figure({
 }) {
   return (
     <div>
-      <dt className="text-xs text-[color:var(--color-muted)]">{label}</dt>
-      <dd className="tnum text-sm font-semibold">
+      <dt className="text-xs muted">{label}</dt>
+      <dd className="num text-sm font-semibold">
         {cents === null ? (
-          <span className="font-normal text-[color:var(--color-muted)]">not recorded</span>
+          <span className="font-normal muted">not recorded</span>
         ) : (
           formatCents(cents)
         )}

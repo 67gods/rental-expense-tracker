@@ -39,7 +39,7 @@ export default async function ReportsPage({
     <div className="grid gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-bold tracking-tight">Reports · {taxYear}</h1>
-        <nav className="chip-row" aria-label="Tax year">
+        <nav className="seg" aria-label="Tax year">
           {years.map((year) => (
             <a
               key={year}
@@ -61,9 +61,9 @@ export default async function ReportsPage({
         the top of Reports because Reports is already where you go when it is
         time to hand something to the CPA.
       */}
-      <Link href={`/year-end?year=${taxYear}`} className="card card-pad block">
-        <p className="row-title">Year-end · {taxYear}</p>
-        <p className="row-meta">
+      <Link href={`/year-end?year=${taxYear}`} className="panel panel-body">
+        <p style={{fontWeight:500}}>Year-end · {taxYear}</p>
+        <p className="hint">
           The 1098s, rent against the 1099, payments still only planned, and the figures your
           CPA sent back. One sitting, one page.
         </p>
@@ -73,7 +73,7 @@ export default async function ReportsPage({
 
       <section>
         <h2 className="section-title mb-2">Hours by person</h2>
-        <div className="table-wrap card">
+        <div className="tablebox tablescroll">
           <table className="table">
             <thead>
               <tr>
@@ -111,7 +111,7 @@ export default async function ReportsPage({
 
       <section>
         <h2 className="section-title mb-2">Schedule E by property</h2>
-        <div className="table-wrap card">
+        <div className="tablebox tablescroll">
           <table className="table">
             <thead>
               <tr>
@@ -170,8 +170,8 @@ export default async function ReportsPage({
 
       <section>
         <h2 className="section-title mb-2">Mileage</h2>
-        <div className="card card-pad">
-          <p className="tnum text-2xl font-bold tracking-tight">
+        <div className="panel panel-body">
+          <p className="num text-2xl font-bold tracking-tight">
             {totalMiles(trips.map((t) => ({ miles: Number(t.miles) })))} miles
           </p>
           <p className="hint">
@@ -195,12 +195,12 @@ export default async function ReportsPage({
           {(Object.keys(REPORTS) as (keyof typeof REPORTS)[]).map((id) => (
             <a
               key={id}
-              className="card card-pad block"
+              className="panel panel-body"
               href={`/api/v1/export/${id}?taxYear=${taxYear}`}
               download
             >
-              <p className="row-title">{REPORTS[id].label}</p>
-              <p className="row-meta tnum">
+              <p style={{fontWeight:500}}>{REPORTS[id].label}</p>
+              <p className="row-meta num">
                 {taxYear}-{id}.csv
               </p>
             </a>

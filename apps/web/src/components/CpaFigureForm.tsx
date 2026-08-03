@@ -41,13 +41,13 @@ export function CpaFigureForm({
         </p>
       ) : null}
       {state.saved ? (
-        <p role="status" className="mb-2 text-sm text-[color:var(--color-eligible-700)]">
+        <p role="status" className="mb-2 text-sm pos">
           {state.saved}
         </p>
       ) : null}
 
       <label className="field">
-        <span className="label">What kind of figure</span>
+        <span className="field-label">What kind of figure</span>
         <select
           className="select"
           name="kind"
@@ -67,7 +67,7 @@ export function CpaFigureForm({
 
       {kind === 'schedule_e_line' ? (
         <label className="field">
-          <span className="label">Which line</span>
+          <span className="field-label">Which line</span>
           <select className="select" name="categoryId" defaultValue="depreciation" required>
             {categories.map((category) => (
               <option key={category.id} value={category.id}>
@@ -83,7 +83,7 @@ export function CpaFigureForm({
 
       <div className="grid gap-1 sm:grid-cols-2 sm:gap-3">
         <label className="field">
-          <span className="label">Property</span>
+          <span className="field-label">Property</span>
           <select className="select" name="propertyId" defaultValue="">
             <option value="">Whole portfolio</option>
             {properties.map((property) => (
@@ -95,9 +95,9 @@ export function CpaFigureForm({
         </label>
 
         <label className="field">
-          <span className="label">Amount</span>
+          <span className="field-label">Amount</span>
           <input
-            className="input tnum"
+            className="input num"
             name="amount"
             inputMode="decimal"
             required
@@ -113,7 +113,7 @@ export function CpaFigureForm({
 
       <div className="grid gap-1 sm:grid-cols-2 sm:gap-3">
         <label className="field">
-          <span className="label">Label</span>
+          <span className="field-label">Label</span>
           <input
             className="input"
             name="label"
@@ -129,9 +129,9 @@ export function CpaFigureForm({
         </label>
 
         <label className="field">
-          <span className="label">Recovery period</span>
+          <span className="field-label">Recovery period</span>
           <input
-            className="input tnum"
+            className="input num"
             name="recoveryYears"
             inputMode="decimal"
             placeholder="27.5"
@@ -141,7 +141,7 @@ export function CpaFigureForm({
       </div>
 
       <label className="field">
-        <span className="label">Where this came from</span>
+        <span className="field-label">Where this came from</span>
         <input
           className="input"
           name="sourceNote"
