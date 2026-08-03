@@ -19,3 +19,8 @@ Thumbs.db
 *.tsbuildinfo
 next-env.d.ts
 .turbo/
+
+# The 2025 hand-off payload from the Tax-Manager repo. Names, addresses, dates
+# and amounts only - but derived from tax documents, so it never enters git.
+rental-import-2025.json
+rental-import-*.json
