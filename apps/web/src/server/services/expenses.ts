@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import {
   allocateExpense,
   createExpenseSchema,
@@ -300,6 +300,21 @@ export async function listExpenses(filter: ExpenseFilter = {}): Promise<Expense[
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(desc(expenses.date), desc(expenses.createdAt))
     .limit(filter.limit ?? 500);
+}
+
+/**
+ * Expenses by id, whatever year they are dated in.
+ *
+ * The reports need this because cash basis breaks the usual assumption. A
+ * payment made in 2026 against an invoice dated December 2025 belongs in the
+ * 2026 report, so the report starts from the payments and then has to fetch
+ * invoices that `listExpenses({ taxYear })` would never return.
+ */
+export async function expensesByIds(ids: readonly string[]): Promise<Map<string, Expense>> {
+  if (ids.length === 0) return new Map();
+  const db = getDb();
+  const rows = await db.select().from(expenses).where(inArray(expenses.id, [...ids]));
+  return new Map(rows.map((r) => [r.id, r]));
 }
 
 /**

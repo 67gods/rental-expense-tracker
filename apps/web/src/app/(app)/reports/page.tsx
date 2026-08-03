@@ -139,22 +139,36 @@ export default async function ReportsPage({
               <tr>
                 <th>Property</th>
                 <th className="num">Rents received</th>
-                <th className="num">Expenses</th>
+                <th className="num">Ledger</th>
+                <th className="num">1098</th>
+                <th className="num">CPA</th>
                 <th className="num">Net</th>
               </tr>
             </thead>
             <tbody>
-              {scheduleE.map((summary) => (
-                <tr key={summary.propertyId}>
-                  <td>{summary.nickname}</td>
-                  <td className="num">{formatCents(summary.rentsReceivedCents)}</td>
-                  <td className="num">{formatCents(summary.totalExpenseCents)}</td>
-                  <td className="num">{formatCents(summary.netCents)}</td>
-                </tr>
-              ))}
+              {scheduleE.map((summary) => {
+                const bySource = (source: 'ledger' | '1098' | 'cpa') =>
+                  summary.expenseLines
+                    .filter((l) => l.source === source)
+                    .reduce((total, l) => total + l.amountCents, 0);
+
+                return (
+                  <tr key={summary.propertyId}>
+                    <td>{summary.nickname}</td>
+                    <td className="num">{formatCents(summary.rentsReceivedCents)}</td>
+                    {/* Split by where each figure came from rather than shown as
+                        one total: a line fed by both the ledger and a 1098 is a
+                        possible double count, and merging them would hide it. */}
+                    <td className="num">{formatCents(bySource('ledger'))}</td>
+                    <td className="num">{formatCents(bySource('1098'))}</td>
+                    <td className="num">{formatCents(bySource('cpa'))}</td>
+                    <td className="num">{formatCents(summary.netCents)}</td>
+                  </tr>
+                );
+              })}
               {scheduleE.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="hint">
+                  <td colSpan={6} className="hint">
                     No properties yet.
                   </td>
                 </tr>
@@ -162,6 +176,10 @@ export default async function ReportsPage({
             </tbody>
           </table>
         </div>
+        <p className="hint mt-2">
+          Expense amounts are what actually left the bank in {taxYear}, not what was invoiced.
+          An invoice dated December and paid in January belongs to January.
+        </p>
       </section>
 
       <section>
