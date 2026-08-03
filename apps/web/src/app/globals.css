@@ -251,7 +251,18 @@ a {
     gap: 8px;
   }
 
+  /*
+   * The content well: every page body sits in one, so padding and max width
+   * are decided in exactly one place.
+   *
+   * It is a grid rather than a block because a page is a stack of sections and
+   * each of them would otherwise have to remember its own margin. That is how
+   * the previous UI accumulated a different gap per page.
+   */
   .well {
+    display: grid;
+    gap: 16px;
+    align-content: start;
     padding: 18px 20px 64px;
     max-width: 1420px;
     width: 100%;

@@ -4,6 +4,8 @@ import { requireUser } from '@/lib/session';
 import { listProperties } from '@/server/services/reference';
 import { getRunningTimer } from '@/server/services/timer';
 import { TimerStartForm } from '@/components/TimerStartForm';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { Well } from '@/components/ui';
 
 export const metadata = { title: 'Timer' };
 
@@ -18,23 +20,26 @@ export default async function TimerPage() {
   const properties = await listProperties();
 
   return (
-    <div>
-      <div className="mb-4 flex items-center gap-3">
-        <Link href="/" className="btn">
-          ← Back
-        </Link>
-        <h1 className="text-xl font-bold tracking-tight">Start a timer</h1>
-      </div>
-
-      <p className="hint mb-4">
-        For desk work — lease review, checking rent landed, market surveys, emailing
-        contractors. It keeps running if you close the tab.
-      </p>
-
-      <TimerStartForm
-        properties={properties.map((p) => ({ id: p.id, label: p.nickname }))}
-        taxYear={user.taxYear}
+    <>
+      <PageHeader
+        title="Start a timer"
+        actions={
+          <Link href="/" className="btn">
+            ← Back
+          </Link>
+        }
       />
-    </div>
+      <Well>
+        <p className="hint mb-4">
+          For desk work — lease review, checking rent landed, market surveys, emailing
+          contractors. It keeps running if you close the tab.
+        </p>
+
+        <TimerStartForm
+          properties={properties.map((p) => ({ id: p.id, label: p.nickname }))}
+          taxYear={user.taxYear}
+        />
+      </Well>
+    </>
   );
 }

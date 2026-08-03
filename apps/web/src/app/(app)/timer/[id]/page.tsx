@@ -4,6 +4,8 @@ import { requireUser } from '@/lib/session';
 import { listProperties } from '@/server/services/reference';
 import { getRunningTimer } from '@/server/services/timer';
 import { TimerStopForm } from '@/components/TimerStopForm';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { Well } from '@/components/ui';
 
 export const metadata = { title: 'Stop timer' };
 
@@ -21,23 +23,26 @@ export default async function StopTimerPage({
   const properties = await listProperties();
 
   return (
-    <div>
-      <div className="mb-4 flex items-center gap-3">
-        <Link href="/" className="btn">
-          ← Back
-        </Link>
-        <h1 className="text-xl font-bold tracking-tight">Stop timer</h1>
-      </div>
-
-      <TimerStopForm
-        id={running.id}
-        measuredMinutes={running.elapsedMinutes}
-        isLongRunning={running.isLongRunning}
-        category={running.category}
-        description={running.description}
-        propertyId={running.propertyId}
-        properties={properties.map((p) => ({ id: p.id, label: p.nickname }))}
+    <>
+      <PageHeader
+        title="Stop timer"
+        actions={
+          <Link href="/" className="btn">
+            ← Back
+          </Link>
+        }
       />
-    </div>
+      <Well>
+        <TimerStopForm
+          id={running.id}
+          measuredMinutes={running.elapsedMinutes}
+          isLongRunning={running.isLongRunning}
+          category={running.category}
+          description={running.description}
+          propertyId={running.propertyId}
+          properties={properties.map((p) => ({ id: p.id, label: p.nickname }))}
+        />
+      </Well>
+    </>
   );
 }

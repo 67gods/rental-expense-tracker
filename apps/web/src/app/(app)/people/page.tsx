@@ -6,6 +6,8 @@ import { listExpenses } from '@/server/services/expenses';
 import { toggleW9Action } from '@/app/actions/admin';
 import { ActorForm } from '@/components/ActorForm';
 import { W9Toggle } from '@/components/W9Toggle';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { Well } from '@/components/ui';
 
 export const metadata = { title: 'People & contractors' };
 
@@ -47,91 +49,94 @@ export default async function PeoplePage() {
   const people = actors.filter((a) => a.type !== 'contractor');
 
   return (
-    <div className="grid gap-4">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-xl font-bold tracking-tight">People &amp; contractors</h1>
-        <Link href="/properties" className="btn">
-          Properties
-        </Link>
-      </div>
-
-      <section>
-        <h2 className="section-title mb-2">Household &amp; managers</h2>
-        <ul className="tablebox">
-          {people.map((actor) => (
-            <li key={actor.id} className="kv">
-              <div>
-                <p className="rowtitle">{actor.name}</p>
-                <p className="hint">
-                  {TYPE_LABELS[actor.type] ?? actor.type}
-                  {actor.email ? ` · ${actor.email}` : ''}
-                </p>
-              </div>
-            </li>
-          ))}
-          {people.length === 0 ? (
-            <li className="p-4">
-              <p className="hint">Nobody yet.</p>
-            </li>
-          ) : null}
-        </ul>
-        <p className="hint mt-2">
-          Hours are counted per person and cannot be pooled between spouses, so keep these
-          two separate rather than merging them.
-        </p>
-      </section>
-
-      <section>
-        <h2 className="section-title mb-2">Contractors · paid in {user.taxYear}</h2>
-        <ul className="tablebox">
-          {contractors.map((actor) => {
-            const total = totalsById.get(actor.id);
-            return (
+    <>
+      <PageHeader
+        title="People & contractors"
+        actions={
+          <Link href="/properties" className="btn">
+            Properties
+          </Link>
+        }
+      />
+      <Well>
+        <section>
+          <h2 className="section-title mb-2">Household &amp; managers</h2>
+          <ul className="tablebox">
+            {people.map((actor) => (
               <li key={actor.id} className="kv">
                 <div>
                   <p className="rowtitle">{actor.name}</p>
                   <p className="hint">
-                    {actor.w9OnFile ? 'W-9 on file' : 'No W-9 on file'}
-                    {actor.taxIdCollected ? ' · tax ID collected' : ''}
+                    {TYPE_LABELS[actor.type] ?? actor.type}
+                    {actor.email ? ` · ${actor.email}` : ''}
                   </p>
-                  {warned.has(actor.id) ? (
-                    <p className="mt-1">
-                      <span className="tag tag-neg">Needs a W-9 before year end</span>
-                    </p>
-                  ) : null}
-                </div>
-                <div className="flex shrink-0 flex-col items-end gap-1">
-                  <span className="num">{formatCents(total?.paidCents ?? 0)}</span>
-                  <W9Toggle
-                    id={actor.id}
-                    name={actor.name}
-                    w9OnFile={actor.w9OnFile}
-                    onToggle={async (id, next) => {
-                      'use server';
-                      await toggleW9Action(id, next);
-                    }}
-                  />
                 </div>
               </li>
-            );
-          })}
-          {contractors.length === 0 ? (
-            <li className="p-4">
-              <p className="hint">
-                No contractors yet. Adding them lets the app total what each was paid and warn
-                you before a 1099 deadline.
-              </p>
-            </li>
-          ) : null}
-        </ul>
-      </section>
+            ))}
+            {people.length === 0 ? (
+              <li className="p-4">
+                <p className="hint">Nobody yet.</p>
+              </li>
+            ) : null}
+          </ul>
+          <p className="hint mt-2">
+            Hours are counted per person and cannot be pooled between spouses, so keep these
+            two separate rather than merging them.
+          </p>
+        </section>
 
-      <details className="panel panel-body">
-        <summary className="cursor-pointer text-sm font-semibold">Add someone</summary>
-        <div className="mt-4">
-          <ActorForm />
-        </div>
-      </details>
-    </div>
+        <section>
+          <h2 className="section-title mb-2">Contractors · paid in {user.taxYear}</h2>
+          <ul className="tablebox">
+            {contractors.map((actor) => {
+              const total = totalsById.get(actor.id);
+              return (
+                <li key={actor.id} className="kv">
+                  <div>
+                    <p className="rowtitle">{actor.name}</p>
+                    <p className="hint">
+                      {actor.w9OnFile ? 'W-9 on file' : 'No W-9 on file'}
+                      {actor.taxIdCollected ? ' · tax ID collected' : ''}
+                    </p>
+                    {warned.has(actor.id) ? (
+                      <p className="mt-1">
+                        <span className="tag tag-neg">Needs a W-9 before year end</span>
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <span className="num">{formatCents(total?.paidCents ?? 0)}</span>
+                    <W9Toggle
+                      id={actor.id}
+                      name={actor.name}
+                      w9OnFile={actor.w9OnFile}
+                      onToggle={async (id, next) => {
+                        'use server';
+                        await toggleW9Action(id, next);
+                      }}
+                    />
+                  </div>
+                </li>
+              );
+            })}
+            {contractors.length === 0 ? (
+              <li className="p-4">
+                <p className="hint">
+                  No contractors yet. Adding them lets the app total what each was paid and warn
+                  you before a 1099 deadline.
+                </p>
+              </li>
+            ) : null}
+          </ul>
+        </section>
+
+        <details className="panel panel-body">
+          <summary className="cursor-pointer text-sm font-semibold">Add someone</summary>
+          <div className="mt-4">
+            <ActorForm />
+          </div>
+        </details>
+      </Well>
+    </>
   );
 }
