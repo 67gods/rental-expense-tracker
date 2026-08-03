@@ -10,10 +10,12 @@
  */
 
 import './loadEnv';
-import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, ne, sql } from 'drizzle-orm';
 import {
   deriveShEligible,
   evaluateEnterpriseComposition,
+  propertyDateProblems,
+  RULES_VERSION,
   taxYearOf,
   validateEnterpriseComposition,
 } from '@rental/domain';
@@ -23,10 +25,18 @@ import {
   enterprises,
   expenses,
   properties,
+  rentReconciliations,
   timeEntries,
   timers,
   trips,
 } from './schema';
+// Imported rather than reimplemented. Two copies of a query is how the audit
+// and the app come to disagree about what the data says - and Phase 9 found a
+// correlated subquery in this codebase that type-checked, ran, and was silently
+// wrong in both directions. One copy, exercised by both callers.
+import { childlessJobIds } from '../server/services/jobs';
+import { overlappingManagementPeriods } from '../server/services/reference';
+import { unreconciledYears } from '../server/services/reconciliation';
 
 export interface IntegrityFinding {
   severity: 'error' | 'warning' | 'info';
@@ -224,6 +234,214 @@ export async function runIntegrityChecks(): Promise<IntegrityFinding[]> {
     count: linkedEntries?.count ?? 0,
     message: 'Time entries whose eligibility follows an expense classification.',
   });
+
+  findings.push(...(await cashBasisChecks()));
+  findings.push(...(await propertyChecks()));
+  findings.push(...(await yearEndChecks()));
+  findings.push(...(await jobChecks()));
+  findings.push(...(await rulesVersionCheck()));
+
+  return findings;
+}
+
+/**
+ * The payments table has to hold two invariants that no constraint can express:
+ * every expense that cost something has a cash event, and the cash events never
+ * add up to more than the invoice claimed.
+ */
+async function cashBasisChecks(): Promise<IntegrityFinding[]> {
+  const db = getDb();
+  const findings: IntegrityFinding[] = [];
+
+  // A zero-amount expense is exempt on purpose: there was no cash event, and
+  // inventing a zero one to satisfy a rule would be a lie in the ledger.
+  const [paymentless] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(expenses)
+    .where(
+      sql`${expenses.amountCents} > 0
+        AND NOT EXISTS (
+          SELECT 1 FROM "expense_payments" p WHERE p."expense_id" = "expenses"."id"
+        )`,
+    );
+  if ((paymentless?.count ?? 0) > 0) {
+    findings.push({
+      severity: 'error',
+      check: 'paymentless_expenses',
+      count: paymentless?.count ?? 0,
+      message:
+        'Expenses with a cost but no payment row. They read as never paid, which drops them out of every report while still sitting in the ledger.',
+    });
+  }
+
+  // Correlated on "expenses"."id" written out in full, not interpolated: an
+  // unqualified ${expenses.id} inside the subquery would bind to
+  // expense_payments.id and quietly compare the wrong two columns.
+  const [overpaid] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(expenses)
+    .where(
+      sql`(
+        SELECT COALESCE(sum(p."amount_cents"), 0)
+        FROM "expense_payments" p
+        WHERE p."expense_id" = "expenses"."id"
+      ) > "expenses"."amount_cents"`,
+    );
+  if ((overpaid?.count ?? 0) > 0) {
+    findings.push({
+      severity: 'error',
+      check: 'payments_over_invoice',
+      count: overpaid?.count ?? 0,
+      message:
+        'Expenses carrying more in payments, settled and scheduled, than the invoice says they are worth. One of the two figures is wrong.',
+    });
+  }
+
+  return findings;
+}
+
+/** Facts about a property that cannot all be true at once. */
+async function propertyChecks(): Promise<IntegrityFinding[]> {
+  const db = getDb();
+  const findings: IntegrityFinding[] = [];
+
+  const rows = await db
+    .select({
+      id: properties.id,
+      nickname: properties.nickname,
+      acquiredDate: properties.acquiredDate,
+      placedInServiceDate: properties.placedInServiceDate,
+      soldDate: properties.soldDate,
+      wasPersonalResidence: properties.wasPersonalResidence,
+    })
+    .from(properties);
+
+  // The same rule the create schema and the update service both ask, asked a
+  // third time over what is actually stored - which catches rows that predate
+  // the rule or arrived through the import.
+  const impossible = rows.flatMap((row) => propertyDateProblems(row));
+  if (impossible.length > 0) {
+    findings.push({
+      severity: 'error',
+      check: 'impossible_property_dates',
+      count: impossible.length,
+      message: `Properties whose dates contradict each other: ${impossible[0]?.message ?? ''}`,
+    });
+  }
+
+  const missingInService = rows.filter((r) => !r.placedInServiceDate && !r.soldDate).length;
+  if (missingInService > 0) {
+    findings.push({
+      severity: 'warning',
+      check: 'no_placed_in_service_date',
+      count: missingInService,
+      message:
+        'Properties with no placed-in-service date. It is where depreciation starts and the line that decides which costs came before the property was earning, so every cost on them is being treated as operating by default.',
+    });
+  }
+
+  const overlapping = await overlappingManagementPeriods();
+  if (overlapping.length > 0) {
+    findings.push({
+      severity: 'error',
+      check: 'overlapping_management_periods',
+      count: overlapping.length,
+      message:
+        'Properties with management periods that overlap. Two managers cannot both have been in charge on the same day, so the history misstates who was.',
+    });
+  }
+
+  return findings;
+}
+
+/** The January sitting, checked from the other side. */
+async function yearEndChecks(): Promise<IntegrityFinding[]> {
+  const db = getDb();
+  const findings: IntegrityFinding[] = [];
+
+  // Every year somebody has started a reconciliation for, rather than a year
+  // guessed from today: a 2025 gap left open still matters in 2027.
+  const years = await db
+    .selectDistinct({ taxYear: rentReconciliations.taxYear })
+    .from(rentReconciliations);
+
+  let unreconciled = 0;
+  for (const { taxYear } of years) {
+    unreconciled += (await unreconciledYears(taxYear)).length;
+  }
+
+  if (unreconciled > 0) {
+    findings.push({
+      severity: 'warning',
+      check: 'unreconciled_rent',
+      count: unreconciled,
+      message:
+        'Property-years where the rent banked and the 1099 still do not agree, with the difference unexplained. A year waiting on its form is not counted here - only ones with a figure entered that does not square.',
+    });
+  }
+
+  return findings;
+}
+
+/** A job with nothing in it is a header the owner should be told about. */
+async function jobChecks(): Promise<IntegrityFinding[]> {
+  const childless = await childlessJobIds();
+  if (childless.length === 0) return [];
+
+  return [
+    {
+      severity: 'warning',
+      check: 'childless_jobs',
+      count: childless.length,
+      // Deliberately not cleaned up automatically. A job is never created
+      // empty, so one that is empty now had its records deleted or moved, and
+      // quietly removing a header the owner named would hide that.
+      message:
+        'Jobs with no records left in them. They were emptied by deletions or regrouping, and are safe to remove - nothing is inside them.',
+    },
+  ];
+}
+
+/**
+ * Rows judged under a rule set that has since moved.
+ *
+ * `sh_eligible` is a cache of a derivation, not a fact. The stamp is what makes
+ * a stale one detectable rather than believed - which is the whole reason the
+ * column exists rather than the derivation simply being trusted.
+ */
+async function rulesVersionCheck(): Promise<IntegrityFinding[]> {
+  const db = getDb();
+
+  const [stale] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(timeEntries)
+    .where(ne(timeEntries.rulesVersion, RULES_VERSION));
+
+  const [unstamped] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(timeEntries)
+    .where(isNull(timeEntries.rulesVersion));
+
+  const findings: IntegrityFinding[] = [];
+
+  if ((stale?.count ?? 0) > 0) {
+    findings.push({
+      severity: 'info',
+      check: 'stale_rules_version',
+      count: stale?.count ?? 0,
+      message: `Time entries whose eligibility was derived under a rule set older than ${RULES_VERSION}. Not wrong - they were right when written - but re-derive before relying on the totals if a rule has changed since.`,
+    });
+  }
+
+  if ((unstamped?.count ?? 0) > 0) {
+    findings.push({
+      severity: 'warning',
+      check: 'unstamped_eligibility',
+      count: unstamped?.count ?? 0,
+      message:
+        'Time entries with no rules version recorded. Their eligibility cannot be tied to any rule set, so there is no way to tell whether it is current.',
+    });
+  }
 
   return findings;
 }
