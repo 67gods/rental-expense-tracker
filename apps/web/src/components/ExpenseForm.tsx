@@ -57,9 +57,9 @@ export function ExpenseForm({
       ) : null}
 
       <label className="field">
-        <span className="label">How much?</span>
+        <span className="field-label">How much?</span>
         <input
-          className="input tnum"
+          className="input num"
           name="amount"
           inputMode="decimal"
           autoComplete="off"
@@ -70,7 +70,7 @@ export function ExpenseForm({
       </label>
 
       <label className="field">
-        <span className="label">Paid to</span>
+        <span className="field-label">Paid to</span>
         <input
           className="input"
           name="vendor"
@@ -82,7 +82,7 @@ export function ExpenseForm({
       </label>
 
       <div className="field">
-        <label className="label" htmlFor="scheduleECategory">
+        <label className="field-label" htmlFor="scheduleECategory">
           Which Schedule E line?
         </label>
         <select
@@ -102,7 +102,7 @@ export function ExpenseForm({
         </select>
         {category ? <span className="hint">{safeHelper(category)}</span> : null}
         {needsClassification ? (
-          <p className="hint mt-2 rounded-lg border border-[color:var(--color-flag-500)] bg-[color:var(--color-flag-50)] p-2.5 text-[color:var(--color-flag-700)]">
+          <p className="hint mt-2 rounded-lg border border-[color:var(--color-flag-500)] bg-[color:var(--color-flag-50)] p-2.5 warn">
             This is spend on physical work, so it needs a repair-or-improvement
             answer before year end. It will sit in the review list until then.
           </p>
@@ -128,12 +128,12 @@ export function ExpenseForm({
       <ReceiptUpload />
 
       <label className="field">
-        <span className="label">When?</span>
+        <span className="field-label">When?</span>
         <input className="input" type="date" name="date" defaultValue={today} required />
       </label>
 
       <label className="field">
-        <span className="label">Notes (optional)</span>
+        <span className="field-label">Notes (optional)</span>
         <textarea className="textarea" name="notes" maxLength={2000} />
       </label>
 

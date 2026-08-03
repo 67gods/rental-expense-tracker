@@ -37,9 +37,9 @@ export function IncomeForm({
       ) : null}
 
       <label className="field">
-        <span className="label">How much came in?</span>
+        <span className="field-label">How much came in?</span>
         <input
-          className="input tnum"
+          className="input num"
           name="amount"
           inputMode="decimal"
           required
@@ -60,7 +60,7 @@ export function IncomeForm({
       ) : null}
 
       <div className="field">
-        <label className="label" htmlFor="source">
+        <label className="field-label" htmlFor="source">
           How did it arrive?
         </label>
         <select id="source" className="select" name="source" defaultValue="property_manager">
@@ -77,12 +77,12 @@ export function IncomeForm({
       </div>
 
       <label className="field">
-        <span className="label">When?</span>
+        <span className="field-label">When?</span>
         <input className="input" type="date" name="date" defaultValue={today} required />
       </label>
 
       <label className="field">
-        <span className="label">Notes (optional)</span>
+        <span className="field-label">Notes (optional)</span>
         <textarea
           className="textarea"
           name="notes"

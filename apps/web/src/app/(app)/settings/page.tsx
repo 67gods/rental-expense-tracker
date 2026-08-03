@@ -24,7 +24,7 @@ export default async function SettingsPage() {
     <div className="grid gap-4">
       <h1 className="text-xl font-bold tracking-tight">Settings</h1>
 
-      <section className="card card-pad">
+      <section className="panel panel-body">
         <h2 className="section-title">This setup</h2>
         <dl className="mt-2 grid gap-2 text-sm">
           <div className="flex justify-between gap-3">
@@ -37,7 +37,7 @@ export default async function SettingsPage() {
           </div>
           <div className="flex justify-between gap-3">
             <dt className="hint">Tax year</dt>
-            <dd className="tnum font-semibold">{user.taxYear}</dd>
+            <dd className="num font-semibold">{user.taxYear}</dd>
           </div>
           <div className="flex justify-between gap-3">
             <dt className="hint">Timezone</dt>
@@ -55,28 +55,28 @@ export default async function SettingsPage() {
         </p>
       </section>
 
-      <section className="card card-pad">
+      <section className="panel panel-body">
         <h2 className="section-title">Figures in force for {user.taxYear}</h2>
         <dl className="mt-2 grid gap-2 text-sm">
           <div className="flex justify-between gap-3">
             <dt className="hint">Hours target</dt>
-            <dd className="tnum font-semibold">{thresholds.safeHarborHourTarget}</dd>
+            <dd className="num font-semibold">{thresholds.safeHarborHourTarget}</dd>
           </div>
           <div className="flex justify-between gap-3">
             <dt className="hint">1099 reporting threshold</dt>
-            <dd className="tnum font-semibold">
+            <dd className="num font-semibold">
               {formatCents(thresholds.w9ReportingThresholdCents)}
             </dd>
           </div>
           <div className="flex justify-between gap-3">
             <dt className="hint">De minimis per invoice</dt>
-            <dd className="tnum font-semibold">
+            <dd className="num font-semibold">
               {formatCents(thresholds.deMinimisInvoiceCents)}
             </dd>
           </div>
           <div className="flex justify-between gap-3">
             <dt className="hint">Rule set</dt>
-            <dd className="tnum font-semibold">{RULES_VERSION}</dd>
+            <dd className="num font-semibold">{RULES_VERSION}</dd>
           </div>
         </dl>
         <p className="hint mt-3">
@@ -89,30 +89,30 @@ export default async function SettingsPage() {
 
       <section>
         <h2 className="section-title mb-2">Data health</h2>
-        <div className="card">
+        <div className="tablebox">
           {findings.length === 0 ? (
             <p className="p-4 text-sm">Nothing to flag.</p>
           ) : (
             [...errors, ...warnings, ...info].map((finding) => (
-              <div key={finding.check} className="row">
-                <div className="row-main">
-                  <p className="row-title">
+              <div key={finding.check} className="kv">
+                <div className="">
+                  <p style={{fontWeight:500}}>
                     <span
                       className={
                         finding.severity === 'error'
-                          ? 'badge badge-alert'
+                          ? 'tag tag-neg'
                           : finding.severity === 'warning'
-                            ? 'badge badge-flag'
-                            : 'badge badge-not-eligible'
+                            ? 'tag tag-warn'
+                            : 'tag tag-muted'
                       }
                     >
                       {finding.severity}
                     </span>{' '}
                     {finding.check.replace(/_/g, ' ')}
                   </p>
-                  <p className="row-meta">{finding.message}</p>
+                  <p className="hint">{finding.message}</p>
                 </div>
-                <span className="row-value">{finding.count}</span>
+                <span className="num">{finding.count}</span>
               </div>
             ))
           )}
@@ -123,7 +123,7 @@ export default async function SettingsPage() {
         </p>
       </section>
 
-      <section className="card card-pad">
+      <section className="panel panel-body">
         <h2 className="section-title mb-2">Your data</h2>
         <p className="hint">
           Everything is exportable as CSV at any time. There is no lock-in and no

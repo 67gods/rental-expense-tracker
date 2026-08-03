@@ -44,7 +44,7 @@ export default async function ReportsPage({
             <a
               key={year}
               href={`/reports?year=${year}`}
-              className={year === taxYear ? 'chip chip-on' : 'chip'}
+              className={year === taxYear ? 'chip chip-accent' : 'chip'}
             >
               {year}
             </a>
@@ -200,7 +200,7 @@ export default async function ReportsPage({
               download
             >
               <p style={{fontWeight:500}}>{REPORTS[id].label}</p>
-              <p className="row-meta num">
+              <p className="hint num">
                 {taxYear}-{id}.csv
               </p>
             </a>

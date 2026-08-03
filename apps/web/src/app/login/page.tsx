@@ -28,7 +28,7 @@ export default async function LoginPage({
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-5 py-10">
-      <div className="card card-pad">
+      <div className="panel panel-body">
         <h1 className="text-2xl font-bold tracking-tight">Rental Tracker</h1>
         <p className="hint mt-1 text-sm">
           Expenses, hours, mileage, and time on site for the portfolio.

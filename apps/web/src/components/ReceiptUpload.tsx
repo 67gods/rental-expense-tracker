@@ -77,7 +77,7 @@ export function ReceiptUpload({ name = 'receiptKey' }: { name?: string }) {
 
   return (
     <div className="field">
-      <span className="label">Receipt (optional)</span>
+      <span className="field-label">Receipt (optional)</span>
       <input type="hidden" name={name} value={key} />
 
       <input
@@ -99,7 +99,7 @@ export function ReceiptUpload({ name = 'receiptKey' }: { name?: string }) {
         {status === 'uploading' ? `Uploading ${filename}…` : null}
         {status === 'done' ? (
           <>
-            <span className="badge badge-eligible">Attached</span> {filename}{' '}
+            <span className="tag tag-pos">Attached</span> {filename}{' '}
             <button type="button" className="underline underline-offset-2" onClick={clear}>
               Remove
             </button>

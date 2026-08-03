@@ -35,7 +35,7 @@ export function TimerStartForm({
       <PropertyPicker options={properties} />
 
       <label className="field">
-        <span className="label">Note to yourself (optional)</span>
+        <span className="field-label">Note to yourself (optional)</span>
         <input
           className="input"
           name="description"

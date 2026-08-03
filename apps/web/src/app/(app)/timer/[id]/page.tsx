@@ -23,7 +23,7 @@ export default async function StopTimerPage({
   return (
     <div>
       <div className="mb-4 flex items-center gap-3">
-        <Link href="/" className="btn btn-ghost">
+        <Link href="/" className="btn">
           ← Back
         </Link>
         <h1 className="text-xl font-bold tracking-tight">Stop timer</h1>

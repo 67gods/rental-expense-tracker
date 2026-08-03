@@ -66,7 +66,7 @@ export default async function JobPage({
       {query.saved ? (
         <p
           role="status"
-          className="rounded-lg border border-[color:var(--color-eligible-500)] bg-[color:var(--color-eligible-50)] p-3 text-sm text-[color:var(--color-eligible-700)]"
+          className="rounded-lg border border-[color:var(--color-eligible-500)] bg-[color:var(--color-eligible-50)] p-3 text-sm pos"
         >
           Saved and added to this job.
         </p>
@@ -96,7 +96,7 @@ export default async function JobPage({
               <a
                 key={year}
                 href={`/jobs/${job.job.id}?year=${year}`}
-                className={year === rollup.taxYear ? 'chip chip-on' : 'chip'}
+                className={year === rollup.taxYear ? 'chip chip-accent' : 'chip'}
               >
                 {year}
               </a>

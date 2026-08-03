@@ -259,15 +259,15 @@ export function DataTable({
                         row.cells[column.key]
                       )}
                       {column.isLink && row.badges?.length
-                        ? row.badges.map((badge) => (
-                            <span key={badge.label}>
+                        ? row.badges.map((tag) => (
+                            <span key={tag.label}>
                               {' '}
-                              {badge.href ? (
-                                <Link href={badge.href} className={`tag tag-${badge.tone}`}>
-                                  {badge.label}
+                              {tag.href ? (
+                                <Link href={tag.href} className={`tag tag-${tag.tone}`}>
+                                  {tag.label}
                                 </Link>
                               ) : (
-                                <span className={`tag tag-${badge.tone}`}>{badge.label}</span>
+                                <span className={`tag tag-${tag.tone}`}>{tag.label}</span>
                               )}
                             </span>
                           ))

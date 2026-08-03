@@ -79,7 +79,7 @@ export default async function YearEndPage({
             <a
               key={year}
               href={`/year-end?year=${year}`}
-              className={year === taxYear ? 'chip chip-on' : 'chip'}
+              className={year === taxYear ? 'chip chip-accent' : 'chip'}
             >
               {year}
             </a>
@@ -228,7 +228,7 @@ export default async function YearEndPage({
             })}
           </div>
         ) : (
-          <p className="card card-pad hint">No properties yet.</p>
+          <p className="panel panel-body hint">No properties yet.</p>
         )}
 
         {/* No global "add a 1098" any more. Every 1098 belongs to a property,
@@ -274,7 +274,7 @@ export default async function YearEndPage({
             ))}
           </div>
         ) : (
-          <p className="card card-pad hint">No properties yet.</p>
+          <p className="panel panel-body hint">No properties yet.</p>
         )}
       </section>
 
@@ -283,7 +283,7 @@ export default async function YearEndPage({
         <h2 className="section-title mb-2">Payments still only planned</h2>
 
         {scheduled.length === 0 ? (
-          <p className="card card-pad hint">
+          <p className="panel panel-body hint">
             Nothing scheduled. Every payment on file is a cash event that has happened.
           </p>
         ) : (
@@ -369,7 +369,7 @@ export default async function YearEndPage({
             ))}
           </div>
         ) : (
-          <p className="card card-pad hint">
+          <p className="panel panel-body hint">
             Nothing entered for {taxYear} yet. Depreciation, a suspended loss carried
             forward, a component schedule — whatever came back, it goes here rather than
             being worked out.

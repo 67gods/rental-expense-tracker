@@ -75,13 +75,13 @@ export function PropertyForm({
         </p>
       ) : null}
       {state.saved ? (
-        <p role="status" className="mb-2 text-sm text-[color:var(--color-eligible-700)]">
+        <p role="status" className="mb-2 text-sm pos">
           {state.saved}
         </p>
       ) : null}
 
       <label className="field">
-        <span className="label">Nickname</span>
+        <span className="field-label">Nickname</span>
         <input
           className="input"
           name="nickname"
@@ -93,7 +93,7 @@ export function PropertyForm({
       </label>
 
       <label className="field">
-        <span className="label">Address</span>
+        <span className="field-label">Address</span>
         <input
           className="input"
           name="address"
@@ -105,7 +105,7 @@ export function PropertyForm({
 
       <div className="grid gap-1 sm:grid-cols-2 sm:gap-3">
         <label className="field">
-          <span className="label">Acquired</span>
+          <span className="field-label">Acquired</span>
           <input
             className="input"
             type="date"
@@ -115,9 +115,9 @@ export function PropertyForm({
         </label>
 
         <label className="field">
-          <span className="label">Ownership %</span>
+          <span className="field-label">Ownership %</span>
           <input
-            className="input tnum"
+            className="input num"
             name="ownershipPct"
             inputMode="decimal"
             defaultValue={defaults.ownershipPct ?? '100'}
@@ -126,9 +126,9 @@ export function PropertyForm({
       </div>
 
       <label className="field">
-        <span className="label">Unadjusted basis</span>
+        <span className="field-label">Unadjusted basis</span>
         <input
-          className="input tnum"
+          className="input num"
           name="unadjustedBasis"
           inputMode="decimal"
           defaultValue={
@@ -149,7 +149,7 @@ export function PropertyForm({
         viewable on the property page and never has to be maintained by hand.
       */}
       <label className="field">
-        <span className="label">Managed by</span>
+        <span className="field-label">Managed by</span>
         <select
           className="select"
           name="managedByActorId"
@@ -170,12 +170,12 @@ export function PropertyForm({
       </label>
 
       <fieldset className="field">
-        <legend className="label">This year</legend>
+        <legend className="field-label">This year</legend>
 
         <label className="row cursor-pointer">
-          <span className="row-main">
-            <span className="row-title">Triple-net leased</span>
-            <span className="row-meta">
+          <span className="">
+            <span style={{fontWeight:500}}>Triple-net leased</span>
+            <span className="hint">
               Takes this property out of the enterprise for the year, so its hours stop
               counting toward the target.
             </span>
@@ -189,9 +189,9 @@ export function PropertyForm({
         </label>
 
         <label className="row cursor-pointer">
-          <span className="row-main">
-            <span className="row-title">Personal use this year</span>
-            <span className="row-meta">
+          <span className="">
+            <span style={{fontWeight:500}}>Personal use this year</span>
+            <span className="hint">
               Same effect: the property leaves the enterprise for the year.
             </span>
           </span>
@@ -229,7 +229,7 @@ function PurchaseAndCpaDetails({
   const [wasHome, setWasHome] = useState(Boolean(defaults.wasPersonalResidence));
 
   return (
-    <details className="card card-pad my-2" open={open}>
+    <details className="panel panel-body my-2" open={open}>
       <summary className="cursor-pointer text-sm font-semibold">
         Purchase &amp; CPA details
       </summary>
@@ -248,7 +248,7 @@ function PurchaseAndCpaDetails({
 
         <div className="grid gap-1 sm:grid-cols-2 sm:gap-3">
           <label className="field">
-            <span className="label">Placed in service</span>
+            <span className="field-label">Placed in service</span>
             <input
               className="input"
               type="date"
@@ -258,7 +258,7 @@ function PurchaseAndCpaDetails({
           </label>
 
           <label className="field">
-            <span className="label">First tenant moved in</span>
+            <span className="field-label">First tenant moved in</span>
             <input
               className="input"
               type="date"
@@ -269,7 +269,7 @@ function PurchaseAndCpaDetails({
         </div>
 
         <label className="field">
-          <span className="label">What shows it was available</span>
+          <span className="field-label">What shows it was available</span>
           <select
             className="select"
             name="placedInServiceEvidence"
@@ -293,9 +293,9 @@ function PurchaseAndCpaDetails({
 
         <div className="grid gap-1 sm:grid-cols-2 sm:gap-3">
           <label className="field">
-            <span className="label">Purchase price</span>
+            <span className="field-label">Purchase price</span>
             <input
-              className="input tnum"
+              className="input num"
               name="purchasePrice"
               inputMode="decimal"
               defaultValue={money(defaults.purchasePriceCents)}
@@ -304,9 +304,9 @@ function PurchaseAndCpaDetails({
           </label>
 
           <label className="field">
-            <span className="label">Closing costs</span>
+            <span className="field-label">Closing costs</span>
             <input
-              className="input tnum"
+              className="input num"
               name="closingCosts"
               inputMode="decimal"
               defaultValue={money(defaults.closingCostsCents)}
@@ -315,9 +315,9 @@ function PurchaseAndCpaDetails({
         </div>
 
         <label className="field">
-          <span className="label">Land value</span>
+          <span className="field-label">Land value</span>
           <input
-            className="input tnum"
+            className="input num"
             name="landValue"
             inputMode="decimal"
             defaultValue={money(defaults.landValueCents)}
@@ -339,9 +339,9 @@ function PurchaseAndCpaDetails({
         <h3 className="section-title">Was this your home first?</h3>
 
         <label className="row cursor-pointer">
-          <span className="row-main">
-            <span className="row-title">Converted from a personal residence</span>
-            <span className="row-meta">
+          <span className="">
+            <span style={{fontWeight:500}}>Converted from a personal residence</span>
+            <span className="hint">
               Basis is then the lesser of what it cost and what it was worth on the day it
               became a rental — so both figures matter.
             </span>
@@ -358,7 +358,7 @@ function PurchaseAndCpaDetails({
         {wasHome ? (
           <div className="grid gap-1 sm:grid-cols-2 sm:gap-3">
             <label className="field">
-              <span className="label">Became a rental on</span>
+              <span className="field-label">Became a rental on</span>
               <input
                 className="input"
                 type="date"
@@ -368,9 +368,9 @@ function PurchaseAndCpaDetails({
             </label>
 
             <label className="field">
-              <span className="label">Market value that day</span>
+              <span className="field-label">Market value that day</span>
               <input
-                className="input tnum"
+                className="input num"
                 name="fmvAtConversion"
                 inputMode="decimal"
                 defaultValue={money(defaults.fmvAtConversionCents)}
@@ -385,7 +385,7 @@ function PurchaseAndCpaDetails({
 
         <div className="grid gap-1 sm:grid-cols-2 sm:gap-3">
           <label className="field">
-            <span className="label">Sold on</span>
+            <span className="field-label">Sold on</span>
             <input
               className="input"
               type="date"
@@ -395,9 +395,9 @@ function PurchaseAndCpaDetails({
           </label>
 
           <label className="field">
-            <span className="label">Sale price</span>
+            <span className="field-label">Sale price</span>
             <input
-              className="input tnum"
+              className="input num"
               name="salePrice"
               inputMode="decimal"
               defaultValue={money(defaults.salePriceCents)}
@@ -410,7 +410,7 @@ function PurchaseAndCpaDetails({
         <h3 className="section-title">Grouping</h3>
 
         <label className="field">
-          <span className="label">§469 activity</span>
+          <span className="field-label">§469 activity</span>
           <input
             className="input"
             name="section469Activity"

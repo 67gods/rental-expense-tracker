@@ -25,7 +25,7 @@ export default async function LogExpensePage({
   return (
     <div>
       <div className="mb-4 flex items-center gap-3">
-        <Link href={job ? `/jobs/${job.id}` : '/log'} className="btn btn-ghost">
+        <Link href={job ? `/jobs/${job.id}` : '/log'} className="btn">
           ← Back
         </Link>
         <h1 className="text-xl font-bold tracking-tight">Log expense</h1>

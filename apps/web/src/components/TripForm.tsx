@@ -68,14 +68,14 @@ export function TripForm({
       ) : null}
 
       <div className="field">
-        <span className="label">Where did you go?</span>
+        <span className="field-label">Where did you go?</span>
         <input type="hidden" name="destinationKind" value={kind} />
         <div className="grid gap-2">
           {DESTINATION_KINDS.map((option) => (
             <button
               key={option.id}
               type="button"
-              className="cat-option"
+              className="btn"
               aria-pressed={kind === option.id}
               onClick={() => chooseKind(option.id)}
             >
@@ -90,11 +90,11 @@ export function TripForm({
 
       <div className="grid gap-1 sm:grid-cols-2 sm:gap-3">
         <label className="field">
-          <span className="label">From</span>
+          <span className="field-label">From</span>
           <input className="input" name="origin" required defaultValue="Home" maxLength={200} />
         </label>
         <label className="field">
-          <span className="label">To</span>
+          <span className="field-label">To</span>
           <input
             className="input"
             name="destination"
@@ -106,9 +106,9 @@ export function TripForm({
       </div>
 
       <label className="field">
-        <span className="label">Miles</span>
+        <span className="field-label">Miles</span>
         <input
-          className="input tnum"
+          className="input num"
           name="miles"
           inputMode="decimal"
           required
@@ -118,7 +118,7 @@ export function TripForm({
       </label>
 
       <label className="field">
-        <span className="label">Why did you go?</span>
+        <span className="field-label">Why did you go?</span>
         <input
           className="input"
           name="purpose"
@@ -137,9 +137,9 @@ export function TripForm({
       <hr className="my-3 border-[color:var(--border)]" />
 
       <label className="field">
-        <span className="label">Time driving (optional)</span>
+        <span className="field-label">Time driving (optional)</span>
         <input
-          className="input tnum"
+          className="input num"
           name="driveMinutes"
           type="number"
           inputMode="numeric"
@@ -156,9 +156,9 @@ export function TripForm({
       </label>
 
       <label className="field">
-        <span className="label">Time working once you got there (optional)</span>
+        <span className="field-label">Time working once you got there (optional)</span>
         <input
-          className="input tnum"
+          className="input num"
           name="onsiteMinutes"
           type="number"
           inputMode="numeric"
@@ -174,7 +174,7 @@ export function TripForm({
       {onsiteMinutes > 0 ? (
         <>
           <div className="field">
-            <label className="label" htmlFor="onsiteCategory">
+            <label className="field-label" htmlFor="onsiteCategory">
               What were you doing there?
             </label>
             <select
@@ -205,7 +205,7 @@ export function TripForm({
           </div>
 
           <label className="field">
-            <span className="label">What did you do there?</span>
+            <span className="field-label">What did you do there?</span>
             <textarea
               className="textarea"
               name="onsiteDescription"
@@ -218,7 +218,7 @@ export function TripForm({
       ) : null}
 
       {driveMinutes > 0 || onsiteMinutes > 0 ? (
-        <p className="card card-pad hint">
+        <p className="panel panel-body hint">
           This will create {[
             'a mileage record',
             driveMinutes > 0 ? `${formatMinutes(driveMinutes)} of travel time (not eligible)` : null,
@@ -235,7 +235,7 @@ export function TripForm({
       ) : null}
 
       <label className="field mt-3">
-        <span className="label">When?</span>
+        <span className="field-label">When?</span>
         <input className="input" type="date" name="date" defaultValue={today} required />
       </label>
 

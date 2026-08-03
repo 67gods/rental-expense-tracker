@@ -50,19 +50,19 @@ export default async function PeoplePage() {
     <div className="grid gap-4">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-bold tracking-tight">People &amp; contractors</h1>
-        <Link href="/properties" className="btn btn-ghost">
+        <Link href="/properties" className="btn">
           Properties
         </Link>
       </div>
 
       <section>
         <h2 className="section-title mb-2">Household &amp; managers</h2>
-        <ul className="card">
+        <ul className="tablebox">
           {people.map((actor) => (
-            <li key={actor.id} className="row">
-              <div className="row-main">
-                <p className="row-title">{actor.name}</p>
-                <p className="row-meta">
+            <li key={actor.id} className="kv">
+              <div className="">
+                <p style={{fontWeight:500}}>{actor.name}</p>
+                <p className="hint">
                   {TYPE_LABELS[actor.type] ?? actor.type}
                   {actor.email ? ` · ${actor.email}` : ''}
                 </p>
@@ -83,25 +83,25 @@ export default async function PeoplePage() {
 
       <section>
         <h2 className="section-title mb-2">Contractors · paid in {user.taxYear}</h2>
-        <ul className="card">
+        <ul className="tablebox">
           {contractors.map((actor) => {
             const total = totalsById.get(actor.id);
             return (
-              <li key={actor.id} className="row">
-                <div className="row-main">
-                  <p className="row-title">{actor.name}</p>
-                  <p className="row-meta">
+              <li key={actor.id} className="kv">
+                <div className="">
+                  <p style={{fontWeight:500}}>{actor.name}</p>
+                  <p className="hint">
                     {actor.w9OnFile ? 'W-9 on file' : 'No W-9 on file'}
                     {actor.taxIdCollected ? ' · tax ID collected' : ''}
                   </p>
                   {warned.has(actor.id) ? (
                     <p className="mt-1">
-                      <span className="badge badge-alert">Needs a W-9 before year end</span>
+                      <span className="tag tag-neg">Needs a W-9 before year end</span>
                     </p>
                   ) : null}
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1">
-                  <span className="row-value">{formatCents(total?.paidCents ?? 0)}</span>
+                  <span className="num">{formatCents(total?.paidCents ?? 0)}</span>
                   <W9Toggle
                     id={actor.id}
                     name={actor.name}
@@ -126,7 +126,7 @@ export default async function PeoplePage() {
         </ul>
       </section>
 
-      <details className="card card-pad">
+      <details className="panel panel-body">
         <summary className="cursor-pointer text-sm font-semibold">Add someone</summary>
         <div className="mt-4">
           <ActorForm />

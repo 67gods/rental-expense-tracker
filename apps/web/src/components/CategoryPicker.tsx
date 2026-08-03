@@ -49,7 +49,7 @@ export function CategoryPicker({
 
   return (
     <div className="field">
-      <span className="label">What were you doing?</span>
+      <span className="field-label">What were you doing?</span>
       <input type="hidden" name={name} value={selected} />
 
       <div className="grid gap-2">
@@ -57,7 +57,7 @@ export function CategoryPicker({
           <button
             key={category.id}
             type="button"
-            className="cat-option"
+            className="btn"
             aria-pressed={selected === category.id}
             onClick={() => pick(category.id)}
           >
@@ -73,7 +73,7 @@ export function CategoryPicker({
       </div>
 
       {selectedCategory && contrast ? (
-        <p className="hint mt-3 rounded-lg border border-[color:var(--color-flag-500)] bg-[color:var(--color-flag-50)] p-2.5 text-[color:var(--color-flag-700)]">
+        <p className="hint mt-3 rounded-lg border border-[color:var(--color-flag-500)] bg-[color:var(--color-flag-50)] p-2.5 warn">
           Not this one? <strong>{contrast.label}</strong> — {contrast.helper} That one{' '}
           {contrast.shEligible ? 'counts' : 'does not count'} toward eligible hours.{' '}
           <button
@@ -97,7 +97,7 @@ export function CategoryPicker({
 
 export function EligibilityBadge({ eligible }: { eligible: boolean }) {
   return (
-    <span className={eligible ? 'badge badge-eligible' : 'badge badge-not-eligible'}>
+    <span className={eligible ? 'tag tag-pos' : 'tag tag-muted'}>
       {eligible ? 'Eligible' : 'Not eligible'}
     </span>
   );

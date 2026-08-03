@@ -52,13 +52,13 @@ export function TimerStopForm({
         </p>
       ) : null}
 
-      <div className="card card-pad mb-3">
+      <div className="panel panel-body mb-3">
         <p className="section-title">Measured</p>
-        <p className="tnum text-3xl font-bold tracking-tight">
+        <p className="num text-3xl font-bold tracking-tight">
           {formatMinutes(measuredMinutes)}
         </p>
         {isLongRunning ? (
-          <p className="hint mt-2 rounded-lg border border-[color:var(--color-flag-500)] bg-[color:var(--color-flag-50)] p-2.5 text-[color:var(--color-flag-700)]">
+          <p className="hint mt-2 rounded-lg border border-[color:var(--color-flag-500)] bg-[color:var(--color-flag-50)] p-2.5 warn">
             This ran for a long stretch. If you stepped away, correct it to the time you
             actually worked — an inflated entry is worse than a missing one.
           </p>
@@ -67,9 +67,9 @@ export function TimerStopForm({
 
       {correcting ? (
         <label className="field">
-          <span className="label">Time actually worked</span>
+          <span className="field-label">Time actually worked</span>
           <input
-            className="input tnum"
+            className="input num"
             type="number"
             inputMode="numeric"
             name="minutesOverride"
@@ -97,7 +97,7 @@ export function TimerStopForm({
       )}
 
       <label className="field">
-        <span className="label">What did you do?</span>
+        <span className="field-label">What did you do?</span>
         <textarea
           className="textarea"
           name="description"
@@ -113,7 +113,7 @@ export function TimerStopForm({
       </label>
 
       <div className="field">
-        <label className="label" htmlFor="category">
+        <label className="field-label" htmlFor="category">
           Category
         </label>
         <select

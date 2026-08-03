@@ -36,12 +36,12 @@ export function PropertyPicker({
 
   return (
     <div className="field">
-      <span className="label">
+      <span className="field-label">
         {label}
         {required ? '' : ' (optional)'}
       </span>
       <input type="hidden" name={name} value={selected} />
-      <div className="chip-row">
+      <div className="seg">
         {allowNone ? (
           <button
             type="button"
@@ -97,9 +97,9 @@ export function ActorPicker({
 
   return (
     <div className="field">
-      <span className="label">Who did this?</span>
+      <span className="field-label">Who did this?</span>
       <input type="hidden" name={name} value={selected} />
-      <div className="chip-row">
+      <div className="seg">
         {options.map((option) => (
           <button
             key={option.id}
@@ -139,7 +139,7 @@ export function SelectField({
 }) {
   return (
     <label className="field">
-      <span className="label">{label}</span>
+      <span className="field-label">{label}</span>
       <select className="select" name={name} defaultValue={defaultValue ?? ''} required={required}>
         <option value="">{placeholder}</option>
         {options.map((option) => (

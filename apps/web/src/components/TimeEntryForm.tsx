@@ -63,7 +63,7 @@ export function TimeEntryForm({
       <MinutePicker defaultValue={defaults.minutes} />
 
       <label className="field">
-        <span className="label">What did you do?</span>
+        <span className="field-label">What did you do?</span>
         <textarea
           className="textarea"
           name="description"
@@ -85,7 +85,7 @@ export function TimeEntryForm({
       <ActorPicker options={people} defaultValue={defaults.actorId} />
 
       <label className="field">
-        <span className="label">When?</span>
+        <span className="field-label">When?</span>
         <input className="input" type="date" name="date" defaultValue={defaults.date} required />
         <span className="hint">
           Defaults to today. Logging an earlier day is fine and is recorded as such.

@@ -13,7 +13,7 @@ export default async function LogIncomePage() {
   return (
     <div>
       <div className="mb-4 flex items-center gap-3">
-        <Link href="/log" className="btn btn-ghost">
+        <Link href="/log" className="btn">
           ← Back
         </Link>
         <h1 className="text-xl font-bold tracking-tight">Record rent received</h1>

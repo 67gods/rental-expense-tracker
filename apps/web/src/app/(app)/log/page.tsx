@@ -33,7 +33,7 @@ export default function QuickLogPage() {
       <h1 className="text-xl font-bold tracking-tight">Log something</h1>
 
       {ACTIONS.map((action) => (
-        <Link key={action.href} href={action.href} className="btn-quick">
+        <Link key={action.href} href={action.href} className="btn btn-primary">
           <strong>{action.title}</strong>
           <span>{action.hint}</span>
         </Link>

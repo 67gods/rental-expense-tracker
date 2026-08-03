@@ -26,10 +26,10 @@ export function MinutePicker({
 
   return (
     <div className="field">
-      <span className="label">How long?</span>
+      <span className="field-label">How long?</span>
       <input type="hidden" name={name} value={minutes || ''} />
 
-      <div className="chip-row">
+      <div className="seg">
         {PRESETS.map((preset) => (
           <button
             key={preset}
