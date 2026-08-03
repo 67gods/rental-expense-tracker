@@ -106,6 +106,12 @@ export default async function DashboardPage() {
           Reports &amp; export
         </Link>
       </div>
+
+      <div className="grid gap-2">
+        <Link href="/year-end" className="btn btn-block">
+          Year-end · {user.taxYear}
+        </Link>
+      </div>
     </div>
   );
 }

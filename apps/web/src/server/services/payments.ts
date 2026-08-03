@@ -304,6 +304,48 @@ export async function outstandingScheduled(taxYear: number): Promise<ExpensePaym
     .orderBy(asc(expensePayments.paidDate));
 }
 
+export interface ScheduledPaymentRow {
+  payment: ExpensePayment;
+  expenseId: string;
+  vendor: string;
+  invoiceDate: string;
+  invoiceTotalCents: number;
+  propertyId: string | null;
+}
+
+/**
+ * Every payment still only planned, with enough of its expense to recognise it.
+ *
+ * Not filtered to one year, deliberately. The case this section exists for is
+ * an invoice that straddles a year boundary - $8,244 with $2,500 paid in
+ * December and the rest queued across the next year - and filtering to the year
+ * being closed would hide exactly the rows that make it straddle. The screen
+ * marks which ones are already due and shows the rest as what is coming.
+ */
+export async function scheduledPayments(): Promise<ScheduledPaymentRow[]> {
+  const rows = await getDb()
+    .select({
+      payment: expensePayments,
+      vendor: expenses.vendor,
+      invoiceDate: expenses.date,
+      invoiceTotalCents: expenses.amountCents,
+      propertyId: expenses.propertyId,
+    })
+    .from(expensePayments)
+    .innerJoin(expenses, eq(expensePayments.expenseId, expenses.id))
+    .where(eq(expensePayments.isScheduled, true))
+    .orderBy(asc(expensePayments.paidDate));
+
+  return rows.map((r) => ({
+    payment: r.payment,
+    expenseId: r.payment.expenseId,
+    vendor: r.vendor,
+    invoiceDate: r.invoiceDate,
+    invoiceTotalCents: r.invoiceTotalCents,
+    propertyId: r.propertyId,
+  }));
+}
+
 /** Re-exported so callers do not need the domain package for one figure. */
 export { paidInYear };
 

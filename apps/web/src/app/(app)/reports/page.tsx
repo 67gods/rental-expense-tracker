@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { formatCents, formatMinutes, totalMiles } from '@rental/domain';
 import { requireUser } from '@/lib/session';
 import { buildScheduleE, REPORTS, timeSummaryByActor } from '@/server/services/reports';
@@ -50,6 +51,23 @@ export default async function ReportsPage({
           ))}
         </nav>
       </div>
+
+      {/*
+        The way in to the January sitting.
+
+        Not a sixth tab: TabBar caps at five for a stated reason - a sixth
+        shrinks every target below comfortable thumb reach - and a screen used
+        one week a year is the wrong thing to spend the last slot on. It sits at
+        the top of Reports because Reports is already where you go when it is
+        time to hand something to the CPA.
+      */}
+      <Link href={`/year-end?year=${taxYear}`} className="card card-pad block">
+        <p className="row-title">Year-end · {taxYear}</p>
+        <p className="row-meta">
+          The 1098s, rent against the 1099, payments still only planned, and the figures your
+          CPA sent back. One sitting, one page.
+        </p>
+      </Link>
 
       <section>
         <h2 className="section-title mb-2">Download for your CPA</h2>
