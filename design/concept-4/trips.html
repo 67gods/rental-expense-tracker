@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Soft</title><style>
+:root{
+  --bg:#0e0e13; --card:#17171f; --card2:#1e1e28; --line:#26263230;
+  --border:#272733; --ink:#eceaf3; --dim:#9b98ad; --faint:#6c6a7e;
+  --violet:#a78bfa; --violet-bg:#2a2140; --violet-br:#3d3060;
+  --green:#6ee7a8; --green-bg:#12301f;
+  --amber:#fcd34d; --amber-bg:#332608;
+  --rose:#fda4af; --rose-bg:#3a1620;
+  --sky:#7dd3fc; --sky-bg:#0c2a38;
+  --r:18px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--ink);font:14.5px/1.6 ui-rounded,-apple-system,"SF Pro Rounded","Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased;padding-bottom:92px}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:560px;margin:0 auto;padding:0 18px}
+@media(min-width:980px){.wrap{max-width:1080px}}
+
+/* header */
+.top{display:flex;align-items:center;gap:12px;padding:22px 0 8px}
+.top .av{width:40px;height:40px;border-radius:14px;background:linear-gradient(140deg,#a78bfa,#f0abfc);display:grid;place-items:center;font:700 14px/1 sans-serif;color:#2a1140}
+.top h1{font-size:21px;font-weight:700;letter-spacing:-.02em}
+.top p{font-size:13.5px;color:var(--faint);margin-top:1px}
+.top .sp{margin-left:auto}
+.yrbtn{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:9px 15px;font-weight:600;font-size:13.5px;color:var(--violet)}
+
+/* cards */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:14px;box-shadow:0 1px 2px rgba(0,0,0,.3)}
+.card.pad0{padding:0;overflow:hidden}
+.card h2{font-size:15px;font-weight:700;margin-bottom:4px;letter-spacing:-.01em}
+.card .cap{font-size:13px;color:var(--faint);margin-bottom:16px;line-height:1.5}
+.grid{display:grid;gap:14px}
+@media(min-width:980px){.grid.two{grid-template-columns:1fr 1fr}.grid.three{grid-template-columns:repeat(3,1fr)}.grid.side{grid-template-columns:1fr 360px;align-items:start}}
+
+/* hero number */
+.hero{text-align:center;padding:12px 0 6px}
+.hero .n{font:700 42px/1 ui-rounded,sans-serif;letter-spacing:-.035em}
+.hero .l{font-size:13.5px;color:var(--faint);margin-top:9px}
+.ring{width:132px;height:132px;margin:0 auto 6px;border-radius:50%;display:grid;place-items:center;
+  background:conic-gradient(var(--violet) 0turn,var(--violet) .0turn,var(--card2) 0turn)}
+.ring.p0{background:conic-gradient(var(--amber) 0 .004turn,var(--card2) 0)}
+.ring .in{width:112px;height:112px;border-radius:50%;background:var(--card);display:grid;place-items:center;text-align:center}
+.ring b{display:block;font:700 26px/1 sans-serif;letter-spacing:-.02em}
+.ring span{font-size:11.5px;color:var(--faint)}
+
+/* stat tiles */
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(min-width:980px){.tiles{grid-template-columns:repeat(4,1fr)}}
+.tile{background:var(--card2);border-radius:15px;padding:15px}
+.tile .k{font-size:12.5px;color:var(--faint)}
+.tile .v{font:700 21px/1.2 sans-serif;margin-top:6px;letter-spacing:-.02em}
+
+/* rows */
+.item{display:flex;align-items:center;gap:14px;padding:15px 20px;border-bottom:1px solid var(--border)}
+.item:last-child{border:0}
+.item .ic{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;font-size:17px;flex:none}
+.item .tx{flex:1;min-width:0}
+.item .tx b{display:block;font-weight:600;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .tx span{font-size:13px;color:var(--faint);display:block;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .rt{text-align:right;flex:none}
+.item .rt b{font-weight:700;font-size:14.5px;font-variant-numeric:tabular-nums}
+.item .rt span{font-size:12px;color:var(--faint);display:block;margin-top:2px}
+
+/* pills */
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:4px 11px;border-radius:100px}
+.p-v{background:var(--violet-bg);color:var(--violet)}
+.p-g{background:var(--green-bg);color:var(--green)}
+.p-a{background:var(--amber-bg);color:var(--amber)}
+.p-r{background:var(--rose-bg);color:var(--rose)}
+.p-s{background:var(--sky-bg);color:var(--sky)}
+.p-d{background:var(--card2);color:var(--dim)}
+
+/* segmented */
+.segs{display:flex;gap:8px;overflow-x:auto;padding:6px 0 16px;scrollbar-width:none}
+.segs::-webkit-scrollbar{display:none}
+.segs a{flex:none;padding:9px 16px;border-radius:100px;background:var(--card);border:1px solid var(--border);font-size:13.5px;font-weight:600;color:var(--dim);white-space:nowrap}
+.segs a.on{background:var(--violet);border-color:var(--violet);color:#25123f}
+
+/* progress */
+.pr{height:10px;border-radius:100px;background:var(--card2);overflow:hidden;display:flex;margin:16px 0 10px}
+.pr i{height:100%}
+.leg{display:flex;flex-wrap:wrap;gap:16px;font-size:13px;color:var(--dim)}
+.leg i{width:10px;height:10px;border-radius:4px;display:inline-block;margin-right:7px}
+
+/* note */
+.note{background:var(--violet-bg);border:1px solid var(--violet-br);border-radius:15px;padding:14px 16px;font-size:13.5px;color:#d6ccf5;line-height:1.6;margin:14px 0}
+.note.amber{background:var(--amber-bg);border-color:#4a3810;color:#f3ddaa}
+.note.green{background:var(--green-bg);border-color:#1c4a30;color:#b6ecd0}
+.note b{color:#fff;font-weight:700}
+
+/* table */
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-size:12px;font-weight:600;color:var(--faint);padding:14px 20px 10px}
+th.n,td.n{text-align:right;font-variant-numeric:tabular-nums}
+td{padding:13px 20px;border-top:1px solid var(--border)}
+
+/* form */
+.f{margin-bottom:14px}
+.f label{display:block;font-size:13px;font-weight:600;color:var(--dim);margin-bottom:7px}
+.f input,.f select{width:100%;background:var(--card2);border:1px solid var(--border);border-radius:14px;color:var(--ink);padding:13px 15px;font-size:15px;outline:none;font-family:inherit}
+.f input:focus{border-color:var(--violet)}
+.big-in{font:700 34px/1 sans-serif !important;text-align:center;padding:20px !important;letter-spacing:-.03em}
+.btn{display:block;width:100%;background:var(--violet);color:#25123f;border:0;border-radius:16px;padding:15px;font:700 15.5px ui-rounded,sans-serif;cursor:pointer;margin-top:6px}
+.btn.ghost{background:var(--card2);color:var(--ink);border:1px solid var(--border)}
+.btn.sm{width:auto;padding:9px 16px;font-size:13.5px;border-radius:12px;display:inline-block}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+/* tabbar */
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;background:rgba(14,14,19,.92);backdrop-filter:blur(18px);border-top:1px solid var(--border);display:flex;padding:10px 6px 26px}
+.tabs a{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--faint)}
+.tabs a.on{color:var(--violet)}
+.tabs .box{width:44px;height:30px;border-radius:11px;display:grid;place-items:center}
+.tabs a.on .box{background:var(--violet-bg)}
+.tabs svg{width:21px;height:21px}
+h3.sec{font-size:16px;font-weight:700;letter-spacing:-.01em;margin:24px 0 12px}
+</style></head><body>
+<div class="wrap">
+<header class="top"><span class="av">AG</span><div><h1>Mileage</h1><p>1,252.5 miles in 2025</p></div><span class="sp"></span><a class="yrbtn" href="#">2025 ▾</a></header>
+<div class="segs"><a href="entries.html">Expenses</a><a href="income.html">Rent</a><a href="time.html">Time</a><a class="on">Miles</a></div>
+<div class="card">
+  <div class="pr"><i style="width:79%;background:var(--green)"></i><i style="width:21%;background:var(--violet)"></i></div>
+  <div class="leg"><span><i style="background:var(--green)"></i>992.9 operating</span><span><i style="background:var(--violet)"></i>259.6 acquisition</span></div>
+</div>
+<div class="card pad0">
+  <div class="item"><span class="ic" style="background:var(--card2)">🏘</span><span class="tx"><b>Arbordale</b><span>37 trips · year total</span></span><span class="rt"><b>812.1 mi</b><span class="pill p-g" style="margin-top:4px">Operating</span></span></div><div class="item"><span class="ic" style="background:var(--card2)">🏚</span><span class="tx"><b>Creedmore</b><span>Due diligence, showings</span></span><span class="rt"><b>259.6 mi</b><span class="pill p-v" style="margin-top:4px">Basis</span></span></div><div class="item"><span class="ic" style="background:var(--card2)">🏡</span><span class="tx"><b>Westmill</b><span>27 trips · year total</span></span><span class="rt"><b>103.3 mi</b><span class="pill p-g" style="margin-top:4px">Operating</span></span></div><div class="item"><span class="ic" style="background:var(--card2)">🏠</span><span class="tx"><b>Kettlewell</b><span>9 trips · year total</span></span><span class="rt"><b>58.6 mi</b><span class="pill p-g" style="margin-top:4px">Operating</span></span></div><div class="item"><span class="ic" style="background:var(--card2)">💻</span><span class="tx"><b>Portfolio</b><span>iPad purchase · 2 trips</span></span><span class="rt"><b>18.9 mi</b><span class="pill p-g" style="margin-top:4px">Operating</span></span></div>
+</div>
+<div class="note">These are year totals from your MileIQ log, not single journeys — recorded honestly as reconstructions. From 2026 each trip gets captured as it happens.</div>
+</div>
+<nav class="tabs"><a href="index.html" class=""><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg></span>Home</a><a href="entries.html" class="on"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M7 9h10M7 13h10M7 17h6"/></svg></span>Records</a><a href="log.html" class=""><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8.5v7M8.5 12h7"/></svg></span>Add</a><a href="year-end.html" class=""><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span>Close</a><a href="reports.html" class=""><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/></svg></span>More</a></nav>
+</body></html>

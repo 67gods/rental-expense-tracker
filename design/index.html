@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Four directions · rental property</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0a0c;color:#eaeaef;font:15px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased;padding:0 20px 80px}
+a{color:inherit;text-decoration:none}
+.w{max-width:1080px;margin:0 auto}
+header{padding:64px 0 40px;border-bottom:1px solid #1e1e24;margin-bottom:40px}
+h1{font-size:34px;font-weight:700;letter-spacing:-.03em}
+header p{color:#8d8d99;margin-top:12px;max-width:640px;font-size:16px}
+.grid{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.c{border:1px solid #22222a;border-radius:16px;overflow:hidden;background:#111114;display:block;transition:border-color .15s}
+.c:hover{border-color:#3a3a46}
+.sw{height:88px;display:flex}
+.sw i{flex:1}
+.cb{padding:18px}
+.cb h2{font-size:17px;font-weight:650;letter-spacing:-.01em}
+.cb .ref{font-size:12.5px;color:#6f6f7d;margin-top:3px}
+.cb p{font-size:13.5px;color:#9a9aa8;margin-top:11px;line-height:1.55}
+.cb .go{display:inline-block;margin-top:14px;font-size:13px;font-weight:600;color:#7aa2ff}
+h3{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#6f6f7d;margin:48px 0 16px;font-weight:600}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#6f6f7d;padding:0 14px 10px;font-weight:600}
+td{padding:12px 14px;border-top:1px solid #1e1e24;vertical-align:top}
+td:first-child{font-weight:600;white-space:nowrap}
+.pg{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.pg a{font-size:12.5px;color:#9a9aa8;border:1px solid #26262f;border-radius:7px;padding:4px 9px}
+.pg a:hover{color:#eaeaef;border-color:#3a3a46}
+.note{border-left:2px solid #7aa2ff;background:#0f1219;padding:14px 16px;border-radius:0 10px 10px 0;color:#9a9aa8;font-size:14px;margin-top:40px;line-height:1.6}
+.note b{color:#eaeaef}
+</style>
+</head>
+<body>
+<div class="w">
+<header>
+  <h1>Four directions</h1>
+  <p>Static mockups, dark throughout, built from the real 2025 figures so the layouts are judged against actual data rather than lorem. No JavaScript — filters and menus are drawn in a plausible state.</p>
+</header>
+
+<div class="grid">
+  <a class="c" href="concept-1/index.html">
+    <div class="sw"><i style="background:#0b0c0e"></i><i style="background:#0f1113"></i><i style="background:#5b8cff"></i><i style="background:#3fb950"></i></div>
+    <div class="cb">
+      <h2>1 · Ledger</h2>
+      <div class="ref">Linear, Arc, a terminal</div>
+      <p>A working instrument. Persistent left rail, hairlines instead of cards, monospaced numerics so columns align optically. Maximum information per screen — built for someone who lives in it.</p>
+      <span class="go">Open →</span>
+    </div>
+  </a>
+
+  <a class="c" href="concept-2/index.html">
+    <div class="sw"><i style="background:#000"></i><i style="background:#101012"></i><i style="background:#32d74b"></i><i style="background:#0a84ff"></i></div>
+    <div class="cb">
+      <h2>2 · Statement</h2>
+      <div class="ref">Robinhood, Wealthfront, Revolut</div>
+      <p>One number dominates every screen; everything else is subordinate. Bottom tab bar, huge type, colour only for direction. Identical on a phone and a laptop.</p>
+      <span class="go">Open →</span>
+    </div>
+  </a>
+
+  <a class="c" href="concept-3/index.html">
+    <div class="sw"><i style="background:#111110"></i><i style="background:#191917"></i><i style="background:#ffb224"></i><i style="background:#ab6ee4"></i></div>
+    <div class="cb">
+      <h2>3 · Console</h2>
+      <div class="ref">Notion Calendar, Copilot, a mail client</div>
+      <p>Split pane — you never leave the list. Filters read as a sentence, and reviewing eighty expenses is eighty glances rather than eighty round trips.</p>
+      <span class="go">Open →</span>
+    </div>
+  </a>
+
+  <a class="c" href="concept-4/index.html">
+    <div class="sw"><i style="background:#0e0e13"></i><i style="background:#17171f"></i><i style="background:#a78bfa"></i><i style="background:#6ee7a8"></i></div>
+    <div class="cb">
+      <h2>4 · Soft</h2>
+      <div class="ref">Your Habit-Tracker, in dark</div>
+      <p>Rounded cards, violet accent, pastel status pills, generous padding — the shapes from Habit-Tracker on a deep neutral. The warmest of the four.</p>
+      <span class="go">Open →</span>
+    </div>
+  </a>
+</div>
+
+<h3>How they differ where it matters</h3>
+<table>
+  <thead><tr><th>Question</th><th>1 · Ledger</th><th>2 · Statement</th><th>3 · Console</th><th>4 · Soft</th></tr></thead>
+  <tbody>
+    <tr><td>Navigation</td><td>Left rail, always visible</td><td>Bottom tabs, five max</td><td>Rail + command bar</td><td>Bottom tabs, rounded</td></tr>
+    <tr><td>Rows per screen</td><td>~24</td><td>~7</td><td>~18</td><td>~8</td></tr>
+    <tr><td>Reading a detail</td><td>Own page</td><td>Own page</td><td>Right pane, list stays</td><td>Own page</td></tr>
+    <tr><td>Best on</td><td>Laptop</td><td>Phone</td><td>Laptop</td><td>Either</td></tr>
+    <tr><td>Weakness</td><td>Austere; small targets</td><td>Scroll-heavy for 78 rows</td><td>Cramped under 1000px</td><td>Less dense than Ledger</td></tr>
+  </tbody>
+</table>
+
+<h3>Every page, in each concept</h3>
+<table>
+  <tbody>
+    <tr><td>Concept 1</td><td><div class="pg">
+      <a href="concept-1/index.html">Overview</a><a href="concept-1/entries.html">Expenses</a><a href="concept-1/expense.html">Expense detail</a><a href="concept-1/income.html">Rent</a><a href="concept-1/time.html">Time</a><a href="concept-1/trips.html">Mileage</a><a href="concept-1/properties.html">Properties</a><a href="concept-1/property.html">Property</a><a href="concept-1/year-end.html">Year-end</a><a href="concept-1/reports.html">Reports</a><a href="concept-1/jobs.html">Jobs</a><a href="concept-1/people.html">People</a><a href="concept-1/log.html">Log</a><a href="concept-1/settings.html">Settings</a>
+    </div></td></tr>
+    <tr><td>Concept 2</td><td><div class="pg">
+      <a href="concept-2/index.html">Home</a><a href="concept-2/entries.html">Activity</a><a href="concept-2/expense.html">Expense detail</a><a href="concept-2/income.html">Rent</a><a href="concept-2/time.html">Time</a><a href="concept-2/trips.html">Mileage</a><a href="concept-2/properties.html">Properties</a><a href="concept-2/property.html">Property</a><a href="concept-2/year-end.html">Year-end</a><a href="concept-2/reports.html">Reports</a><a href="concept-2/jobs.html">Jobs</a><a href="concept-2/people.html">People</a><a href="concept-2/log.html">Log</a><a href="concept-2/settings.html">Settings</a>
+    </div></td></tr>
+    <tr><td>Concept 3</td><td><div class="pg">
+      <a href="concept-3/index.html">Overview</a><a href="concept-3/entries.html">Expenses + detail</a><a href="concept-3/income.html">Rent + detail</a><a href="concept-3/time.html">Time</a><a href="concept-3/trips.html">Mileage</a><a href="concept-3/properties.html">Properties + detail</a><a href="concept-3/year-end.html">Year-end</a><a href="concept-3/reports.html">Reports</a><a href="concept-3/jobs.html">Jobs</a><a href="concept-3/people.html">People</a><a href="concept-3/log.html">Log</a><a href="concept-3/settings.html">Settings</a>
+    </div><p style="font-size:12.5px;color:#6f6f7d;margin-top:8px">No separate detail pages — the right pane <em>is</em> the detail view. That is the concept.</p></td></tr>
+    <tr><td>Concept 4</td><td><div class="pg">
+      <a href="concept-4/index.html">Home</a><a href="concept-4/entries.html">Records</a><a href="concept-4/expense.html">Expense detail</a><a href="concept-4/income.html">Rent</a><a href="concept-4/time.html">Time</a><a href="concept-4/trips.html">Mileage</a><a href="concept-4/properties.html">Properties</a><a href="concept-4/property.html">Property</a><a href="concept-4/year-end.html">Year-end</a><a href="concept-4/reports.html">Reports</a><a href="concept-4/jobs.html">Jobs</a><a href="concept-4/people.html">People</a><a href="concept-4/log.html">Log</a><a href="concept-4/settings.html">Settings</a>
+    </div></td></tr>
+  </tbody>
+</table>
+
+<div class="note">Every concept solves the same four problems you named: <b>1098s grouped by property</b> rather than by lender, since servicing transfers as readily as a refinance; <b>read-only until you choose to edit</b>; <b>key dates for all four properties in one glance</b>; and <b>miles visible</b> rather than buried in a dollar figure. Where they differ is density, navigation, and whether reading a record costs you your place in the list.</div>
+</div>
+</body>
+</html>
