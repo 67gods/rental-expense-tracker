@@ -2,10 +2,13 @@ import { ZodError } from 'zod';
 import {
   AllocationError,
   DateError,
+  knownTaxYears,
   MoneyError,
+  PaymentError,
   TripError,
   UnknownHourCategoryError,
   UnknownScheduleECategoryError,
+  UnknownTaxYearError,
 } from '@rental/domain';
 import { ConfigError } from '@/env';
 import { UnauthorizedError } from '@/lib/session';
@@ -79,10 +82,33 @@ export function toErrorPayload(error: unknown): ErrorPayload {
     error instanceof TripError ||
     error instanceof MoneyError ||
     error instanceof DateError ||
+    error instanceof PaymentError ||
     error instanceof UnknownHourCategoryError ||
     error instanceof UnknownScheduleECategoryError
   ) {
     return { status: 400, error: 'rule_violation', message: error.message };
+  }
+
+  /**
+   * A year the threshold table has never heard of.
+   *
+   * This is the one error whose class message is written for a developer - it
+   * names the file to edit - so it is logged in full and the caller gets the
+   * version they can act on. Without this branch the app answers "something
+   * broke on our side", which is exactly wrong: nothing broke, the app just
+   * refuses to guess which year's rules to apply, and that refusal is the whole
+   * point of the year-keyed table.
+   */
+  if (error instanceof UnknownTaxYearError) {
+    console.error(error.message);
+    const years = knownTaxYears();
+    return {
+      status: 400,
+      error: 'unknown_tax_year',
+      message:
+        `This app does not carry the figures for ${error.taxYear} yet, and it will not ` +
+        `borrow another year's. Years available: ${years[0]} to ${years[years.length - 1]}.`,
+    };
   }
 
   if (error instanceof ConfigError) {

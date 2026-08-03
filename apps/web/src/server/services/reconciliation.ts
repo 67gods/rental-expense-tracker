@@ -11,6 +11,7 @@ import {
 } from '@rental/domain';
 import { getDb, withTransaction } from '@/db/client';
 import {
+  properties,
   rentReceipts,
   rentReconciliationItems,
   rentReconciliations,
@@ -106,6 +107,34 @@ export async function reconciliationFor(
     taxYear,
     items: items.map((item) => ({ ...item, isUnusualSign: isUnusualSign(item) })),
   };
+}
+
+/**
+ * Every active property's view for a year, whether or not anyone has started.
+ *
+ * The year-end screen shows all four properties with their received totals and
+ * an empty 1099 box. Listing only the ones with a header would hide the exact
+ * case that needs attention - the property whose 1099 arrived and was never
+ * entered looks identical to one that has no 1099 at all.
+ *
+ * A handful of properties, so the per-property queries are not worth batching;
+ * if that changes this is the one place to fix.
+ */
+export async function reconciliationsForYear(
+  taxYear: number,
+): Promise<(ReconciliationView & { propertyNickname: string })[]> {
+  const rows = await getDb()
+    .select({ id: properties.id, nickname: properties.nickname })
+    .from(properties)
+    .where(eq(properties.isArchived, false))
+    .orderBy(asc(properties.nickname));
+
+  const views: (ReconciliationView & { propertyNickname: string })[] = [];
+  for (const row of rows) {
+    const view = await reconciliationFor(row.id, taxYear);
+    views.push({ ...view, propertyNickname: row.nickname });
+  }
+  return views;
 }
 
 export async function upsertReconciliation(

@@ -1,14 +1,16 @@
-import { asc, desc, eq, inArray, or, sql } from 'drizzle-orm';
+import { asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import {
   assignJobSchema,
   createJobSchema,
   jobTitleFrom,
   rollUpJob,
   taxYearOf,
+  unassignJobSchema,
   updateJobSchema,
   type AssignJobInput,
   type CreateJobInput,
   type JobRollup,
+  type UnassignJobInput,
 } from '@rental/domain';
 import { getDb, withTransaction } from '@/db/client';
 import {
@@ -292,6 +294,45 @@ export async function assignToJob(input: AssignJobInput): Promise<Job> {
   });
 }
 
+/**
+ * The reverse of "group these": takes records back out of their job.
+ *
+ * Only the membership goes. The records themselves are the evidence and are
+ * never touched, which is the same promise `deleteJob` makes from the other
+ * direction. A job left with no children is reported by the integrity audit
+ * rather than cleaned up here - a header the owner named is worth telling them
+ * about before it disappears.
+ */
+export async function unassignFromJob(input: UnassignJobInput): Promise<number> {
+  const data = unassignJobSchema.parse(input);
+  const total =
+    data.timeEntryIds.length + data.tripIds.length + data.expenseIds.length;
+  if (total === 0) return 0;
+
+  return withTransaction(async (tx) => {
+    const now = new Date();
+    if (data.timeEntryIds.length) {
+      await tx
+        .update(timeEntries)
+        .set({ jobId: null, updatedAt: now })
+        .where(inArray(timeEntries.id, data.timeEntryIds));
+    }
+    if (data.tripIds.length) {
+      await tx
+        .update(trips)
+        .set({ jobId: null, updatedAt: now })
+        .where(inArray(trips.id, data.tripIds));
+    }
+    if (data.expenseIds.length) {
+      await tx
+        .update(expenses)
+        .set({ jobId: null, updatedAt: now })
+        .where(inArray(expenses.id, data.expenseIds));
+    }
+    return total;
+  });
+}
+
 /** Job ids that no longer have a single child, for the integrity audit. */
 export async function childlessJobIds(): Promise<string[]> {
   const rows = await getDb()
@@ -314,6 +355,3 @@ export async function jobTitlesById(): Promise<Map<string, string>> {
 function asTreatment(value: string | null): 'operating' | 'acquisition' | null {
   return value === 'operating' || value === 'acquisition' ? value : null;
 }
-
-/** Re-exported so callers do not need to import from two places. */
-export { or };

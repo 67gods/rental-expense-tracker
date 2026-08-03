@@ -574,6 +574,7 @@ export const unassignJobSchema = z.object({
   tripIds: z.array(uuid).optional().default([]),
   expenseIds: z.array(uuid).optional().default([]),
 });
+export type UnassignJobInput = z.input<typeof unassignJobSchema>;
 
 // --- Reports ---------------------------------------------------------------
 
