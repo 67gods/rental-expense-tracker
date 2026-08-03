@@ -96,25 +96,65 @@ export default async function YearEndPage({
       <section>
         <h2 className="section-title mb-2">Mortgage &amp; escrow · from the 1098s</h2>
 
-        {loanYears.length > 0 ? (
-          <div className="grid gap-2">
-            {loanYears.map((row) => (
-              <div key={row.id} className="card card-pad">
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <div>
-                    <p className="row-title">{row.lenderName}</p>
-                    <p className="row-meta">
-                      {propertyNames.get(row.propertyId) ?? 'Unknown property'}
-                    </p>
+        {/*
+          Grouped by PROPERTY, not listed by lender.
+
+          A refinance leaves two 1098s on one house, and a flat list by bank
+          makes you hold the mapping in your head to answer "what did Westmill
+          cost me in interest". The property is the thing you think in; the
+          lender is a detail underneath it.
+        */}
+        {properties.length > 0 ? (
+          <div className="grid gap-3">
+            {properties.map((property) => {
+              const forProperty = loanYears.filter((l) => l.propertyId === property.id);
+              const interest = forProperty.reduce((s, l) => s + (l.interestCents ?? 0), 0);
+              const propertyTax = forProperty.reduce((s, l) => s + (l.propertyTaxCents ?? 0), 0);
+              const insurance = forProperty.reduce(
+                (s, l) => s + (l.insurancePaidFromEscrowCents ?? 0),
+                0,
+              );
+
+              return (
+                <section key={property.id} className="card card-pad">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <h3 className="text-base font-semibold">{property.nickname}</h3>
+                    {forProperty.length === 0 ? (
+                      <span className="badge badge-flag">No 1098 entered</span>
+                    ) : (
+                      <span className="row-meta">
+                        {forProperty.length}{' '}
+                        {forProperty.length === 1 ? 'lender' : 'lenders'}
+                      </span>
+                    )}
                   </div>
-                  <DeleteButton
-                    what={`the ${row.lenderName} 1098 for ${taxYear}`}
-                    onDelete={async () => {
-                      'use server';
-                      await deleteLoanYearAction(row.id);
-                    }}
-                  />
-                </div>
+
+                  {/* The property-level totals first, because that is the
+                      question being asked. The per-lender rows are the
+                      evidence for it. */}
+                  {forProperty.length > 1 ? (
+                    <dl className="mt-3 grid gap-x-6 gap-y-1 sm:grid-cols-3">
+                      <Figure label="Interest, all lenders" cents={interest} />
+                      <Figure label="Property tax" cents={propertyTax} />
+                      <Figure label="Insurance" cents={insurance} />
+                    </dl>
+                  ) : null}
+
+                  {forProperty.map((row) => (
+                    <div
+                      key={row.id}
+                      className="mt-3 border-t border-[color:var(--border)] pt-3"
+                    >
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <p className="row-title">{row.lenderName}</p>
+                        <DeleteButton
+                          what={`the ${row.lenderName} 1098 for ${taxYear}`}
+                          onDelete={async () => {
+                            'use server';
+                            await deleteLoanYearAction(row.id);
+                          }}
+                        />
+                      </div>
 
                 <dl className="mt-3 grid gap-x-6 gap-y-1 sm:grid-cols-3">
                   <Figure label="Interest" cents={row.interestCents} />
@@ -159,21 +199,41 @@ export default async function YearEndPage({
                   </div>
                 </details>
               </div>
-            ))}
+                  ))}
+
+                  {forProperty.length === 0 ? (
+                    <p className="hint mt-2">
+                      Nothing entered for {taxYear}. Mortgage interest, property tax and
+                      escrowed insurance are the largest deductions on the return and none
+                      of them passes through the expense ledger.
+                    </p>
+                  ) : null}
+
+                  <details className="mt-3">
+                    <summary className="cursor-pointer text-sm font-semibold">
+                      {forProperty.length === 0
+                        ? `Add the 1098 for ${property.nickname}`
+                        : 'Add another lender (after a refinance)'}
+                    </summary>
+                    <div className="mt-3">
+                      <LoanYearForm
+                        taxYear={taxYear}
+                        properties={propertyOptions}
+                        defaults={{ propertyId: property.id }}
+                      />
+                    </div>
+                  </details>
+                </section>
+              );
+            })}
           </div>
         ) : (
-          <p className="card card-pad hint">
-            No 1098s recorded for {taxYear}. These are the largest deductions on the return
-            and none of them passes through the expense ledger, so they have to be typed in.
-          </p>
+          <p className="card card-pad hint">No properties yet.</p>
         )}
 
-        <details className="card card-pad mt-2" open={loanYears.length === 0}>
-          <summary className="cursor-pointer text-sm font-semibold">Add a 1098</summary>
-          <div className="mt-4">
-            <LoanYearForm taxYear={taxYear} properties={propertyOptions} />
-          </div>
-        </details>
+        {/* No global "add a 1098" any more. Every 1098 belongs to a property,
+            and adding one from inside that property's card means the property
+            is already chosen rather than being the first question asked. */}
       </section>
 
       {/* 2 --------------------------------------------------------------- */}

@@ -11,6 +11,11 @@ import { PropertyForm } from '@/components/PropertyForm';
 
 export const metadata = { title: 'Properties' };
 
+/** A blank cell that reads as "nobody has filled this in", not as a zero. */
+function Missing() {
+  return <span className="text-[color:var(--color-muted)]">—</span>;
+}
+
 export default async function PropertiesPage({
   searchParams,
 }: {
@@ -34,6 +39,62 @@ export default async function PropertiesPage({
           People &amp; contractors
         </Link>
       </div>
+
+      {/*
+        The whole portfolio's key dates on one screen.
+
+        These four facts are what every conversation with a CPA starts with,
+        and until now they were one property at a time, three clicks deep. A
+        blank cell is doing real work here: it is the fastest way to see which
+        property is still missing the date that decides where depreciation
+        starts.
+      */}
+      {properties.length > 0 ? (
+        <section>
+          <h2 className="section-title mb-2">Key dates</h2>
+          <div className="table-wrap card">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Property</th>
+                  <th>Acquired</th>
+                  <th>Listed / available</th>
+                  <th>First tenant</th>
+                  <th>Managed by</th>
+                </tr>
+              </thead>
+              <tbody>
+                {properties.map((property) => {
+                  const managerActorId = managers.get(property.id);
+                  const managerName = managerActorId
+                    ? managerNames.get(managerActorId)
+                    : null;
+                  return (
+                    <tr key={property.id}>
+                      <td>
+                        <Link href={`/properties/${property.id}`}>{property.nickname}</Link>
+                      </td>
+                      <td className="tnum">{property.acquiredDate ?? <Missing />}</td>
+                      <td className="tnum">
+                        {property.placedInServiceDate ?? <Missing />}
+                      </td>
+                      <td className="tnum">{property.firstTenantDate ?? <Missing />}</td>
+                      <td>
+                        {managerName ?? (property.isSelfManaged ? 'Self-managed' : <Missing />)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="hint mt-2">
+            <strong>Listed / available</strong> is the placed-in-service date — when it was
+            ready to rent, not when it was bought and not when someone moved in. Depreciation
+            starts there, and every cost before it sits on the other side of the line.
+          </p>
+        </section>
+      ) : null}
 
       {properties.length > 0 ? (
         <ul className="card">

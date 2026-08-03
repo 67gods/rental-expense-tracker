@@ -102,8 +102,17 @@ export default async function PropertyDetailPage({
 
       <ManagementHistory periods={periods} names={names} />
 
-      <section className="card card-pad">
-        <h2 className="section-title mb-4">Details</h2>
+      {/*
+        Read-only until asked otherwise.
+
+        The facts card above is what this page is for; the form is how you
+        correct it. Rendering eleven open inputs under a card that already
+        states the same values reads as "fill this in" every single visit,
+        which is why the page felt like a form rather than a record.
+      */}
+      <details className="card card-pad">
+        <summary className="cursor-pointer text-sm font-semibold">Edit these details</summary>
+        <div className="mt-4">
         <PropertyForm
           enterpriseId={property.enterpriseId}
           managers={managerActors.map((a) => ({ id: a.id, name: a.name }))}
@@ -141,7 +150,8 @@ export default async function PropertyDetailPage({
                 : null,
           }}
         />
-      </section>
+        </div>
+      </details>
     </div>
   );
 }
