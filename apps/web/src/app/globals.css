@@ -604,7 +604,13 @@ a {
     padding: 5px 10px;
     border-radius: 6px;
     cursor: pointer;
-    display: inline-block;
+    /* Flex rather than inline-block so a button holding an icon and a word
+       centres them against each other instead of dropping the icon onto the
+       text baseline. Single-word buttons are unaffected. */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
     text-align: center;
   }
   .btn:hover {
@@ -634,7 +640,7 @@ a {
     border-color: #6d3330;
   }
   .btn-block {
-    display: block;
+    display: flex;
     width: 100%;
     padding: 8px 10px;
   }
