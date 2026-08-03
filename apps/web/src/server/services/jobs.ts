@@ -1,7 +1,10 @@
-import { asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import {
   assignJobSchema,
   createJobSchema,
+  formatCents,
+  formatDateShort,
+  formatMinutes,
   jobTitleFrom,
   rollUpJob,
   taxYearOf,
@@ -278,6 +281,79 @@ export async function jobForRecord(
     await tx.update(table).set({ jobId: job.id }).where(eq(table.id, recordId));
     return job;
   });
+}
+
+export interface LinkableRecords {
+  timeEntries: { id: string; title: string; meta: string }[];
+  trips: { id: string; title: string; meta: string }[];
+  expenses: { id: string; title: string; meta: string }[];
+  /** True when a kind had more rows than the limit, so the UI can say so. */
+  truncated: boolean;
+}
+
+/**
+ * Records that are not in any job yet, for linking one that already exists.
+ *
+ * DELIBERATELY ONLY THE UNASSIGNED ONES. A record already inside another job
+ * could be offered here too, and moving it would silently empty out the job it
+ * came from - a grouping the owner made on purpose, removed as a side effect of
+ * a checkbox on a different screen. Taking it out of its job first is one extra
+ * step and makes the loss visible, which is the right trade for a destructive
+ * one.
+ *
+ * Not filtered to the job's property either. An errand genuinely spans
+ * properties - one store run covering two houses is the ordinary case - so the
+ * property is shown on each row and the choice is left to the person who was
+ * there.
+ */
+export async function listLinkableRecords(
+  options: { limit?: number } = {},
+): Promise<LinkableRecords> {
+  const db = getDb();
+  const limit = options.limit ?? 100;
+  // One more than asked for, purely to detect that there were more.
+  const probe = limit + 1;
+
+  const [entries, tripRows, expenseRows, propertyRows] = await Promise.all([
+    db
+      .select()
+      .from(timeEntries)
+      .where(isNull(timeEntries.jobId))
+      .orderBy(desc(timeEntries.date))
+      .limit(probe),
+    db.select().from(trips).where(isNull(trips.jobId)).orderBy(desc(trips.date)).limit(probe),
+    db
+      .select()
+      .from(expenses)
+      .where(isNull(expenses.jobId))
+      .orderBy(desc(expenses.date))
+      .limit(probe),
+    db.select({ id: properties.id, nickname: properties.nickname }).from(properties),
+  ]);
+
+  const names = new Map(propertyRows.map((p) => [p.id, p.nickname]));
+  const place = (propertyId: string | null) =>
+    propertyId ? (names.get(propertyId) ?? 'Unknown property') : 'Portfolio-wide';
+
+  return {
+    timeEntries: entries.slice(0, limit).map((e) => ({
+      id: e.id,
+      title: e.description,
+      meta: `${formatDateShort(e.date)} · ${formatMinutes(e.minutes)} · ${place(e.propertyId)}`,
+    })),
+    trips: tripRows.slice(0, limit).map((t) => ({
+      id: t.id,
+      title: `${t.origin} → ${t.destination}`,
+      meta: `${formatDateShort(t.date)} · ${Number(t.miles)} mi · ${place(t.propertyId)}`,
+    })),
+    expenses: expenseRows.slice(0, limit).map((e) => ({
+      id: e.id,
+      title: e.vendor,
+      meta: `${formatDateShort(e.date)} · ${formatCents(e.amountCents)} · ${place(e.propertyId)}`,
+    })),
+    truncated:
+      entries.length > limit || tripRows.length > limit || expenseRows.length > limit,
+  };
 }
 
 /** The "group these" action: attach existing records to a job, or a new one. */
