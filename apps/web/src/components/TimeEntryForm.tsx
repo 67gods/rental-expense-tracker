@@ -31,11 +31,14 @@ export function TimeEntryForm({
   properties,
   people,
   returnTo,
+  jobId = null,
 }: {
   defaults: TimeEntryDefaults;
   properties: Option[];
   people: Option[];
   returnTo?: string;
+  /** Set only when opened from "+ Add related". Hidden - never a field. */
+  jobId?: string | null;
 }) {
   const [state, formAction] = useActionState(saveTimeEntryAction, EMPTY_FORM_STATE);
 
@@ -43,6 +46,7 @@ export function TimeEntryForm({
     <form action={formAction} className="grid gap-1">
       {defaults.id ? <input type="hidden" name="id" value={defaults.id} /> : null}
       {returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}
+      {jobId ? <input type="hidden" name="jobId" value={jobId} /> : null}
 
       {state.message ? (
         <p role="alert" className="error-text mb-2">

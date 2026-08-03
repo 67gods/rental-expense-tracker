@@ -32,11 +32,14 @@ export function TripForm({
   actorId,
   properties,
   people,
+  jobId = null,
 }: {
   today: string;
   actorId: string;
   properties: Option[];
   people: Option[];
+  /** Set only when opened from "+ Add related". Hidden - never a field. */
+  jobId?: string | null;
 }) {
   const [state, formAction] = useActionState(saveTripAction, EMPTY_FORM_STATE);
   const [kind, setKind] = useState<DestinationKind>('property');
@@ -55,6 +58,9 @@ export function TripForm({
 
   return (
     <form action={formAction} className="grid gap-1">
+      {/* Reaches all three rows a trip writes: miles, drive time, on-site time. */}
+      {jobId ? <input type="hidden" name="jobId" value={jobId} /> : null}
+
       {state.message ? (
         <p role="alert" className="error-text mb-2">
           {state.message}

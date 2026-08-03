@@ -21,12 +21,17 @@ export function ExpenseForm({
   properties,
   people,
   contractors,
+  jobId = null,
+  defaultPropertyId = null,
 }: {
   today: string;
   actorId: string;
   properties: Option[];
   people: Option[];
   contractors: Option[];
+  /** Set only when opened from "+ Add related". Hidden - never a field. */
+  jobId?: string | null;
+  defaultPropertyId?: string | null;
 }) {
   const [state, formAction] = useActionState(saveExpenseAction, EMPTY_FORM_STATE);
   const [category, setCategory] = useState('');
@@ -37,6 +42,14 @@ export function ExpenseForm({
 
   return (
     <form action={formAction} className="grid gap-1">
+      {/*
+        The job rides along invisibly. THIS FORM HAS THE SAME FIELDS IT HAS
+        ALWAYS HAD - a hidden value is not a field, and the word "job" appears
+        nowhere on it. Adding a job picker here would tax the seventy-odd
+        expenses a year that stand alone to serve the handful that do not.
+      */}
+      {jobId ? <input type="hidden" name="jobId" value={jobId} /> : null}
+
       {state.message ? (
         <p role="alert" className="error-text mb-2">
           {state.message}
@@ -101,6 +114,7 @@ export function ExpenseForm({
         label="Which property?"
         allowNone={false}
         required
+        defaultValue={defaultPropertyId}
       />
 
       <SelectField

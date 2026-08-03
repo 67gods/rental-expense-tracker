@@ -56,10 +56,20 @@ export async function listJobs(
   const rows = await db
     .select({
       job: jobs,
+      /*
+       * Written as literal SQL with explicit aliases, and it has to be.
+       *
+       * Interpolating the schema objects here - ${timeEntries.jobId} = ${jobs.id} -
+       * renders as `WHERE "job_id" = "id"` with no table qualifier on either
+       * side. Inside a correlated subquery both names then resolve to the
+       * SUBQUERY's table, so it compares time_entries.job_id to
+       * time_entries.id: never true, and every job reports zero records
+       * forever. It type-checks, it runs, and it is silently wrong.
+       */
       recordCount: sql<string>`(
-        (SELECT count(*) FROM ${timeEntries} WHERE ${timeEntries.jobId} = ${jobs.id})
-      + (SELECT count(*) FROM ${trips}       WHERE ${trips.jobId}       = ${jobs.id})
-      + (SELECT count(*) FROM ${expenses}    WHERE ${expenses.jobId}    = ${jobs.id})
+        (SELECT count(*) FROM "time_entries" te WHERE te."job_id" = "jobs"."id")
+      + (SELECT count(*) FROM "trips"        tr WHERE tr."job_id" = "jobs"."id")
+      + (SELECT count(*) FROM "expenses"     ex WHERE ex."job_id" = "jobs"."id")
       )`,
     })
     .from(jobs)
@@ -74,6 +84,23 @@ export async function getJob(id: string): Promise<Job> {
   const [row] = await getDb().select().from(jobs).where(eq(jobs.id, id)).limit(1);
   if (!row) throw new NotFoundError('That job no longer exists.');
   return row;
+}
+
+/**
+ * The tolerant lookup the capture forms use for `?job=`.
+ *
+ * Returns null instead of throwing, for a deliberate reason: a stale or
+ * mistyped job id in a link must not stop someone logging an expense. The
+ * record still gets written, just without the grouping - and losing a grouping
+ * is recoverable where losing the expense is not.
+ */
+export async function openJob(id: string | undefined | null): Promise<Job | null> {
+  if (!id) return null;
+  // A malformed id would make Postgres raise on the uuid cast rather than
+  // simply not match, so it is refused before the query runs.
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return null;
+  const [row] = await getDb().select().from(jobs).where(eq(jobs.id, id)).limit(1);
+  return row ?? null;
 }
 
 /**
@@ -333,15 +360,22 @@ export async function unassignFromJob(input: UnassignJobInput): Promise<number> 
   });
 }
 
-/** Job ids that no longer have a single child, for the integrity audit. */
+/**
+ * Job ids that no longer have a single child, for the integrity audit.
+ *
+ * Literal SQL for the same reason as `listJobs` above: interpolated schema
+ * objects lose their table qualifier inside a correlated subquery. Here the
+ * consequence was the opposite and worse - every NOT EXISTS would have been
+ * true, so the audit would have reported every job in the database as childless.
+ */
 export async function childlessJobIds(): Promise<string[]> {
   const rows = await getDb()
     .select({ id: jobs.id })
     .from(jobs)
     .where(
-      sql`NOT EXISTS (SELECT 1 FROM ${timeEntries} WHERE ${timeEntries.jobId} = ${jobs.id})
-      AND NOT EXISTS (SELECT 1 FROM ${trips}       WHERE ${trips.jobId}       = ${jobs.id})
-      AND NOT EXISTS (SELECT 1 FROM ${expenses}    WHERE ${expenses.jobId}    = ${jobs.id})`,
+      sql`NOT EXISTS (SELECT 1 FROM "time_entries" te WHERE te."job_id" = "jobs"."id")
+      AND NOT EXISTS (SELECT 1 FROM "trips"        tr WHERE tr."job_id" = "jobs"."id")
+      AND NOT EXISTS (SELECT 1 FROM "expenses"     ex WHERE ex."job_id" = "jobs"."id")`,
     );
   return rows.map((r) => r.id);
 }

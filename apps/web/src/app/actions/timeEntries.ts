@@ -58,15 +58,25 @@ export async function saveTimeEntryAction(
       source: 'manual' as const,
     };
 
+    const jobId = str(formData, 'jobId') || null;
+    let landing: string;
+
     if (id) {
       await updateTimeEntry({ ...payload, id });
+      landing = `/entries?saved=time&kind=time&id=${id}`;
     } else {
-      await createTimeEntry(payload);
+      const entry = await createTimeEntry(payload, { jobId });
+      // Saved INTO a job means the owner is part-way through an errand and
+      // wants to see what is in it. Saved on its own goes back to the list,
+      // which offers to start a job from it.
+      landing = jobId
+        ? `/jobs/${jobId}?saved=time`
+        : `/entries?saved=time&kind=time&id=${entry.id}`;
     }
 
     revalidatePath('/');
     revalidatePath('/entries');
-    destination = formData.get('returnTo')?.toString() || '/entries?saved=time';
+    destination = formData.get('returnTo')?.toString() || landing;
   } catch (error) {
     const payload = toErrorPayload(error);
     return { ok: false, message: payload.message, fields: payload.fields };

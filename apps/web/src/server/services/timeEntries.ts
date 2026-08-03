@@ -38,7 +38,7 @@ export interface TimeEntryFilter {
 
 export async function createTimeEntry(
   input: CreateTimeEntryInput,
-  context: { linkedExpenseId?: string | null } = {},
+  context: { linkedExpenseId?: string | null; jobId?: string | null } = {},
 ): Promise<TimeEntry> {
   const data = createTimeEntrySchema.parse(input);
   const db = getDb();
@@ -69,6 +69,9 @@ export async function createTimeEntry(
       enterpriseId: data.enterpriseId,
       propertyId: data.propertyId,
       turnId: data.turnId,
+      // Membership in a job, which is neither the derivation link that a trip
+      // creates nor the §5.2 eligibility dependency below. Pure grouping.
+      jobId: context.jobId ?? null,
       minutes: data.minutes,
       category: data.category,
       description: data.description,

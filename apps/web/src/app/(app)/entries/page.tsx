@@ -22,6 +22,9 @@ import {
   deleteTripAction,
 } from '@/app/actions/capture';
 import { DeleteButton } from '@/components/DeleteButton';
+import { AddRelated } from '@/components/AddRelated';
+import { GroupIntoJob } from '@/components/GroupIntoJob';
+import { listJobs, jobTitlesById } from '@/server/services/jobs';
 
 export const metadata = { title: 'Entries' };
 
@@ -42,19 +45,33 @@ type Tab = 'time' | 'expenses' | 'trips' | 'income';
 export default async function EntriesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; saved?: string }>;
+  searchParams: Promise<{ tab?: string; saved?: string; kind?: string; id?: string }>;
 }) {
   const user = await requireUser();
   const params = await searchParams;
   const tab: Tab = isTab(params.tab) ? params.tab : 'time';
 
-  const [properties, actors] = await Promise.all([listProperties(), listActors()]);
+  const [properties, actors, jobTitles] = await Promise.all([
+    listProperties(),
+    listActors(),
+    jobTitlesById(),
+  ]);
   const propertyNames = new Map(properties.map((p) => [p.id, p.nickname]));
   const actorNames = new Map(actors.map((a) => [a.id, a.name]));
 
+  // Offered only against the record that was just saved, and only for the three
+  // kinds a job can hold. Rent has no job column: a confirmed rent payment is
+  // never part of an errand, and it should never see the word "job".
+  const justSaved = isGroupable(params.kind) && params.id ? params.kind : null;
+
   return (
     <div className="grid gap-4">
-      <h1 className="text-xl font-bold tracking-tight">Entries · {user.taxYear}</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-xl font-bold tracking-tight">Entries · {user.taxYear}</h1>
+        <Link href="/jobs" className="btn btn-ghost">
+          Jobs
+        </Link>
+      </div>
 
       {params.saved && SAVED_MESSAGES[params.saved] ? (
         <p
@@ -64,6 +81,8 @@ export default async function EntriesPage({
           {SAVED_MESSAGES[params.saved]}
         </p>
       ) : null}
+
+      {justSaved && params.id ? <AddRelated kind={justSaved} recordId={params.id} /> : null}
 
       <nav className="chip-row" aria-label="Entry type">
         {(
@@ -86,26 +105,111 @@ export default async function EntriesPage({
 
       <div className="card">
         {tab === 'time' ? (
-          <TimeList taxYear={user.taxYear} names={{ propertyNames, actorNames }} />
+          <TimeList
+            taxYear={user.taxYear}
+            names={{ propertyNames, actorNames }}
+            jobTitles={jobTitles}
+          />
         ) : null}
         {tab === 'expenses' ? (
-          <ExpenseList taxYear={user.taxYear} propertyNames={propertyNames} />
+          <ExpenseList
+            taxYear={user.taxYear}
+            propertyNames={propertyNames}
+            jobTitles={jobTitles}
+          />
         ) : null}
-        {tab === 'trips' ? <TripList taxYear={user.taxYear} propertyNames={propertyNames} /> : null}
+        {tab === 'trips' ? (
+          <TripList
+            taxYear={user.taxYear}
+            propertyNames={propertyNames}
+            jobTitles={jobTitles}
+          />
+        ) : null}
         {tab === 'income' ? (
           <IncomeList taxYear={user.taxYear} propertyNames={propertyNames} />
         ) : null}
       </div>
+
+      {tab === 'income' ? null : <Grouping tab={tab} taxYear={user.taxYear} />}
     </div>
+  );
+}
+
+/**
+ * The after-the-fact grouping, one tab at a time.
+ *
+ * Collapsed, and it stays collapsed: the entries list is mostly for scrolling
+ * to check a figure, and checkboxes on every row all the time would make the
+ * common case noisier to serve the rare one.
+ */
+async function Grouping({ tab, taxYear }: { tab: Exclude<Tab, 'income'>; taxYear: number }) {
+  const jobs = await listJobs({ limit: 100 });
+  const existingJobs = jobs.map((j) => ({ id: j.id, title: j.title }));
+
+  if (tab === 'time') {
+    const entries = await listTimeEntries({ taxYear, limit: 100 });
+    return (
+      <GroupIntoJob
+        field="timeEntryIds"
+        existingJobs={existingJobs}
+        records={entries.map((e) => ({
+          id: e.id,
+          title: e.description,
+          meta: `${formatDateShort(e.date)} · ${formatMinutes(e.minutes)}`,
+        }))}
+      />
+    );
+  }
+
+  if (tab === 'expenses') {
+    const rows = await listExpenses({ taxYear, limit: 100 });
+    return (
+      <GroupIntoJob
+        field="expenseIds"
+        existingJobs={existingJobs}
+        records={rows.map((e) => ({
+          id: e.id,
+          title: e.vendor,
+          meta: `${formatDateShort(e.date)} · ${formatCents(e.amountCents)}`,
+        }))}
+      />
+    );
+  }
+
+  const rows = await listTrips({ taxYear, limit: 100 });
+  return (
+    <GroupIntoJob
+      field="tripIds"
+      existingJobs={existingJobs}
+      records={rows.map((t) => ({
+        id: t.id,
+        title: `${t.origin} → ${t.destination}`,
+        meta: `${formatDateShort(t.date)} · ${Number(t.miles)} mi`,
+      }))}
+    />
+  );
+}
+
+/** A small badge linking a row to the job it belongs to. */
+function JobTag({ jobId, jobTitles }: { jobId: string | null; jobTitles: Map<string, string> }) {
+  if (!jobId) return null;
+  const title = jobTitles.get(jobId);
+  if (!title) return null;
+  return (
+    <Link href={`/jobs/${jobId}`} className="badge badge-not-eligible">
+      {title}
+    </Link>
   );
 }
 
 async function TimeList({
   taxYear,
   names,
+  jobTitles,
 }: {
   taxYear: number;
   names: { propertyNames: Map<string, string>; actorNames: Map<string, string> };
+  jobTitles: Map<string, string>;
 }) {
   const entries = await listTimeEntries({ taxYear, limit: 300 });
   if (entries.length === 0) return <Empty what="time entries" href="/log/time" />;
@@ -130,6 +234,7 @@ async function TimeList({
                 <span className="badge badge-flag">Depends on a classification</span>
               ) : null}
               {entry.source === 'timer' ? <span className="badge badge-not-eligible">Timer</span> : null}
+              <JobTag jobId={entry.jobId} jobTitles={jobTitles} />
             </p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1">
@@ -154,9 +259,11 @@ async function TimeList({
 async function ExpenseList({
   taxYear,
   propertyNames,
+  jobTitles,
 }: {
   taxYear: number;
   propertyNames: Map<string, string>;
+  jobTitles: Map<string, string>;
 }) {
   const expenses = await listExpenses({ taxYear, limit: 300 });
   if (expenses.length === 0) return <Empty what="expenses" href="/log/expense" />;
@@ -190,10 +297,14 @@ async function ExpenseList({
                 {expense.receiptKey ? (
                   <span className="badge badge-not-eligible">Receipt</span>
                 ) : null}
+                <JobTag jobId={expense.jobId} jobTitles={jobTitles} />
               </p>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1">
               <span className="row-value">{formatCents(expense.amountCents)}</span>
+              <Link href={`/entries/expense/${expense.id}`} className="btn btn-ghost text-xs">
+                Open
+              </Link>
               <DeleteButton
                 what={`the ${formatCents(expense.amountCents)} expense from ${expense.vendor}`}
                 onDelete={async () => {
@@ -212,9 +323,11 @@ async function ExpenseList({
 async function TripList({
   taxYear,
   propertyNames,
+  jobTitles,
 }: {
   taxYear: number;
   propertyNames: Map<string, string>;
+  jobTitles: Map<string, string>;
 }) {
   const trips = await listTrips({ taxYear, limit: 300 });
   if (trips.length === 0) return <Empty what="trips" href="/log/trip" />;
@@ -238,6 +351,7 @@ async function TripList({
               {trip.onsiteTimeEntryId ? (
                 <span className="badge badge-eligible">On-site time logged</span>
               ) : null}
+              <JobTag jobId={trip.jobId} jobTitles={jobTitles} />
             </p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1">
@@ -306,6 +420,11 @@ function Empty({ what, href }: { what: string; href: string }) {
 
 function isTab(value: string | undefined): value is Tab {
   return value === 'time' || value === 'expenses' || value === 'trips' || value === 'income';
+}
+
+/** The three kinds a job can hold. Rent is deliberately not one of them. */
+function isGroupable(value: string | undefined): value is 'time' | 'trip' | 'expense' {
+  return value === 'time' || value === 'trip' || value === 'expense';
 }
 
 function safeCategory(id: string): string {

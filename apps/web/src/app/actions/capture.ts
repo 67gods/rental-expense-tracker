@@ -57,21 +57,26 @@ export async function saveExpenseAction(
       };
     }
 
-    await createExpense({
-      date: str(formData, 'date') || todayInZone(user.timeZone),
-      actorId: str(formData, 'actorId') || user.actor.id,
-      propertyId: str(formData, 'propertyId') || null,
-      amountCents,
-      vendor: str(formData, 'vendor'),
-      scheduleECategory,
-      contractorActorId: str(formData, 'contractorActorId') || null,
-      receiptKey: str(formData, 'receiptKey') || null,
-      notes: str(formData, 'notes') || null,
-    });
+    const jobId = str(formData, 'jobId') || null;
+
+    const expense = await createExpense(
+      {
+        date: str(formData, 'date') || todayInZone(user.timeZone),
+        actorId: str(formData, 'actorId') || user.actor.id,
+        propertyId: str(formData, 'propertyId') || null,
+        amountCents,
+        vendor: str(formData, 'vendor'),
+        scheduleECategory,
+        contractorActorId: str(formData, 'contractorActorId') || null,
+        receiptKey: str(formData, 'receiptKey') || null,
+        notes: str(formData, 'notes') || null,
+      },
+      { jobId },
+    );
 
     revalidatePath('/');
     revalidatePath('/entries');
-    destination = '/entries?saved=expense';
+    destination = afterSave('expense', expense.id, jobId);
   } catch (error) {
     const payload = toErrorPayload(error);
     return { ok: false, message: payload.message, fields: payload.fields };
@@ -105,27 +110,34 @@ export async function saveTripAction(
     const onsiteMinutes = numberOrNull(str(formData, 'onsiteMinutes'));
     const onsiteDescription = str(formData, 'onsiteDescription') || null;
 
+    const jobId = str(formData, 'jobId') || null;
+
     // buildTripDrafts refuses on-site time with no description or category and
     // says why, so those cases surface as the domain's own message.
-    await createTrip({
-      date: str(formData, 'date') || todayInZone(user.timeZone),
-      actorId: str(formData, 'actorId') || user.actor.id,
-      enterpriseId: user.enterprise.id,
-      propertyId: str(formData, 'propertyId') || null,
-      origin: str(formData, 'origin'),
-      destination: str(formData, 'destination'),
-      destinationKind,
-      miles,
-      purpose: str(formData, 'purpose'),
-      driveMinutes: numberOrNull(str(formData, 'driveMinutes')),
-      onsiteMinutes,
-      onsiteCategory,
-      onsiteDescription,
-    });
+    // The job id reaches all three rows the trip writes - miles, drive time and
+    // on-site time - so grouping a store run captures the whole errand.
+    const result = await createTrip(
+      {
+        date: str(formData, 'date') || todayInZone(user.timeZone),
+        actorId: str(formData, 'actorId') || user.actor.id,
+        enterpriseId: user.enterprise.id,
+        propertyId: str(formData, 'propertyId') || null,
+        origin: str(formData, 'origin'),
+        destination: str(formData, 'destination'),
+        destinationKind,
+        miles,
+        purpose: str(formData, 'purpose'),
+        driveMinutes: numberOrNull(str(formData, 'driveMinutes')),
+        onsiteMinutes,
+        onsiteCategory,
+        onsiteDescription,
+      },
+      { jobId },
+    );
 
     revalidatePath('/');
     revalidatePath('/entries');
-    destination = '/entries?saved=trip';
+    destination = afterSave('trip', result.trip.id, jobId);
   } catch (error) {
     const payload = toErrorPayload(error);
     return { ok: false, message: payload.message, fields: payload.fields };
@@ -210,6 +222,23 @@ export async function deleteIncomeAction(id: string): Promise<void> {
   await deleteRentReceipt(id);
   revalidatePath('/');
   revalidatePath('/entries');
+}
+
+/**
+ * Where to land after a save.
+ *
+ * A record saved on its own goes back to the entries list, which offers to
+ * start a job from it. A record saved INTO a job goes to that job, because the
+ * only reason it carried a job id is that the owner is part-way through
+ * building one and wants to see what is in it so far.
+ *
+ * The record id travels either way, so the list can offer "+ Add related" for
+ * the thing just saved rather than making the owner find it again.
+ */
+function afterSave(kind: 'expense' | 'trip' | 'time', recordId: string, jobId: string | null) {
+  return jobId
+    ? `/jobs/${jobId}?saved=${kind}`
+    : `/entries?saved=${kind}&kind=${kind}&id=${recordId}`;
 }
 
 function str(formData: FormData, key: string): string {
