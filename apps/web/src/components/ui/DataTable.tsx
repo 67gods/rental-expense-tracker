@@ -231,7 +231,7 @@ export function DataTable({
       </div>
 
       {summary.length > 0 ? (
-        <div className="strip" style={{ marginBottom: 12 }}>
+        <div className="strip mb-3">
           {summary.map((item) => (
             <div className="strip-cell" key={item.label}>
               <div className="strip-key">{item.label}</div>

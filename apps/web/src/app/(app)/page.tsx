@@ -125,7 +125,7 @@ export default async function OverviewPage({
           ]}
         />
 
-        <div className="cols-detail" style={{ marginTop: 18 }}>
+        <div className="cols-detail mt-[18px]">
           <div>
             <SectionTitle>Per property</SectionTitle>
             {withActivity.length === 0 ? (
@@ -327,9 +327,8 @@ export default async function OverviewPage({
                 ]}
               />
               <Link
-                className="btn btn-primary btn-block"
+                className="btn btn-primary btn-block mt-3"
                 href={withYear('/year-end', taxYear)}
-                style={{ marginTop: 12 }}
               >
                 Open year-end
               </Link>

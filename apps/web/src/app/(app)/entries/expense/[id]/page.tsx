@@ -92,7 +92,7 @@ export default async function ExpenseDetailPage({
                 {line.line ? `Schedule E line ${line.line}` : line.label}
               </p>
 
-              <p style={{ marginTop: 10, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <p className="mt-2.5 flex flex-wrap gap-1.5">
                 {expense.capitalClassification === 'repair' ? (
                   <Tag tone="pos">Repair</Tag>
                 ) : null}
@@ -178,14 +178,13 @@ export default async function ExpenseDetailPage({
 
             {job ? (
               <Panel title="Part of a job">
-                <p style={{ fontWeight: 500 }}>{job.title}</p>
+                <p className="rowtitle">{job.title}</p>
                 <p className="hint">
                   The time and miles that went with this expense are grouped with it.
                 </p>
                 <Link
-                  className="btn btn-block"
+                  className="btn btn-block mt-2.5"
                   href={`/jobs/${job.id}`}
-                  style={{ marginTop: 10 }}
                 >
                   Open the job
                 </Link>

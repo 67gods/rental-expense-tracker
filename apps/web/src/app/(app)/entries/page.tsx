@@ -122,7 +122,7 @@ export default async function EntriesPage({
 
       {justSaved && params.id ? <AddRelated kind={justSaved} recordId={params.id} /> : null}
 
-      <div style={{ marginBottom: 12 }}>
+      <div className="mb-3">
         <SegLinks
           current={tab}
           items={[

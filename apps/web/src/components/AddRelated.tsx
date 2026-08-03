@@ -32,7 +32,7 @@ export function AddRelated({ kind, recordId }: { kind: Kind; recordId: string })
         Add the time, miles, or money that went with it and they will be kept together as one
         job.
       </p>
-      <div className="seg" style={{marginTop:10}}>
+      <div className="seg mt-2.5">
         {NEXT.map((option) => (
           <button
             key={option.kind}

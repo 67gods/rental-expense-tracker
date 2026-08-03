@@ -83,7 +83,7 @@ export function Panel({
       {title ? (
         <div className="panel-head">
           <span>{title}</span>
-          {aside ? <span style={{ marginLeft: 'auto' }}>{aside}</span> : null}
+          {aside ? <span className="ml-auto">{aside}</span> : null}
         </div>
       ) : null}
       {bodyless ? children : <div className="panel-body">{children}</div>}
@@ -199,12 +199,12 @@ export function Empty({
         {/* Said out loud because nobody guesses it: the year switcher, not the
             data, is the usual reason a loaded year looks empty. */}
         {year === undefined ? null : (
-          <p className="hint" style={{ maxWidth: 420, margin: '8px auto 0' }}>
+          <p className="hint mx-auto mt-2 max-w-[420px]">
             Records live in the year they happened, not the year you are signed
             in to. Check the year in the rail if you were expecting some.
           </p>
         )}
-        {action ? <div style={{ marginTop: 16 }}>{action}</div> : null}
+        {action ? <div className="mt-4">{action}</div> : null}
       </div>
     </div>
   );

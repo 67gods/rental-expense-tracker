@@ -74,8 +74,7 @@ export function PaymentSplit({ summary }: { summary: PaymentSummaryView }) {
           </p>
           <button
             type="button"
-            className="btn"
-            style={{ marginTop: 12 }}
+            className="btn mt-3"
             onClick={() => setOpen(true)}
           >
             Paid in instalments?
@@ -89,7 +88,7 @@ export function PaymentSplit({ summary }: { summary: PaymentSummaryView }) {
     <section className="panel">
       <div className="panel-head">Payments</div>
 
-      <div className="strip" style={{ border: 0, borderRadius: 0 }}>
+      <div className="strip strip-flush">
         <Figure label="Invoice" value={formatCents(summary.invoiceTotalCents)} />
         <Figure label="Paid" value={formatCents(summary.paidToDateCents)} />
         <Figure label="Scheduled" value={formatCents(summary.scheduledCents)} />
@@ -122,13 +121,13 @@ export function PaymentSplit({ summary }: { summary: PaymentSummaryView }) {
 
         {summary.unscheduledCents > 0 ? (
           <>
-            <p className="section-title" style={{ marginTop: 18 }}>
+            <p className="section-title mt-[18px]">
               Spread {formatCents(summary.unscheduledCents)} over instalments
             </p>
             <InstalmentForm summary={summary} />
           </>
         ) : (
-          <p className="hint" style={{ marginTop: 12 }}>
+          <p className="hint mt-3">
             Every cent of this invoice is accounted for
             {summary.scheduledCents > 0
               ? ` — ${formatCents(summary.paidToDateCents)} paid and ${formatCents(
@@ -156,7 +155,7 @@ function PaymentLine({
 
   if (editing) {
     return (
-      <li className="kv" style={{ display: 'block' }}>
+      <li className="kv kv-stack">
         <form action={formAction}>
           <input type="hidden" name="id" value={payment.id} />
           <input type="hidden" name="expenseId" value={expenseId} />
@@ -191,7 +190,7 @@ function PaymentLine({
   return (
     <li className="kv">
       <div>
-        <div style={{ fontWeight: 500 }}>
+        <div className="rowtitle">
           {formatDateShort(payment.paidDate)}{' '}
           {payment.isScheduled ? <span className="tag tag-warn">Scheduled</span> : null}
         </div>

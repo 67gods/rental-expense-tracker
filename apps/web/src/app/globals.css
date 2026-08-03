@@ -344,6 +344,13 @@ a {
     overflow: hidden;
     background: var(--panel);
   }
+  /* A strip that already sits inside a panel: the panel supplies the border,
+     and two nested rounded boxes read as a mistake. */
+  .strip-flush {
+    border: 0;
+    border-radius: 0;
+    background: none;
+  }
   .strip-cell {
     padding: 11px 14px;
     border-right: 1px solid var(--line);
@@ -520,6 +527,11 @@ a {
      definition row inside a panel it already has one. */
   .tablebox > .kv {
     padding: 9px 12px;
+  }
+  /* A row whose two halves stack rather than sitting either side of a gap -
+     used where the right-hand side is a form rather than a single figure. */
+  .kv-stack {
+    display: block;
   }
   /* The line that names a list row - the label the row's action belongs to. */
   /* Block for the same reason as .hint - it is a title with something under
