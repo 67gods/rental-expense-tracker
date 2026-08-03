@@ -1,0 +1,267 @@
+import Link from 'next/link';
+
+/**
+ * The Ledger primitives.
+ *
+ * Nine shapes carry the whole product. Anything a page needs beyond these is a
+ * signal to extend one rather than write a page-specific block of markup -
+ * which is how the previous UI ended up with 314 hand-written class
+ * combinations and no way to change anything globally.
+ *
+ * All of them are server components taking plain serialisable props, so a page
+ * doing database work can render them without crossing a client boundary.
+ */
+
+/* ---------------------------------------------------------------- Page ---- */
+
+/**
+ * The content well.
+ *
+ * Every page body is wrapped in one, so padding and max width are decided in
+ * exactly one place. `PageHeader` sits outside it because the header is sticky
+ * and the well scrolls under it.
+ */
+export function Well({ children }: { children: React.ReactNode }) {
+  return <div className="well">{children}</div>;
+}
+
+export function SectionTitle({ children }: { children: React.ReactNode }) {
+  return <h2 className="section-title">{children}</h2>;
+}
+
+/* ---------------------------------------------------------------- Stats --- */
+
+export interface Stat {
+  key: string;
+  label: string;
+  value: string;
+  /** Small line under the figure - a count, a qualifier, a date. */
+  sub?: string;
+  tone?: 'pos' | 'neg' | 'warn' | 'capital';
+}
+
+/**
+ * The joined row of headline figures.
+ *
+ * One border around the group with hairlines between, rather than separate
+ * cards - these numbers are read together and gaps between cards make them
+ * look like unrelated facts.
+ */
+export function StatStrip({ stats }: { stats: Stat[] }) {
+  return (
+    <div className="strip">
+      {stats.map((stat) => (
+        <div className="strip-cell" key={stat.key}>
+          <div className="strip-key">{stat.label}</div>
+          <div className={stat.tone ? `strip-value ${stat.tone}` : 'strip-value'}>
+            {stat.value}
+          </div>
+          {stat.sub ? <div className="strip-sub">{stat.sub}</div> : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* --------------------------------------------------------------- Panels --- */
+
+export function Panel({
+  title,
+  aside,
+  children,
+  bodyless,
+}: {
+  title?: string;
+  /** Right-aligned content in the panel head - a count, a link. */
+  aside?: React.ReactNode;
+  children: React.ReactNode;
+  /** Set when the child is a table, which brings its own padding. */
+  bodyless?: boolean;
+}) {
+  return (
+    <section className="panel">
+      {title ? (
+        <div className="panel-head">
+          <span>{title}</span>
+          {aside ? <span style={{ marginLeft: 'auto' }}>{aside}</span> : null}
+        </div>
+      ) : null}
+      {bodyless ? children : <div className="panel-body">{children}</div>}
+    </section>
+  );
+}
+
+export interface KeyValueRow {
+  key: string;
+  label: string;
+  value: React.ReactNode;
+  tone?: 'pos' | 'neg' | 'warn' | 'muted';
+}
+
+/**
+ * Label/value rows.
+ *
+ * A `dl` rather than a table because these are facts about one thing, not rows
+ * of comparable records - and a screen reader should announce them that way.
+ */
+export function KeyValues({ rows }: { rows: KeyValueRow[] }) {
+  return (
+    <dl>
+      {rows.map((row) => (
+        <div className="kv" key={row.key}>
+          <dt>{row.label}</dt>
+          <dd className={row.tone === 'muted' ? 'muted' : row.tone}>{row.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/* ----------------------------------------------------------------- Tags --- */
+
+export type TagTone = 'pos' | 'warn' | 'neg' | 'capital' | 'info' | 'muted';
+
+/**
+ * A status label.
+ *
+ * Six tones, each with one meaning, because a palette where colour is
+ * decorative teaches people to ignore it: pos is a check that passed, warn is
+ * a decision waiting on the owner, capital is basis rather than a deduction,
+ * neg is a loss or a refusal, info is a neutral link, muted is a fact.
+ */
+export function Tag({
+  tone = 'muted',
+  href,
+  children,
+}: {
+  tone?: TagTone;
+  href?: string;
+  children: React.ReactNode;
+}) {
+  const className = `tag tag-${tone}`;
+  return href ? (
+    <Link href={href} className={className}>
+      {children}
+    </Link>
+  ) : (
+    <span className={className}>{children}</span>
+  );
+}
+
+/* ---------------------------------------------------------------- Notes --- */
+
+/**
+ * An explanation attached to what it explains.
+ *
+ * These carry the reasoning that would otherwise live only in a commit message
+ * - why capital sits outside the net, why a blank 1099 is not a zero. The tone
+ * follows the same meaning as tags.
+ */
+export function Note({
+  tone,
+  children,
+}: {
+  tone?: 'warn' | 'pos';
+  children: React.ReactNode;
+}) {
+  return <p className={tone ? `note note-${tone}` : 'note'}>{children}</p>;
+}
+
+/* ---------------------------------------------------------------- Table --- */
+
+export function TableBox({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="tablebox">
+      <div className="tablescroll">
+        <table className="table">{children}</table>
+      </div>
+    </div>
+  );
+}
+
+/** Shown in place of a table when a year genuinely holds nothing. */
+export function Empty({
+  what,
+  year,
+  action,
+}: {
+  what: string;
+  year?: number;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="panel">
+      <div className="empty">
+        <p>
+          No {what}
+          {year === undefined ? '' : ` in ${year}`}.
+        </p>
+        {/* Said out loud because nobody guesses it: the year switcher, not the
+            data, is the usual reason a loaded year looks empty. */}
+        {year === undefined ? null : (
+          <p className="hint" style={{ maxWidth: 420, margin: '8px auto 0' }}>
+            Records live in the year they happened, not the year you are signed
+            in to. Check the year in the rail if you were expecting some.
+          </p>
+        )}
+        {action ? <div style={{ marginTop: 16 }}>{action}</div> : null}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ Bar --- */
+
+/**
+ * A proportional bar with a legend.
+ *
+ * The only place inline styles are legitimate: the widths are data, and a
+ * class per possible percentage would be absurd.
+ */
+export function SplitBar({
+  parts,
+}: {
+  parts: { key: string; label: string; pct: number; color: string }[];
+}) {
+  return (
+    <>
+      <div className="bar">
+        {parts.map((part) => (
+          <span key={part.key} style={{ width: `${part.pct}%`, background: part.color }} />
+        ))}
+      </div>
+      <div className="legend">
+        {parts.map((part) => (
+          <span key={part.key}>
+            <i className="legend-dot" style={{ background: part.color }} />
+            {part.label}
+          </span>
+        ))}
+      </div>
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------ Seg --- */
+
+/**
+ * A row of mutually exclusive links - the tab strip on Entries, the record
+ * type on the log screen.
+ */
+export function SegLinks({
+  items,
+  current,
+}: {
+  items: { href: string; label: string; key: string }[];
+  current: string;
+}) {
+  return (
+    <div className="seg">
+      {items.map((item) => (
+        <Link key={item.key} href={item.href} aria-current={item.key === current}>
+          {item.label}
+        </Link>
+      ))}
+    </div>
+  );
+}
