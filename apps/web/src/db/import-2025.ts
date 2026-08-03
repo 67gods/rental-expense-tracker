@@ -40,6 +40,7 @@ import {
   rentReceipts,
   rentReconciliationItems,
   rentReconciliations,
+  trips,
 } from './schema';
 
 const IMPORT_KEY = 'import:rental-import-2025';
@@ -54,6 +55,7 @@ interface Payload {
   payments: PayloadPaymentPlan[];
   rentReceipts: PayloadRentReceipt[];
   reconciliations: PayloadReconciliation[];
+  mileage?: PayloadMileage[];
 }
 
 interface PayloadProperty {
@@ -109,6 +111,16 @@ interface PayloadPaymentPlan {
   invoiceTotalCents: number;
   note: string;
   rows: { paidDate: string; amountCents: number; isScheduled: boolean }[];
+}
+
+/** A year total, not a journey. The individual trips were never logged. */
+interface PayloadMileage {
+  propertyKey: string | null;
+  miles: number;
+  valueCents: number;
+  treatment: string;
+  detail: string | null;
+  note: string | null;
 }
 
 interface PayloadRentReceipt {
@@ -170,6 +182,7 @@ export interface ImportResult {
   expenses: number;
   payments: number;
   rentReceipts: number;
+  trips: number;
   reconciliations: number;
   reconciliationItems: number;
   skipped: string[];
@@ -225,6 +238,7 @@ async function runImport(
     expenses: 0,
     payments: 0,
     rentReceipts: 0,
+    trips: 0,
     reconciliations: 0,
     reconciliationItems: 0,
     skipped: [],
@@ -477,6 +491,41 @@ async function runImport(
     result.payments += plan.rows.length;
   }
 
+  // --- Mileage
+  //
+  // One trip row per bucket, so the miles are visible at all. The dollar value
+  // already came across as an expense on the ledger; this is the mileage LOG,
+  // which is what a CPA asks for and what the workbook could not produce.
+  //
+  // Written straight rather than through createTrip(), because that builds the
+  // linked drive and on-site time entries from a real journey's minutes. There
+  // are no minutes here and inventing them would be fiction.
+  for (const m of payload.mileage ?? []) {
+    const propertyId = m.propertyKey ? (propertyIdByKey.get(m.propertyKey) ?? null) : null;
+    if (m.miles <= 0) continue;
+
+    await db.insert(trips).values({
+      date: `${taxYear}-12-31`,
+      actorId: owner.id,
+      propertyId,
+      origin: 'Various',
+      destination: 'Various',
+      destinationKind: 'other',
+      miles: String(m.miles),
+      // A trip has no notes column, and the business purpose is the right home
+      // for this anyway: it is the field a CPA reads to judge whether the
+      // mileage stands up, so saying plainly that it is a year total belongs
+      // there rather than in a footnote.
+      purpose: m.detail
+        ? `${taxYear} mileage total (${m.detail}) - aggregated from the MileIQ log, not a single journey`
+        : `${taxYear} mileage total - aggregated from the MileIQ log, not a single journey`,
+      costTreatmentOverride: m.treatment === 'acquisition' ? 'acquisition' : null,
+      source: 'manual',
+      isBackdated: true,
+    });
+    result.trips += 1;
+  }
+
   // --- Rent received
   for (const r of payload.rentReceipts) {
     const propertyId = propertyIdByKey.get(r.propertyKey);
@@ -605,6 +654,7 @@ async function main() {
   console.log(`  expenses              ${result.expenses}`);
   console.log(`  payment rows          ${result.payments}`);
   console.log(`  rent receipts         ${result.rentReceipts}`);
+  console.log(`  mileage rows          ${result.trips}`);
   console.log(`  reconciliations       ${result.reconciliations}`);
   console.log(`  reconciliation items  ${result.reconciliationItems}`);
 

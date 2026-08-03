@@ -69,29 +69,7 @@ export default async function ReportsPage({
         </p>
       </Link>
 
-      <section>
-        <h2 className="section-title mb-2">Download for your CPA</h2>
-        <div className="card">
-          {(Object.keys(REPORTS) as (keyof typeof REPORTS)[]).map((id) => (
-            <div key={id} className="row">
-              <div className="row-main">
-                <p className="row-title">{REPORTS[id].label}</p>
-                <p className="row-meta">{taxYear}-{id}.csv</p>
-              </div>
-              <a
-                className="btn btn-ghost shrink-0 text-xs"
-                href={`/api/v1/export/${id}?taxYear=${taxYear}`}
-                download
-              >
-                Download
-              </a>
-            </div>
-          ))}
-        </div>
-        <p className="hint mt-2">
-          Plain CSV, openable in anything. Amounts are in dollars, hours in decimals.
-        </p>
-      </section>
+
 
       <section>
         <h2 className="section-title mb-2">Hours by person</h2>
@@ -202,6 +180,36 @@ export default async function ReportsPage({
             your CPA applies the rate.
           </p>
         </div>
+      </section>
+      {/*
+        Downloads LAST, and as a grid.
+
+        Twelve reports as full-width rows is a screen and a half of scrolling
+        before any number appears, and the numbers are what you came for. Each
+        one is now a single tile: the label is the link, the filename is the
+        subtitle, and twelve of them fit in the space four used to take.
+      */}
+      <section>
+        <h2 className="section-title mb-2">Download for your CPA</h2>
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {(Object.keys(REPORTS) as (keyof typeof REPORTS)[]).map((id) => (
+            <a
+              key={id}
+              className="card card-pad block"
+              href={`/api/v1/export/${id}?taxYear=${taxYear}`}
+              download
+            >
+              <p className="row-title">{REPORTS[id].label}</p>
+              <p className="row-meta tnum">
+                {taxYear}-{id}.csv
+              </p>
+            </a>
+          ))}
+        </div>
+        <p className="hint mt-2">
+          Plain CSV, openable in anything. Amounts are in dollars, hours in decimals. The whole
+          tile is the download.
+        </p>
       </section>
     </div>
   );
