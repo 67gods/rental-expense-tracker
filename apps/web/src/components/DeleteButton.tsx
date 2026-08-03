@@ -13,17 +13,21 @@ export function DeleteButton({
   onDelete,
   label,
   what,
+  variant = 'button',
 }: {
   onDelete: () => Promise<void>;
   label?: string;
   what: string;
+  /** 'action' for a table row. A bordered red box repeated down eighty rows
+      out-shouts the money beside it, which is what the table is for. */
+  variant?: 'button' | 'action';
 }) {
   const [pending, startTransition] = useTransition();
 
   return (
     <button
       type="button"
-      className="btn btn-danger"
+      className={variant === 'action' ? 'act act-danger' : 'btn btn-danger'}
       disabled={pending}
       onClick={() => {
         if (!confirm(`Delete ${what}? This cannot be undone.`)) return;

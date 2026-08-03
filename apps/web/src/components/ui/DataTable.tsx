@@ -242,7 +242,7 @@ export function DataTable({
                     </th>
                   );
                 })}
-                {onDelete ? <th aria-label="Actions" /> : null}
+                {onDelete ? <th className="acts-cell" aria-label="Actions" /> : null}
               </tr>
             </thead>
             <tbody>
@@ -275,18 +275,21 @@ export function DataTable({
                     </td>
                   ))}
                   {onDelete ? (
-                    <td className="nowrap num">
-                      {row.href ? (
-                        <Link href={row.href} className="btn">
-                          {openLabel}
-                        </Link>
-                      ) : null}{' '}
-                      <DeleteButton
-                        what={row.deleteLabel ?? 'this record'}
-                        onDelete={async () => {
-                          await onDelete(row.id);
-                        }}
-                      />
+                    <td className="acts-cell">
+                      <span className="acts">
+                        {row.href ? (
+                          <Link href={row.href} className="act">
+                            {openLabel}
+                          </Link>
+                        ) : null}
+                        <DeleteButton
+                          variant="action"
+                          what={row.deleteLabel ?? 'this record'}
+                          onDelete={async () => {
+                            await onDelete(row.id);
+                          }}
+                        />
+                      </span>
                     </td>
                   ) : null}
                 </tr>

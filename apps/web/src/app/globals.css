@@ -696,7 +696,8 @@ a {
     background: #23161a;
   }
   /* Only ever the actions column, so it must not inherit the numeric mono. */
-  .table td.acts-cell {
+  .table td.acts-cell,
+  .table th.acts-cell {
     text-align: right;
     white-space: nowrap;
     width: 1%;
