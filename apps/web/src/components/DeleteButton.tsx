@@ -23,7 +23,7 @@ export function DeleteButton({
   return (
     <button
       type="button"
-      className="btn btn-ghost text-xs"
+      className="btn btn-danger"
       disabled={pending}
       onClick={() => {
         if (!confirm(`Delete ${what}? This cannot be undone.`)) return;

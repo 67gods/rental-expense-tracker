@@ -18,7 +18,10 @@ import {
   deleteIncomeAction,
   deleteTripAction,
 } from '@/app/actions/capture';
-import { DataTable, type DataRow } from '@/components/DataTable';
+import { DataTable, type DataRow } from '@/components/ui/DataTable';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { Empty, SegLinks, Well } from '@/components/ui';
+import { resolveTaxYear, withYear } from '@/lib/year';
 import { AddRelated } from '@/components/AddRelated';
 import { GroupIntoJob } from '@/components/GroupIntoJob';
 import { listJobs, jobTitlesById } from '@/server/services/jobs';
@@ -47,7 +50,7 @@ type Tab = 'time' | 'expenses' | 'trips' | 'income';
  *
  * And it rendered every record as a three-line card, which is fine for five
  * rows and unusable for eighty. Tables now, dense, with the numbers right
- * aligned so a column can be scanned rather than read. `.table-wrap` scrolls
+ * aligned so a column can be scanned rather than read. The table scrolls
  * sideways on a narrow screen, so the phone keeps working without the desktop
  * being padded out to match it.
  */
@@ -60,11 +63,7 @@ export default async function EntriesPage({
   const params = await searchParams;
   const tab: Tab = isTab(params.tab) ? params.tab : 'expenses';
 
-  const requested = Number(params.year);
-  const taxYear =
-    Number.isInteger(requested) && requested > 1900 && requested < 3000
-      ? requested
-      : user.taxYear;
+  const taxYear = resolveTaxYear(params.year, user.taxYear);
 
   const [properties, actors, jobTitles] = await Promise.all([
     listProperties(),
@@ -75,59 +74,50 @@ export default async function EntriesPage({
   const actorNames = new Map(actors.map((a) => [a.id, a.name]));
 
   const justSaved = isGroupable(params.kind) && params.id ? params.kind : null;
-  const years = [user.taxYear, user.taxYear - 1, user.taxYear - 2];
-  if (!years.includes(taxYear)) years.unshift(taxYear);
 
-  const link = (next: Partial<{ tab: string; year: number }>) =>
-    `/entries?tab=${next.tab ?? tab}&year=${next.year ?? taxYear}`;
+  // Built through the shared helper so the year survives a tab change. Every
+  // link in the app goes through it; one that did not is exactly what made a
+  // loaded year invisible.
+  const tabHref = (next: Tab) => withYear(`/entries?tab=${next}`, taxYear);
+
+  const TITLES: Record<Tab, string> = {
+    expenses: 'Expenses',
+    income: 'Rent received',
+    time: 'Time',
+    trips: 'Mileage',
+  };
 
   return (
-    <div className="grid gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-bold tracking-tight">Entries · {taxYear}</h1>
-        <div className="flex flex-wrap items-center gap-2">
-          <nav className="chip-row" aria-label="Tax year">
-            {years.map((year) => (
-              <a
-                key={year}
-                href={link({ year })}
-                className={year === taxYear ? 'chip chip-on' : 'chip'}
-              >
-                {year}
-              </a>
-            ))}
-          </nav>
-          <Link href="/jobs" className="btn btn-ghost">
-            Jobs
+    <>
+      <PageHeader
+        title={TITLES[tab]}
+        crumb={String(taxYear)}
+        actions={
+          <Link className="btn btn-primary" href={withYear('/log', taxYear)}>
+            + Log
           </Link>
-        </div>
-      </div>
-
+        }
+      />
+      <Well>
       {params.saved && SAVED_MESSAGES[params.saved] ? (
-        <p
-          role="status"
-          className="rounded-lg border border-[color:var(--color-eligible-500)] bg-[color:var(--color-eligible-50)] p-3 text-sm text-[color:var(--color-eligible-700)]"
-        >
+        <p className="note note-pos" role="status">
           {SAVED_MESSAGES[params.saved]}
         </p>
       ) : null}
 
       {justSaved && params.id ? <AddRelated kind={justSaved} recordId={params.id} /> : null}
 
-      <nav className="chip-row" aria-label="Entry type">
-        {(
-          [
-            ['expenses', 'Expenses'],
-            ['income', 'Rent'],
-            ['time', 'Time'],
-            ['trips', 'Trips'],
-          ] as const
-        ).map(([key, label]) => (
-          <a key={key} href={link({ tab: key })} className={tab === key ? 'chip chip-on' : 'chip'}>
-            {label}
-          </a>
-        ))}
-      </nav>
+      <div style={{ marginBottom: 12 }}>
+        <SegLinks
+          current={tab}
+          items={[
+            { key: 'expenses', label: 'Expenses', href: tabHref('expenses') },
+            { key: 'income', label: 'Rent', href: tabHref('income') },
+            { key: 'time', label: 'Time', href: tabHref('time') },
+            { key: 'trips', label: 'Mileage', href: tabHref('trips') },
+          ]}
+        />
+      </div>
 
       {tab === 'expenses' ? (
         <ExpenseTable taxYear={taxYear} propertyNames={propertyNames} jobTitles={jobTitles} />
@@ -146,7 +136,8 @@ export default async function EntriesPage({
       ) : null}
 
       {tab === 'income' ? null : <Grouping tab={tab} taxYear={taxYear} />}
-    </div>
+      </Well>
+    </>
   );
 }
 
@@ -164,7 +155,7 @@ async function ExpenseTable({
     paidByExpenseInYear(taxYear),
   ]);
 
-  if (expenses.length === 0) return <Empty what="expenses" href="/log/expense" year={taxYear} />;
+  if (expenses.length === 0) return <Empty what="expenses" year={taxYear} action={<Link className="btn btn-primary" href={withYear("/log/expense", taxYear)}>Add one</Link>} />;
 
   // Shaped on the server into plain rows: display text, sort keys and the
   // figures the totals sum. The client component stays dumb and fast, and
@@ -174,8 +165,8 @@ async function ExpenseTable({
     const line = safeScheduleE(e.scheduleECategory);
     const property = e.propertyId ? (propertyNames.get(e.propertyId) ?? '') : 'Split';
     const badges = [];
-    if (e.capitalClassification === 'improvement') badges.push({ label: 'Capital', tone: 'muted' as const });
-    if (needsAnswer(e)) badges.push({ label: 'Review', tone: 'flag' as const });
+    if (e.capitalClassification === 'improvement') badges.push({ label: 'Capital', tone: 'capital' as const });
+    if (needsAnswer(e)) badges.push({ label: 'Review', tone: 'warn' as const });
     if (e.jobId && jobTitles.get(e.jobId)) {
       badges.push({ label: 'Job', tone: 'muted' as const, href: `/jobs/${e.jobId}` });
     }
@@ -242,7 +233,7 @@ async function IncomeTable({
   propertyNames: Map<string, string>;
 }) {
   const receipts = await listRentReceipts({ taxYear, limit: 5000 });
-  if (receipts.length === 0) return <Empty what="rent records" href="/log/income" year={taxYear} />;
+  if (receipts.length === 0) return <Empty what="rent records" year={taxYear} action={<Link className="btn btn-primary" href={withYear("/log/income", taxYear)}>Add one</Link>} />;
 
   const rows: DataRow[] = receipts.map((r) => {
     const property = propertyNames.get(r.propertyId) ?? '';
@@ -299,7 +290,7 @@ async function TimeTable({
   jobTitles: Map<string, string>;
 }) {
   const entries = await listTimeEntries({ taxYear, limit: 5000 });
-  if (entries.length === 0) return <Empty what="time entries" href="/log/time" year={taxYear} />;
+  if (entries.length === 0) return <Empty what="time entries" year={taxYear} action={<Link className="btn btn-primary" href={withYear("/log/time", taxYear)}>Add one</Link>} />;
 
   const rows: DataRow[] = entries.map((e) => {
     const who = actorNames.get(e.actorId) ?? 'Unattributed';
@@ -380,7 +371,7 @@ async function TripTable({
   jobTitles: Map<string, string>;
 }) {
   const trips = await listTrips({ taxYear, limit: 5000 });
-  if (trips.length === 0) return <Empty what="trips" href="/log/trip" year={taxYear} />;
+  if (trips.length === 0) return <Empty what="trips" year={taxYear} action={<Link className="btn btn-primary" href={withYear("/log/trip", taxYear)}>Add one</Link>} />;
 
   const rows: DataRow[] = trips.map((t) => {
     const miles = Number(t.miles);
@@ -498,20 +489,6 @@ async function Grouping({ tab, taxYear }: { tab: Exclude<Tab, 'income'>; taxYear
   );
 }
 
-function Empty({ what, href, year }: { what: string; href: string; year: number }) {
-  return (
-    <div className="card p-6 text-center">
-      <p className="hint">No {what} in {year}.</p>
-      <p className="hint mt-1">
-        If you were expecting some, check the year above — records live in the year they
-        happened, not the year you are signed in to.
-      </p>
-      <Link href={href} className="btn mt-3">
-        Add one
-      </Link>
-    </div>
-  );
-}
 
 function needsAnswer(expense: {
   capitalClassification: string | null;
