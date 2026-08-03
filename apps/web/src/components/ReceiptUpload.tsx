@@ -15,11 +15,24 @@ type Status = 'idle' | 'uploading' | 'done' | 'error';
  * through a serverless function to reach a bucket adds a timeout risk and buys
  * nothing.
  */
-export function ReceiptUpload({ name = 'receiptKey' }: { name?: string }) {
-  const [status, setStatus] = useState<Status>('idle');
-  const [key, setKey] = useState('');
+export function ReceiptUpload({
+  name = 'receiptKey',
+  /**
+   * The key already on the record, when editing.
+   *
+   * It has to round-trip through the form. Without it the field posts an empty
+   * string, and an edit that never touched the receipt would detach the one
+   * already attached.
+   */
+  defaultKey = null,
+}: {
+  name?: string;
+  defaultKey?: string | null;
+}) {
+  const [status, setStatus] = useState<Status>(defaultKey ? 'done' : 'idle');
+  const [key, setKey] = useState(defaultKey ?? '');
   const [error, setError] = useState<string | null>(null);
-  const [filename, setFilename] = useState('');
+  const [filename, setFilename] = useState(defaultKey ? basename(defaultKey) : '');
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function upload(file: File) {
@@ -100,7 +113,7 @@ export function ReceiptUpload({ name = 'receiptKey' }: { name?: string }) {
         {status === 'done' ? (
           <>
             <span className="tag tag-pos">Attached</span> {filename}{' '}
-            <button type="button" className="underline underline-offset-2" onClick={clear}>
+            <button type="button" className="linkbtn" onClick={clear}>
               Remove
             </button>
           </>
@@ -114,4 +127,9 @@ export function ReceiptUpload({ name = 'receiptKey' }: { name?: string }) {
       ) : null}
     </div>
   );
+}
+
+/** The stored key is a path; only its last segment is worth showing. */
+function basename(key: string): string {
+  return key.split('/').pop() || key;
 }

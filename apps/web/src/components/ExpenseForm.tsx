@@ -6,14 +6,43 @@ import { getScheduleECategory, listScheduleECategories } from '@rental/domain';
 import { saveExpenseAction } from '@/app/actions/capture';
 import { EMPTY_FORM_STATE } from '@/app/actions/formState';
 import { ReceiptUpload } from './ReceiptUpload';
+import { CapitalPicker } from './CapitalPicker';
 import { ActorPicker, PropertyPicker, SelectField, SubmitButton, type Option } from './Pickers';
 
+/** Everything the form needs to reopen an expense as it was saved. */
+export interface ExpenseDefaults {
+  id: string;
+  date: string;
+  actorId: string;
+  propertyId: string | null;
+  amountCents: number;
+  vendor: string;
+  scheduleECategory: string;
+  capitalClassification: string | null;
+  contractorActorId: string | null;
+  receiptKey: string | null;
+  notes: string | null;
+  /** The cost is divided across properties by a rule (§6) rather than owned by one. */
+  isSplit: boolean;
+  /** More than one payment row, or one that no longer mirrors the invoice. */
+  hasOwnPayments: boolean;
+}
+
 /**
- * Expense entry.
+ * Expense entry, and the same form reopened to correct one.
  *
- * The repair-versus-improvement prompt that §5.3 describes is milestone 2. What
- * this form does now is flag - honestly - which lines will need that answer, so
- * the user knows an entry is not finished rather than believing it is.
+ * The two modes are one component because they are one set of rules: a vendor
+ * is required either way, and a Schedule E line either way. Splitting them is
+ * how the create and edit paths drift until only one of them validates.
+ *
+ * Two fields exist only when editing, both deliberately:
+ *
+ *   - REPAIR OR IMPROVEMENT. §5.3 is not asked at capture. The capture form is
+ *     built for the fifteen-second case and the answer is frequently not known
+ *     at the counter, so the entry is flagged honestly and answered later. Here
+ *     is later.
+ *   - The RECEIPT already on file, which has to round-trip or an edit that
+ *     ignored it would detach it.
  */
 export function ExpenseForm({
   today,
@@ -23,6 +52,8 @@ export function ExpenseForm({
   contractors,
   jobId = null,
   defaultPropertyId = null,
+  defaults = null,
+  returnTo,
 }: {
   today: string;
   actorId: string;
@@ -32,13 +63,15 @@ export function ExpenseForm({
   /** Set only when opened from "+ Add related". Hidden - never a field. */
   jobId?: string | null;
   defaultPropertyId?: string | null;
+  /** Present when correcting an existing expense rather than logging a new one. */
+  defaults?: ExpenseDefaults | null;
+  returnTo?: string;
 }) {
   const [state, formAction] = useActionState(saveExpenseAction, EMPTY_FORM_STATE);
-  const [category, setCategory] = useState('');
+  const [category, setCategory] = useState(defaults?.scheduleECategory ?? '');
 
-  const needsClassification = category
-    ? safeTriggersPrompt(category)
-    : false;
+  const editing = defaults !== null;
+  const lineAsks = category ? safeTriggersPrompt(category) : false;
 
   return (
     <form action={formAction} className="form">
@@ -49,6 +82,8 @@ export function ExpenseForm({
         expenses a year that stand alone to serve the handful that do not.
       */}
       {jobId ? <input type="hidden" name="jobId" value={jobId} /> : null}
+      {defaults ? <input type="hidden" name="id" value={defaults.id} /> : null}
+      {returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}
 
       {state.message ? (
         <p role="alert" className="error-text mb-2">
@@ -66,10 +101,23 @@ export function ExpenseForm({
           inputMode="decimal"
           autoComplete="off"
           placeholder="124.99"
+          defaultValue={defaults ? centsToInput(defaults.amountCents) : ''}
           required
         />
         {state.fields?.amount ? <span className="error-text">{state.fields.amount}</span> : null}
       </label>
+
+      {/* An unsplit expense keeps its single payment in step with the invoice
+          automatically. Once the payments are real cash events of their own,
+          they are left alone and a changed total can contradict them - so say
+          so here rather than after the save is refused. */}
+      {defaults?.hasOwnPayments ? (
+        <p className="note note-warn">
+          This invoice has payments recorded against it separately. Changing the
+          total will not move them, and a total below what is already paid will
+          be refused. Adjust the payments on the expense itself.
+        </p>
+      ) : null}
 
       <label className="field">
         <span className="field-label">Paid to</span>
@@ -80,6 +128,7 @@ export function ExpenseForm({
           maxLength={200}
           placeholder="Home Depot"
           autoComplete="off"
+          defaultValue={defaults?.vendor ?? ''}
         />
       </label>
 
@@ -103,7 +152,9 @@ export function ExpenseForm({
           ))}
         </select>
         {category ? <span className="hint">{safeHelper(category)}</span> : null}
-        {needsClassification ? (
+        {/* Only worth saying while the question cannot yet be answered. In edit
+            mode the picker is right below, so the warning would point at it. */}
+        {lineAsks && !editing ? (
           <p className="note note-warn">
             This is spend on physical work, so it needs a repair-or-improvement
             answer before year end. It will sit in the review list until then.
@@ -111,48 +162,84 @@ export function ExpenseForm({
         ) : null}
       </div>
 
-      <PropertyPicker
-        options={properties}
-        label="Which property"
-        allowNone={false}
-        required
-        defaultValue={defaultPropertyId}
-      />
+      {editing ? (
+        <CapitalPicker defaultValue={defaults.capitalClassification} lineAsks={lineAsks} />
+      ) : null}
+
+      {/* A split cost belongs to a rule, not to a property, and there is no UI
+          for editing the rule. Rendering the picker here would offer to break
+          the split with no way to put it back. */}
+      {defaults?.isSplit ? (
+        <div className="field">
+          <span className="field-label">Which property</span>
+          <p className="hint">
+            Split across properties by an allocation rule, so no single property
+            owns it. The split is not editable here.
+          </p>
+        </div>
+      ) : (
+        <PropertyPicker
+          options={properties}
+          label="Which property"
+          allowNone={false}
+          required
+          defaultValue={defaults?.propertyId ?? defaultPropertyId}
+        />
+      )}
 
       {/* Two short answers on one line. Neither needs a full row, and stacking
           them pushed the save button below the fold on a phone. */}
       <div className="form-row">
         <label className="field">
           <span className="field-label">When</span>
-          <input className="input" type="date" name="date" defaultValue={today} required />
+          <input
+            className="input"
+            type="date"
+            name="date"
+            defaultValue={defaults?.date ?? today}
+            required
+          />
         </label>
 
         <SelectField
           name="contractorActorId"
           label="Contractor (optional)"
           options={contractors}
+          defaultValue={defaults?.contractorActorId ?? null}
           placeholder="Not a contractor"
           hint="Keeps their yearly total running, so the W-9 warning can fire before October."
         />
       </div>
 
-      <ReceiptUpload />
+      <ReceiptUpload defaultKey={defaults?.receiptKey ?? null} />
 
       <label className="field">
         <span className="field-label">Notes (optional)</span>
-        <textarea className="textarea" name="notes" maxLength={2000} />
+        <textarea
+          className="textarea"
+          name="notes"
+          maxLength={2000}
+          defaultValue={defaults?.notes ?? ''}
+        />
       </label>
 
-      <ActorPicker options={people} defaultValue={actorId} />
+      <ActorPicker options={people} defaultValue={defaults?.actorId ?? actorId} />
 
-      <Submit />
+      <Submit editing={editing} />
     </form>
   );
 }
 
-function Submit() {
+function Submit({ editing }: { editing: boolean }) {
   const { pending } = useFormStatus();
-  return <SubmitButton pending={pending}>Save expense</SubmitButton>;
+  return (
+    <SubmitButton pending={pending}>{editing ? 'Save changes' : 'Save expense'}</SubmitButton>
+  );
+}
+
+/** Cents back to something the amount field can show and parseAmountToCents can read. */
+function centsToInput(amountCents: number): string {
+  return (amountCents / 100).toFixed(2);
 }
 
 function safeTriggersPrompt(id: string): boolean {

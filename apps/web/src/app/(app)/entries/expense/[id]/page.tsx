@@ -31,10 +31,13 @@ export const metadata = { title: 'Expense' };
  */
 export default async function ExpenseDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ saved?: string }>;
 }) {
   const { id } = await params;
+  const { saved } = await searchParams;
   await requireUser();
 
   let expense;
@@ -77,12 +80,22 @@ export default async function ExpenseDetailPage({
         title={expense.vendor}
         crumb={`${formatDateShort(expense.date)} · ${line.label}`}
         actions={
-          <Link className="btn" href={withYear('/entries?tab=expenses', taxYear)}>
-            Back to expenses
-          </Link>
+          <>
+            <Link className="btn" href={withYear('/entries?tab=expenses', taxYear)}>
+              Back to expenses
+            </Link>
+            <Link className="btn btn-primary" href={`/entries/expense/${id}/edit`}>
+              Edit
+            </Link>
+          </>
         }
       />
       <Well>
+        {saved ? (
+          <p className="note note-pos" role="status">
+            Expense saved.
+          </p>
+        ) : null}
         <div className="cols-detail">
           <div className="stack">
             <Panel title="Invoice">
@@ -146,7 +159,7 @@ export default async function ExpenseDetailPage({
                   {
                     key: 'class',
                     label: 'Repair or improvement',
-                    value: expense.capitalClassification ?? 'Not answered',
+                    value: CLASSIFICATION_LABELS[expense.capitalClassification ?? ''] ?? 'Not answered',
                     tone: expense.capitalClassification ? undefined : 'warn',
                   },
                   {
@@ -200,6 +213,13 @@ export default async function ExpenseDetailPage({
     </>
   );
 }
+
+/** The stored enum is not the word for it. `needs_review` is a database value. */
+const CLASSIFICATION_LABELS: Record<string, string> = {
+  repair: 'Repair',
+  improvement: 'Capital improvement',
+  needs_review: 'Waiting on the CPA',
+};
 
 function safeLine(id: string): { label: string; line: number | null } {
   try {
