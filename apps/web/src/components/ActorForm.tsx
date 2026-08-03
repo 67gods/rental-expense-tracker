@@ -18,7 +18,7 @@ export function ActorForm() {
   const [state, formAction] = useActionState(saveActorAction, EMPTY_FORM_STATE);
 
   return (
-    <form action={formAction} className="grid gap-1">
+    <form action={formAction} className="form">
       {state.message ? (
         <p role="alert" className="error-text mb-2">
           {state.message}

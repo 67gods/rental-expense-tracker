@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { Well } from '@/components/ui';
 
 export const metadata = { title: 'Quick log' };
 
@@ -29,28 +31,33 @@ const ACTIONS = [
 
 export default function QuickLogPage() {
   return (
-    <div className="grid gap-3">
-      <h1 className="text-xl font-bold tracking-tight">Log something</h1>
+    <>
+      <PageHeader title="Log something" />
+      <Well>
+        {/* Capped like a form: three choices stretched across a 1400px screen
+            are harder to hit than three sitting in a column. */}
+        <div className="form grid gap-3">
+          {/* Three peers, so none of them is the accent one. Painting all three
+              primary made a wall of blue in which nothing was the obvious tap. */}
+          {ACTIONS.map((action) => (
+            <Link key={action.href} href={action.href} className="choice">
+              <span className="choice-body">
+                <span className="choice-title">{action.title}</span>
+                <span className="hint">{action.hint}</span>
+              </span>
+            </Link>
+          ))}
 
-      {/* Three peers, so none of them is the accent one. Painting all three
-          primary made a wall of blue in which nothing was the obvious tap. */}
-      {ACTIONS.map((action) => (
-        <Link key={action.href} href={action.href} className="choice">
-          <span className="choice-body">
-            <span className="choice-title">{action.title}</span>
-            <span className="hint">{action.hint}</span>
-          </span>
-        </Link>
-      ))}
-
-      <div className="mt-2 grid gap-2">
-        <Link href="/timer" className="btn btn-block">
-          Start a timer instead
-        </Link>
-        <Link href="/log/income" className="btn btn-block">
-          Record rent received
-        </Link>
-      </div>
-    </div>
+          <div className="mt-2 grid gap-2">
+            <Link href="/timer" className="btn btn-block">
+              Start a timer instead
+            </Link>
+            <Link href="/log/income" className="btn btn-block">
+              Record rent received
+            </Link>
+          </div>
+        </div>
+      </Well>
+    </>
   );
 }

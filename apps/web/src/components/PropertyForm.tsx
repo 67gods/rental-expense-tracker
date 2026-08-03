@@ -65,7 +65,7 @@ export function PropertyForm({
   );
 
   return (
-    <form action={formAction} className="grid gap-1">
+    <form action={formAction} className="form">
       {defaults.id ? <input type="hidden" name="id" value={defaults.id} /> : null}
       <input type="hidden" name="enterpriseId" value={enterpriseId} />
 

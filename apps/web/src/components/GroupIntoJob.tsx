@@ -50,7 +50,7 @@ export function GroupIntoJob({
     <details className="panel panel-body">
       <summary className="cursor-pointer text-sm font-semibold">Group some of these</summary>
 
-      <form action={formAction} className="mt-3 grid gap-1">
+      <form action={formAction} className="form mt-3">
         {state.message ? (
           <p role="alert" className="error-text mb-2">
             {state.message}

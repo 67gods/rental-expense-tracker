@@ -49,7 +49,7 @@ export function LoanYearForm({
   const [state, formAction] = useActionState(saveLoanYearAction, EMPTY_FORM_STATE);
 
   return (
-    <form action={formAction} className="grid gap-1">
+    <form action={formAction} className="form">
       <input type="hidden" name="taxYear" value={taxYear} />
 
       {state.message ? (

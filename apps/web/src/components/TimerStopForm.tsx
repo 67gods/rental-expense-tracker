@@ -43,7 +43,7 @@ export function TimerStopForm({
   const chosen = safeGet(selectedCategory);
 
   return (
-    <form action={formAction} className="grid gap-1">
+    <form action={formAction} className="form">
       <input type="hidden" name="id" value={id} />
 
       {state.message ? (

@@ -57,7 +57,7 @@ export function TripForm({
   const selected = onsiteCategory ? safeGet(onsiteCategory) : null;
 
   return (
-    <form action={formAction} className="grid gap-1">
+    <form action={formAction} className="form">
       {/* Reaches all three rows a trip writes: miles, drive time, on-site time. */}
       {jobId ? <input type="hidden" name="jobId" value={jobId} /> : null}
 
@@ -135,7 +135,7 @@ export function TripForm({
 
       <PropertyPicker options={properties} label="Which property was this for?" />
 
-      <hr className="my-3 border-[color:var(--border)]" />
+      <hr className="rule" />
 
       <label className="field">
         <span className="field-label">Time driving (optional)</span>

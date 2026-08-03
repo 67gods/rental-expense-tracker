@@ -41,7 +41,7 @@ export function ExpenseForm({
     : false;
 
   return (
-    <form action={formAction} className="grid gap-1">
+    <form action={formAction} className="form">
       {/*
         The job rides along invisibly. THIS FORM HAS THE SAME FIELDS IT HAS
         ALWAYS HAD - a hidden value is not a field, and the word "job" appears

@@ -158,7 +158,7 @@ function ReportedForm({
   const [state, formAction] = useActionState(saveReconciliationAction, EMPTY_FORM_STATE);
 
   return (
-    <form action={formAction} className="grid gap-1">
+    <form action={formAction} className="form">
       <input type="hidden" name="propertyId" value={view.propertyId} />
       <input type="hidden" name="taxYear" value={taxYear} />
 
@@ -219,7 +219,7 @@ function ItemForm({ view, taxYear }: { view: ReconciliationView; taxYear: number
   const [state, formAction] = useActionState(addReconciliationItemAction, EMPTY_FORM_STATE);
 
   return (
-    <form action={formAction} className="grid gap-1">
+    <form action={formAction} className="form">
       <input type="hidden" name="propertyId" value={view.propertyId} />
       <input type="hidden" name="taxYear" value={taxYear} />
       {view.reconciliationId ? (

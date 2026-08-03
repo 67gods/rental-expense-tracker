@@ -143,7 +143,7 @@ export default async function YearEndPage({
                   {forProperty.map((row) => (
                     <div
                       key={row.id}
-                      className="mt-3 border-t border-[color:var(--border)] pt-3"
+                      className="rule-top"
                     >
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
                         <p className="rowtitle">{row.lenderName}</p>

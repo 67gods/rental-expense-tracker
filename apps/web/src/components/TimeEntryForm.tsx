@@ -43,7 +43,7 @@ export function TimeEntryForm({
   const [state, formAction] = useActionState(saveTimeEntryAction, EMPTY_FORM_STATE);
 
   return (
-    <form action={formAction} className="grid gap-1">
+    <form action={formAction} className="form">
       {defaults.id ? <input type="hidden" name="id" value={defaults.id} /> : null}
       {returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}
       {jobId ? <input type="hidden" name="jobId" value={jobId} /> : null}

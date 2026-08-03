@@ -858,6 +858,40 @@ a {
     grid-template-columns: 1fr 1fr;
     gap: 12px;
   }
+  /* A divider between parts of one form. */
+  .rule {
+    border: 0;
+    border-top: 1px solid var(--line);
+    margin: 16px 0;
+  }
+  .rule-top {
+    border-top: 1px solid var(--line);
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+
+  /*
+   * Mutually exclusive options as separate pills.
+   *
+   * Not .seg: that is a segmented control, and .seg > * outranks .chip on
+   * specificity, so chips placed inside one lost their border, background and
+   * radius and came out as "Arbordale wayCreedmore ctKettlewellWestmill".
+   * .seg is right for uniform short values (15m, 30m); names need gaps.
+   */
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .chips .chip {
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .chip[aria-pressed='true'] {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: #fff;
+  }
 
   .filters {
     display: flex;

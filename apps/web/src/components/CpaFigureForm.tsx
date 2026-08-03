@@ -32,7 +32,7 @@ export function CpaFigureForm({
   const categories = listScheduleECategories();
 
   return (
-    <form action={formAction} className="grid gap-1">
+    <form action={formAction} className="form">
       <input type="hidden" name="taxYear" value={taxYear} />
 
       {state.message ? (
