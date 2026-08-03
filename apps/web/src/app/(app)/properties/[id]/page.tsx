@@ -20,6 +20,8 @@ import { listExpenses } from '@/server/services/expenses';
 import { NotFoundError } from '@/server/errors';
 import { PropertyForm } from '@/components/PropertyForm';
 import type { PropertyManagementPeriod } from '@/db/schema';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { Well } from '@/components/ui';
 
 export const metadata = { title: 'Property' };
 
@@ -63,96 +65,99 @@ export default async function PropertyDetailPage({
   );
 
   return (
-    <div className="grid gap-4">
-      <div className="flex items-center gap-3">
-        <Link href="/properties" className="btn">
-          ← Back
-        </Link>
-        <h1 className="text-xl font-bold tracking-tight">{property.nickname}</h1>
-      </div>
+    <>
+      <PageHeader
+        title={property.nickname}
+        actions={
+          <Link href="/properties" className="btn">
+            ← Back
+          </Link>
+        }
+      />
+      <Well>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <section className="panel panel-body">
+            <h2 className="section-title">Hours this year</h2>
+            {/* Both figures, never merged (§10). */}
+            <p className="num mt-1 text-xl font-bold">{formatMinutes(hours.eligibleMinutes)}</p>
+            <p className="hint">eligible</p>
+            <p className="num mt-2 text-sm font-semibold">{formatMinutes(hours.totalMinutes)}</p>
+            <p className="hint">total logged</p>
+          </section>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <section className="panel panel-body">
-          <h2 className="section-title">Hours this year</h2>
-          {/* Both figures, never merged (§10). */}
-          <p className="num mt-1 text-xl font-bold">{formatMinutes(hours.eligibleMinutes)}</p>
-          <p className="hint">eligible</p>
-          <p className="num mt-2 text-sm font-semibold">{formatMinutes(hours.totalMinutes)}</p>
-          <p className="hint">total logged</p>
-        </section>
+          <section className="panel panel-body">
+            <h2 className="section-title">Expenses</h2>
+            <p className="num mt-1 text-xl font-bold">
+              {formatCents(sumCents(expenses.map((e) => e.amountCents)))}
+            </p>
+            <p className="hint">{expenses.length} recorded</p>
+          </section>
 
-        <section className="panel panel-body">
-          <h2 className="section-title">Expenses</h2>
-          <p className="num mt-1 text-xl font-bold">
-            {formatCents(sumCents(expenses.map((e) => e.amountCents)))}
-          </p>
-          <p className="hint">{expenses.length} recorded</p>
-        </section>
-
-        <section className="panel panel-body">
-          <h2 className="section-title">Rent received</h2>
-          <p className="num mt-1 text-xl font-bold">
-            {formatCents(sumCents(receipts.map((r) => r.amountCents)))}
-          </p>
-          <p className="hint">{receipts.length} recorded</p>
-        </section>
-      </div>
-
-      <PropertyFacts property={property} />
-
-      <ManagementHistory periods={periods} names={names} />
-
-      {/*
-        Read-only until asked otherwise.
-
-        The facts card above is what this page is for; the form is how you
-        correct it. Rendering eleven open inputs under a card that already
-        states the same values reads as "fill this in" every single visit,
-        which is why the page felt like a form rather than a record.
-      */}
-      <details className="panel panel-body">
-        <summary className="cursor-pointer text-sm font-semibold">Edit these details</summary>
-        <div className="mt-4">
-        <PropertyForm
-          enterpriseId={property.enterpriseId}
-          managers={managerActors.map((a) => ({ id: a.id, name: a.name }))}
-          defaults={{
-            id: property.id,
-            nickname: property.nickname,
-            address: property.address,
-            acquiredDate: property.acquiredDate,
-            unadjustedBasisCents: property.unadjustedBasisCents,
-            ownershipPct: property.ownershipPct,
-            isSelfManaged: property.isSelfManaged,
-            isTripleNet: property.isTripleNet,
-            hadPersonalUse: property.hadPersonalUse,
-
-            placedInServiceDate: property.placedInServiceDate,
-            placedInServiceEvidence: property.placedInServiceEvidence,
-            firstTenantDate: property.firstTenantDate,
-            purchasePriceCents: property.purchasePriceCents,
-            closingCostsCents: property.closingCostsCents,
-            landValueCents: property.landValueCents,
-            wasPersonalResidence: property.wasPersonalResidence,
-            convertedToRentalDate: property.convertedToRentalDate,
-            fmvAtConversionCents: property.fmvAtConversionCents,
-            soldDate: property.soldDate,
-            salePriceCents: property.salePriceCents,
-            section469Activity: property.section469Activity,
-
-            // The open period is the truth about who manages it now; the
-            // property's own boolean is only the fallback for one that has
-            // never changed hands.
-            managedByActorId: openPeriod
-              ? (openPeriod.managerActorId ?? 'self')
-              : property.isSelfManaged
-                ? 'self'
-                : null,
-          }}
-        />
+          <section className="panel panel-body">
+            <h2 className="section-title">Rent received</h2>
+            <p className="num mt-1 text-xl font-bold">
+              {formatCents(sumCents(receipts.map((r) => r.amountCents)))}
+            </p>
+            <p className="hint">{receipts.length} recorded</p>
+          </section>
         </div>
-      </details>
-    </div>
+
+        <PropertyFacts property={property} />
+
+        <ManagementHistory periods={periods} names={names} />
+
+        {/*
+          Read-only until asked otherwise.
+
+          The facts card above is what this page is for; the form is how you
+          correct it. Rendering eleven open inputs under a card that already
+          states the same values reads as "fill this in" every single visit,
+          which is why the page felt like a form rather than a record.
+        */}
+        <details className="panel panel-body">
+          <summary className="cursor-pointer text-sm font-semibold">Edit these details</summary>
+          <div className="mt-4">
+          <PropertyForm
+            enterpriseId={property.enterpriseId}
+            managers={managerActors.map((a) => ({ id: a.id, name: a.name }))}
+            defaults={{
+              id: property.id,
+              nickname: property.nickname,
+              address: property.address,
+              acquiredDate: property.acquiredDate,
+              unadjustedBasisCents: property.unadjustedBasisCents,
+              ownershipPct: property.ownershipPct,
+              isSelfManaged: property.isSelfManaged,
+              isTripleNet: property.isTripleNet,
+              hadPersonalUse: property.hadPersonalUse,
+
+              placedInServiceDate: property.placedInServiceDate,
+              placedInServiceEvidence: property.placedInServiceEvidence,
+              firstTenantDate: property.firstTenantDate,
+              purchasePriceCents: property.purchasePriceCents,
+              closingCostsCents: property.closingCostsCents,
+              landValueCents: property.landValueCents,
+              wasPersonalResidence: property.wasPersonalResidence,
+              convertedToRentalDate: property.convertedToRentalDate,
+              fmvAtConversionCents: property.fmvAtConversionCents,
+              soldDate: property.soldDate,
+              salePriceCents: property.salePriceCents,
+              section469Activity: property.section469Activity,
+
+              // The open period is the truth about who manages it now; the
+              // property's own boolean is only the fallback for one that has
+              // never changed hands.
+              managedByActorId: openPeriod
+                ? (openPeriod.managerActorId ?? 'self')
+                : property.isSelfManaged
+                  ? 'self'
+                  : null,
+            }}
+          />
+          </div>
+        </details>
+      </Well>
+    </>
   );
 }
 
