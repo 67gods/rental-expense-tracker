@@ -65,33 +65,33 @@ export default async function PropertyDetailPage({
   return (
     <div className="grid gap-4">
       <div className="flex items-center gap-3">
-        <Link href="/properties" className="btn btn-ghost">
+        <Link href="/properties" className="btn">
           ← Back
         </Link>
         <h1 className="text-xl font-bold tracking-tight">{property.nickname}</h1>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <section className="card card-pad">
+        <section className="panel panel-body">
           <h2 className="section-title">Hours this year</h2>
           {/* Both figures, never merged (§10). */}
-          <p className="tnum mt-1 text-xl font-bold">{formatMinutes(hours.eligibleMinutes)}</p>
+          <p className="num mt-1 text-xl font-bold">{formatMinutes(hours.eligibleMinutes)}</p>
           <p className="hint">eligible</p>
-          <p className="tnum mt-2 text-sm font-semibold">{formatMinutes(hours.totalMinutes)}</p>
+          <p className="num mt-2 text-sm font-semibold">{formatMinutes(hours.totalMinutes)}</p>
           <p className="hint">total logged</p>
         </section>
 
-        <section className="card card-pad">
+        <section className="panel panel-body">
           <h2 className="section-title">Expenses</h2>
-          <p className="tnum mt-1 text-xl font-bold">
+          <p className="num mt-1 text-xl font-bold">
             {formatCents(sumCents(expenses.map((e) => e.amountCents)))}
           </p>
           <p className="hint">{expenses.length} recorded</p>
         </section>
 
-        <section className="card card-pad">
+        <section className="panel panel-body">
           <h2 className="section-title">Rent received</h2>
-          <p className="tnum mt-1 text-xl font-bold">
+          <p className="num mt-1 text-xl font-bold">
             {formatCents(sumCents(receipts.map((r) => r.amountCents)))}
           </p>
           <p className="hint">{receipts.length} recorded</p>
@@ -110,7 +110,7 @@ export default async function PropertyDetailPage({
         states the same values reads as "fill this in" every single visit,
         which is why the page felt like a form rather than a record.
       */}
-      <details className="card card-pad">
+      <details className="panel panel-body">
         <summary className="cursor-pointer text-sm font-semibold">Edit these details</summary>
         <div className="mt-4">
         <PropertyForm
@@ -191,8 +191,8 @@ function PropertyFacts({
     : null;
 
   return (
-    <section className="card card-pad">
-      <h2 className="section-title mb-3">Facts for the CPA</h2>
+    <section className="panel panel-body">
+      <h2 className="section-title">Facts for the CPA</h2>
 
       <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
         <Fact label="Acquired" value={property.acquiredDate} />
@@ -247,12 +247,12 @@ function Fact({
   note?: string;
 }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 border-b border-dashed border-[color:var(--color-border)] py-1 last:border-0">
-      <dt className="text-sm text-[color:var(--color-muted)]">{label}</dt>
-      <dd className="tnum text-sm font-semibold">
-        {value || <span className="font-normal text-[color:var(--color-muted)]">—</span>}
+    <div className="flex items-baseline justify-between gap-3 border-b border-dashed border-[color:var(--line)] py-1 last:border-0">
+      <dt className="text-sm muted">{label}</dt>
+      <dd className="num text-sm font-semibold">
+        {value || <span className="font-normal muted">—</span>}
         {value && note ? (
-          <span className="ml-2 font-normal text-[color:var(--color-muted)]">{note}</span>
+          <span className="ml-2 font-normal muted">{note}</span>
         ) : null}
       </dd>
     </div>
@@ -276,22 +276,22 @@ function ManagementHistory({
   if (periods.length === 0) return null;
 
   return (
-    <section className="card card-pad">
-      <h2 className="section-title mb-3">Management history</h2>
+    <section className="panel panel-body">
+      <h2 className="section-title">Management history</h2>
       <ul className="grid gap-1">
         {periods.map((period) => (
-          <li key={period.id} className="row">
-            <span className="row-main">
-              <span className="row-title">
+          <li key={period.id} className="kv">
+            <span className="">
+              <span style={{fontWeight:500}}>
                 {period.managerActorId
                   ? (names.get(period.managerActorId) ?? 'A manager no longer on file')
                   : 'Self-managed'}
               </span>
-              <span className="row-meta">
+              <span className="hint">
                 {period.startDate} — {period.endDate ?? 'now'}
               </span>
             </span>
-            {period.endDate === null ? <span className="badge badge-eligible">Current</span> : null}
+            {period.endDate === null ? <span className="tag tag-pos">Current</span> : null}
           </li>
         ))}
       </ul>

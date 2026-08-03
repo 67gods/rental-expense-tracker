@@ -15,6 +15,9 @@ import { openJob } from '@/server/services/jobs';
 import { NotFoundError } from '@/server/errors';
 import { PaymentSplit } from '@/components/PaymentSplit';
 import { AddRelated } from '@/components/AddRelated';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { KeyValues, Note, Panel, Tag, Well } from '@/components/ui';
+import { withYear } from '@/lib/year';
 
 export const metadata = { title: 'Expense' };
 
@@ -23,8 +26,8 @@ export const metadata = { title: 'Expense' };
  *
  * The expense is the obligation; the payments are what actually left the bank.
  * Cash basis deducts in the year of payment, so those are two different facts
- * and this page keeps them visibly apart - the invoice total at the top, what
- * was paid and when below it.
+ * and the page keeps them visibly apart - the invoice total on the left, what
+ * was paid and when underneath it.
  */
 export default async function ExpenseDetailPage({
   params,
@@ -32,7 +35,7 @@ export default async function ExpenseDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const user = await requireUser();
+  await requireUser();
 
   let expense;
   try {
@@ -42,6 +45,8 @@ export default async function ExpenseDetailPage({
     throw error;
   }
 
+  const taxYear = taxYearOf(expense.date);
+
   const [summary, actors, job, property] = await Promise.all([
     paymentSummary(id),
     listActors({ includeArchived: true }),
@@ -49,18 +54,17 @@ export default async function ExpenseDetailPage({
     expense.propertyId ? getProperty(expense.propertyId) : Promise.resolve(null),
   ]);
 
-  // The domain proposes a date in the next tax year for the remainder. Asking
-  // it rather than computing a date here keeps the form and the rule agreeing.
-  const suggestion = await suggestRemainder(id, taxYearOf(expense.date));
+  // The domain proposes the date for the remainder, so the form and the rule
+  // cannot disagree about what is left or when it falls due.
+  const suggestion = await suggestRemainder(id, taxYear);
 
   const line = safeLine(expense.scheduleECategory);
   const contractor = expense.contractorActorId
-    ? actors.find((a) => a.id === expense.contractorActorId)
+    ? actors.find((actor) => actor.id === expense.contractorActorId)
     : null;
 
-  // Which side of the placed-in-service line this fell on. A date comparison
-  // and a label, never a recommendation - what to do with an acquisition-side
-  // cost is the CPA's call.
+  // A date comparison and a label, never a recommendation. What to do with an
+  // acquisition-side cost is the CPA's call.
   const treatment = costTreatmentFor(
     expense.date,
     property?.placedInServiceDate ?? null,
@@ -68,100 +72,142 @@ export default async function ExpenseDetailPage({
   );
 
   return (
-    <div className="grid gap-4">
-      <div className="flex items-center gap-3">
-        <Link href="/entries?tab=expenses" className="btn btn-ghost">
-          ← Entries
-        </Link>
-        <h1 className="text-xl font-bold tracking-tight">{expense.vendor}</h1>
-      </div>
-
-      <section className="card card-pad">
-        <p className="tnum text-2xl font-bold tracking-tight">
-          {formatCents(expense.amountCents)}
-        </p>
-        <p className="hint">
-          Invoiced {formatDateShort(expense.date)} · {line.label}
-          {property ? ` · ${property.nickname}` : ' · split across properties'}
-        </p>
-
-        <p className="mt-2 flex flex-wrap gap-1.5">
-          {expense.capitalClassification === 'repair' ? (
-            <span className="badge badge-eligible">Repair</span>
-          ) : null}
-          {expense.capitalClassification === 'improvement' ? (
-            <span className="badge badge-not-eligible">Improvement</span>
-          ) : null}
-          {expense.capitalClassification === 'needs_review' ? (
-            <span className="badge badge-flag">Needs review</span>
-          ) : null}
-          <span
-            className={
-              treatment.treatment === 'acquisition'
-                ? 'badge badge-flag'
-                : 'badge badge-not-eligible'
-            }
-          >
-            {treatment.treatment === 'acquisition' ? 'Acquisition side' : 'Operating'}
-          </span>
-          {expense.isBackdated ? (
-            <span className="badge badge-not-eligible">Logged later</span>
-          ) : null}
-        </p>
-
-        <p className="hint mt-2">{treatment.explanation}</p>
-
-        {contractor ? <p className="hint mt-1">Paid to {contractor.name}.</p> : null}
-        {expense.notes ? <p className="hint mt-1">{expense.notes}</p> : null}
-      </section>
-
-      <PaymentSplit
-        summary={{
-          expenseId: id,
-          invoiceTotalCents: summary.invoiceTotalCents,
-          paidToDateCents: summary.paidToDateCents,
-          scheduledCents: summary.scheduledCents,
-          outstandingCents: summary.outstandingCents,
-          // The domain returns null once nothing is left unscheduled, which is
-          // the same question the instalment form needs answered - so it is
-          // asked once, here, rather than recomputed in the component.
-          unscheduledCents: suggestion?.amountCents ?? 0,
-          isFullyPaid: summary.isFullyPaid,
-          isSplit: summary.isSplit,
-          payments: summary.payments.map((p) => ({
-            id: p.id,
-            paidDate: p.paidDate,
-            amountCents: p.amountCents,
-            isScheduled: p.isScheduled,
-          })),
-          suggestedFirstDate: suggestion?.paidDate ?? `${taxYearOf(expense.date) + 1}-01-15`,
-        }}
-      />
-
-      {job ? (
-        <section className="card card-pad">
-          <p className="row-title">Part of “{job.title}”</p>
-          <p className="row-meta">
-            The time and miles that went with this expense are grouped with it.
-          </p>
-          <Link href={`/jobs/${job.id}`} className="btn btn-ghost mt-2 text-xs">
-            Open the job
+    <>
+      <PageHeader
+        title={expense.vendor}
+        crumb={`${formatDateShort(expense.date)} · ${line.label}`}
+        actions={
+          <Link className="btn" href={withYear('/entries?tab=expenses', taxYear)}>
+            Back to expenses
           </Link>
-        </section>
-      ) : (
-        <AddRelated kind="expense" recordId={id} />
-      )}
+        }
+      />
+      <Well>
+        <div className="cols-detail">
+          <div className="stack">
+            <Panel title="Invoice">
+              <div className="panel-figure">{formatCents(expense.amountCents)}</div>
+              <p className="muted">
+                {property ? property.nickname : 'Split across properties'} ·{' '}
+                {line.line ? `Schedule E line ${line.line}` : line.label}
+              </p>
 
-      <p className="hint">Signed in as {user.actor.name}.</p>
-    </div>
+              <p style={{ marginTop: 10, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {expense.capitalClassification === 'repair' ? (
+                  <Tag tone="pos">Repair</Tag>
+                ) : null}
+                {expense.capitalClassification === 'improvement' ? (
+                  <Tag tone="capital">Capital improvement</Tag>
+                ) : null}
+                {expense.capitalClassification === 'needs_review' ? (
+                  <Tag tone="warn">Needs review</Tag>
+                ) : null}
+                <Tag tone={treatment.treatment === 'acquisition' ? 'capital' : 'muted'}>
+                  {treatment.treatment === 'acquisition' ? 'Acquisition side' : 'Operating'}
+                </Tag>
+                {expense.isBackdated ? <Tag tone="muted">Logged later</Tag> : null}
+              </p>
+
+              <Note>{treatment.explanation}</Note>
+              {expense.notes ? <p className="hint">{expense.notes}</p> : null}
+            </Panel>
+
+            <PaymentSplit
+              summary={{
+                expenseId: id,
+                invoiceTotalCents: summary.invoiceTotalCents,
+                paidToDateCents: summary.paidToDateCents,
+                scheduledCents: summary.scheduledCents,
+                outstandingCents: summary.outstandingCents,
+                unscheduledCents: suggestion?.amountCents ?? 0,
+                isFullyPaid: summary.isFullyPaid,
+                isSplit: summary.isSplit,
+                payments: summary.payments.map((payment) => ({
+                  id: payment.id,
+                  paidDate: payment.paidDate,
+                  amountCents: payment.amountCents,
+                  isScheduled: payment.isScheduled,
+                })),
+                suggestedFirstDate: suggestion?.paidDate ?? `${taxYear + 1}-01-15`,
+              }}
+            />
+          </div>
+
+          <div className="stack">
+            <Panel title="The record">
+              <KeyValues
+                rows={[
+                  {
+                    key: 'property',
+                    label: 'Property',
+                    value: property ? property.nickname : 'Split',
+                  },
+                  { key: 'line', label: 'Schedule E line', value: line.label },
+                  {
+                    key: 'class',
+                    label: 'Repair or improvement',
+                    value: expense.capitalClassification ?? 'Not answered',
+                    tone: expense.capitalClassification ? undefined : 'warn',
+                  },
+                  {
+                    key: 'treatment',
+                    label: 'Cost treatment',
+                    value: treatment.treatment,
+                  },
+                  {
+                    key: 'contractor',
+                    label: 'Contractor',
+                    value: contractor?.name ?? '—',
+                    tone: contractor ? undefined : 'muted',
+                  },
+                  {
+                    key: 'receipt',
+                    label: 'Receipt',
+                    value: expense.receiptKey ? 'On file' : 'None',
+                    tone: expense.receiptKey ? 'pos' : 'muted',
+                  },
+                  {
+                    key: 'recorded',
+                    label: 'Recorded',
+                    value: expense.isBackdated ? 'After the fact' : 'On the day',
+                    tone: 'muted',
+                  },
+                ]}
+              />
+            </Panel>
+
+            {job ? (
+              <Panel title="Part of a job">
+                <p style={{ fontWeight: 500 }}>{job.title}</p>
+                <p className="hint">
+                  The time and miles that went with this expense are grouped with it.
+                </p>
+                <Link
+                  className="btn btn-block"
+                  href={`/jobs/${job.id}`}
+                  style={{ marginTop: 10 }}
+                >
+                  Open the job
+                </Link>
+              </Panel>
+            ) : (
+              <Panel title="Related work">
+                <AddRelated kind="expense" recordId={id} />
+              </Panel>
+            )}
+          </div>
+        </div>
+      </Well>
+    </>
   );
 }
 
-function safeLine(id: string) {
+function safeLine(id: string): { label: string; line: number | null } {
   try {
-    return getScheduleECategory(id);
+    const category = getScheduleECategory(id);
+    return { label: category.label, line: category.line };
   } catch {
-    return { label: id, triggersCapitalPrompt: false } as const;
+    return { label: id, line: null };
   }
 }
 

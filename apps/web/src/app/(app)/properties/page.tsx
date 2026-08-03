@@ -13,7 +13,7 @@ export const metadata = { title: 'Properties' };
 
 /** A blank cell that reads as "nobody has filled this in", not as a zero. */
 function Missing() {
-  return <span className="text-[color:var(--color-muted)]">—</span>;
+  return <span className="muted">—</span>;
 }
 
 export default async function PropertiesPage({
@@ -35,7 +35,7 @@ export default async function PropertiesPage({
     <div className="grid gap-4">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-bold tracking-tight">Properties</h1>
-        <Link href="/people" className="btn btn-ghost">
+        <Link href="/people" className="btn">
           People &amp; contractors
         </Link>
       </div>
@@ -51,8 +51,8 @@ export default async function PropertiesPage({
       */}
       {properties.length > 0 ? (
         <section>
-          <h2 className="section-title mb-2">Key dates</h2>
-          <div className="table-wrap card">
+          <h2 className="section-title">Key dates</h2>
+          <div className="tablebox tablescroll">
             <table className="table">
               <thead>
                 <tr>
@@ -74,11 +74,11 @@ export default async function PropertiesPage({
                       <td>
                         <Link href={`/properties/${property.id}`}>{property.nickname}</Link>
                       </td>
-                      <td className="tnum">{property.acquiredDate ?? <Missing />}</td>
-                      <td className="tnum">
+                      <td className="num">{property.acquiredDate ?? <Missing />}</td>
+                      <td className="num">
                         {property.placedInServiceDate ?? <Missing />}
                       </td>
-                      <td className="tnum">{property.firstTenantDate ?? <Missing />}</td>
+                      <td className="num">{property.firstTenantDate ?? <Missing />}</td>
                       <td>
                         {managerName ?? (property.isSelfManaged ? 'Self-managed' : <Missing />)}
                       </td>
@@ -97,7 +97,7 @@ export default async function PropertiesPage({
       ) : null}
 
       {properties.length > 0 ? (
-        <ul className="card">
+        <ul className="tablebox">
           {properties.map((property) => {
             const membership = evaluatePropertyMembership(
               domain.find((d) => d.id === property.id) ?? {
@@ -118,24 +118,24 @@ export default async function PropertiesPage({
             const managerName = managerActorId ? managerNames.get(managerActorId) : null;
 
             return (
-              <li key={property.id} className="row">
-                <div className="row-main">
-                  <p className="row-title">{property.nickname}</p>
-                  <p className="row-meta">{property.address}</p>
+              <li key={property.id} className="kv">
+                <div className="">
+                  <p style={{fontWeight:500}}>{property.nickname}</p>
+                  <p className="hint">{property.address}</p>
                   <p className="mt-1 flex flex-wrap gap-1.5">
                     {managerName ? (
-                      <span className="badge badge-not-eligible">Managed by {managerName}</span>
+                      <span className="tag tag-muted">Managed by {managerName}</span>
                     ) : property.isSelfManaged ? (
-                      <span className="badge badge-not-eligible">Self-managed</span>
+                      <span className="tag tag-muted">Self-managed</span>
                     ) : null}
                     {property.placedInServiceDate ? null : (
-                      <span className="badge badge-flag">No in-service date</span>
+                      <span className="tag tag-warn">No in-service date</span>
                     )}
                     {membership.included ? null : (
-                      <span className="badge badge-flag">Outside the enterprise this year</span>
+                      <span className="tag tag-warn">Outside the enterprise this year</span>
                     )}
                     {Number(property.ownershipPct) !== 100 ? (
-                      <span className="badge badge-not-eligible">
+                      <span className="tag tag-muted">
                         {Number(property.ownershipPct)}% owned
                       </span>
                     ) : null}
@@ -147,12 +147,12 @@ export default async function PropertiesPage({
                   ))}
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1">
-                  <span className="row-value">
+                  <span className="num">
                     {property.unadjustedBasisCents
                       ? formatCents(property.unadjustedBasisCents)
                       : '—'}
                   </span>
-                  <Link href={`/properties/${property.id}`} className="btn btn-ghost text-xs">
+                  <Link href={`/properties/${property.id}`} className="btn">
                     Edit
                   </Link>
                 </div>
@@ -161,13 +161,13 @@ export default async function PropertiesPage({
           })}
         </ul>
       ) : (
-        <p className="card card-pad hint">
+        <p className="panel panel-body muted">
           No properties yet. Add your five below — nickname and address are enough to start
           logging against them.
         </p>
       )}
 
-      <details className="card card-pad" open={properties.length === 0 || params.add === '1'}>
+      <details className="panel panel-body" open={properties.length === 0 || params.add === '1'}>
         <summary className="cursor-pointer text-sm font-semibold">Add a property</summary>
         <div className="mt-4">
           <PropertyForm

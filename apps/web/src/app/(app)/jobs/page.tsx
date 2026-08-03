@@ -24,14 +24,14 @@ export default async function JobsPage() {
   return (
     <div className="grid gap-4">
       <div className="flex items-center gap-3">
-        <Link href="/entries" className="btn btn-ghost">
+        <Link href="/entries" className="btn">
           ← Entries
         </Link>
         <h1 className="text-xl font-bold tracking-tight">Jobs</h1>
       </div>
 
       {jobs.length === 0 ? (
-        <div className="card card-pad">
+        <div className="panel panel-body">
           <p className="hint">
             No jobs yet. They are not something you create — after saving any time entry,
             trip, or expense, a <strong>+ Add related</strong> panel appears, and one tap
@@ -42,28 +42,28 @@ export default async function JobsPage() {
           </Link>
         </div>
       ) : (
-        <ul className="card">
+        <ul className="tablebox">
           {jobs.map((job) => (
-            <li key={job.id} className="row">
-              <div className="row-main">
-                <p className="row-title">{job.title}</p>
-                <p className="row-meta">
+            <li key={job.id} className="kv">
+              <div className="">
+                <p style={{fontWeight:500}}>{job.title}</p>
+                <p className="hint">
                   {job.propertyId
                     ? (propertyNames.get(job.propertyId) ?? 'Unknown property')
                     : 'Portfolio-wide'}{' '}
                   · started {formatDateShort(job.createdAt.toISOString().slice(0, 10))}
                 </p>
                 {job.recordCount === 0 ? (
-                  <span className="badge badge-flag mt-1">
+                  <span className="tag tag-warn mt-1">
                     Nothing left in it — its records were deleted or moved
                   </span>
                 ) : null}
               </div>
               <div className="flex shrink-0 flex-col items-end gap-1">
-                <span className="row-value tnum">
+                <span className="num">
                   {job.recordCount} {job.recordCount === 1 ? 'record' : 'records'}
                 </span>
-                <Link href={`/jobs/${job.id}`} className="btn btn-ghost text-xs">
+                <Link href={`/jobs/${job.id}`} className="btn">
                   Open
                 </Link>
               </div>

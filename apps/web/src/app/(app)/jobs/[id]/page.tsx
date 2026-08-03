@@ -57,7 +57,7 @@ export default async function JobPage({
   return (
     <div className="grid gap-4">
       <div className="flex items-center gap-3">
-        <Link href="/jobs" className="btn btn-ghost">
+        <Link href="/jobs" className="btn">
           ← Jobs
         </Link>
         <h1 className="text-xl font-bold tracking-tight">{job.job.title}</h1>
@@ -79,9 +79,9 @@ export default async function JobPage({
         · {rollup.recordCount} {rollup.recordCount === 1 ? 'record' : 'records'}
       </p>
 
-      <div className="card card-pad">
-        <p className="row-title">Add to this job</p>
-        <p className="row-meta">Opens the ordinary form with the job carried across.</p>
+      <div className="panel panel-body">
+        <p style={{fontWeight:500}}>Add to this job</p>
+        <p className="hint">Opens the ordinary form with the job carried across.</p>
         <div className="mt-3">
           <AddToJob jobId={job.job.id} />
         </div>
@@ -91,7 +91,7 @@ export default async function JobPage({
       <section>
         <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
           <h2 className="section-title">Rolled up under {rollup.taxYear} rules</h2>
-          <nav className="chip-row" aria-label="Tax year">
+          <nav className="seg" aria-label="Tax year">
             {years.map((year) => (
               <a
                 key={year}
@@ -105,21 +105,21 @@ export default async function JobPage({
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <div className="card card-pad">
+          <div className="panel panel-body">
             <h3 className="section-title">Time</h3>
-            <p className="tnum mt-1 text-xl font-bold">
+            <p className="num mt-1 text-xl font-bold">
               {formatMinutes(rollup.eligibleMinutes)}
             </p>
             <p className="hint">eligible</p>
-            <p className="tnum mt-2 text-sm font-semibold">
+            <p className="num mt-2 text-sm font-semibold">
               {formatMinutes(rollup.totalMinutes)}
             </p>
             <p className="hint">total logged</p>
           </div>
 
-          <div className="card card-pad">
+          <div className="panel panel-body">
             <h3 className="section-title">Miles</h3>
-            <p className="tnum mt-1 text-xl font-bold">{rollup.totalMiles}</p>
+            <p className="num mt-1 text-xl font-bold">{rollup.totalMiles}</p>
             <p className="hint">
               {rollup.acquisitionMiles > 0
                 ? `${rollup.operatingMiles} operating · ${rollup.acquisitionMiles} acquisition`
@@ -127,13 +127,13 @@ export default async function JobPage({
             </p>
           </div>
 
-          <div className="card card-pad">
+          <div className="panel panel-body">
             <h3 className="section-title">Money</h3>
-            <p className="tnum mt-1 text-xl font-bold">
+            <p className="num mt-1 text-xl font-bold">
               {formatCents(rollup.paidInYearCents)}
             </p>
             <p className="hint">paid in {rollup.taxYear}</p>
-            <p className="tnum mt-2 text-sm font-semibold">
+            <p className="num mt-2 text-sm font-semibold">
               {formatCents(rollup.invoicedCents)}
             </p>
             <p className="hint">
@@ -154,19 +154,19 @@ export default async function JobPage({
       {/* ------------------------------------------------------------- */}
       {job.timeEntries.length > 0 ? (
         <section>
-          <h2 className="section-title mb-2">Time</h2>
-          <ul className="card">
+          <h2 className="section-title">Time</h2>
+          <ul className="tablebox">
             {job.timeEntries.map((entry) => (
-              <li key={entry.id} className="row">
-                <div className="row-main">
-                  <p className="row-title">{entry.description}</p>
-                  <p className="row-meta">
+              <li key={entry.id} className="kv">
+                <div className="">
+                  <p style={{fontWeight:500}}>{entry.description}</p>
+                  <p className="hint">
                     {formatDateShort(entry.date)} · {safeHour(entry.category)}
                   </p>
                   <p className="mt-1">
                     <span
                       className={
-                        entry.shEligible ? 'badge badge-eligible' : 'badge badge-not-eligible'
+                        entry.shEligible ? 'tag tag-pos' : 'tag tag-muted'
                       }
                     >
                       {entry.shEligible ? 'Eligible' : 'Not eligible'}
@@ -174,7 +174,7 @@ export default async function JobPage({
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1">
-                  <span className="row-value">{formatMinutes(entry.minutes)}</span>
+                  <span className="num">{formatMinutes(entry.minutes)}</span>
                   <RemoveButton kind="time" id={entry.id} label={entry.description} />
                 </div>
               </li>
@@ -185,20 +185,20 @@ export default async function JobPage({
 
       {job.trips.length > 0 ? (
         <section>
-          <h2 className="section-title mb-2">Trips</h2>
-          <ul className="card">
+          <h2 className="section-title">Trips</h2>
+          <ul className="tablebox">
             {job.trips.map((trip) => (
-              <li key={trip.id} className="row">
-                <div className="row-main">
-                  <p className="row-title">
+              <li key={trip.id} className="kv">
+                <div className="">
+                  <p style={{fontWeight:500}}>
                     {trip.origin} → {trip.destination}
                   </p>
-                  <p className="row-meta">
+                  <p className="hint">
                     {formatDateShort(trip.date)} · {trip.purpose}
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1">
-                  <span className="row-value">{Number(trip.miles)} mi</span>
+                  <span className="num">{Number(trip.miles)} mi</span>
                   <RemoveButton kind="trip" id={trip.id} label={`the ${trip.miles} mile trip`} />
                 </div>
               </li>
@@ -209,21 +209,21 @@ export default async function JobPage({
 
       {job.expenses.length > 0 ? (
         <section>
-          <h2 className="section-title mb-2">Money</h2>
-          <ul className="card">
+          <h2 className="section-title">Money</h2>
+          <ul className="tablebox">
             {job.expenses.map((expense) => (
-              <li key={expense.id} className="row">
-                <div className="row-main">
-                  <p className="row-title">{expense.vendor}</p>
-                  <p className="row-meta">
+              <li key={expense.id} className="kv">
+                <div className="">
+                  <p style={{fontWeight:500}}>{expense.vendor}</p>
+                  <p className="hint">
                     {formatDateShort(expense.date)} · {safeLine(expense.scheduleECategory)}
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1">
-                  <span className="row-value">{formatCents(expense.amountCents)}</span>
+                  <span className="num">{formatCents(expense.amountCents)}</span>
                   <Link
                     href={`/entries/expense/${expense.id}`}
-                    className="btn btn-ghost text-xs"
+                    className="btn"
                   >
                     Open
                   </Link>
@@ -236,16 +236,16 @@ export default async function JobPage({
       ) : null}
 
       {rollup.recordCount === 0 ? (
-        <p className="card card-pad hint">
+        <p className="panel panel-body muted">
           Nothing is in this job any more. Its records were deleted or moved out — they are
           not gone with it, and the header is safe to remove.
         </p>
       ) : null}
 
       {/* ------------------------------------------------------------- */}
-      <div className="card card-pad">
-        <p className="row-title">Delete this job</p>
-        <p className="row-meta">
+      <div className="panel panel-body">
+        <p style={{fontWeight:500}}>Delete this job</p>
+        <p className="hint">
           Only the grouping goes. All {rollup.recordCount}{' '}
           {rollup.recordCount === 1 ? 'record' : 'records'} above stay exactly where they are —
           the grouping was a convenience and the records are the evidence.

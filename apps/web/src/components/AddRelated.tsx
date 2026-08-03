@@ -26,18 +26,17 @@ export function AddRelated({ kind, recordId }: { kind: Kind; recordId: string })
   const [pending, startTransition] = useTransition();
 
   return (
-    <div className="card card-pad">
-      <p className="row-title">Part of something bigger?</p>
-      <p className="row-meta">
+    <div>
+      <p style={{fontWeight:500}}>Part of something bigger?</p>
+      <p className="hint">
         Add the time, miles, or money that went with it and they will be kept together as one
         job.
       </p>
-      <div className="chip-row mt-3">
+      <div className="seg" style={{marginTop:10}}>
         {NEXT.map((option) => (
           <button
             key={option.kind}
             type="button"
-            className="chip"
             disabled={pending}
             onClick={() =>
               startTransition(() => {
@@ -58,12 +57,12 @@ export function AddToJob({ jobId }: { jobId: string }) {
   const [pending, startTransition] = useTransition();
 
   return (
-    <div className="chip-row">
+    <div className="seg">
       {NEXT.map((option) => (
         <button
           key={option.kind}
           type="button"
-          className="chip"
+          className=""
           disabled={pending}
           onClick={() =>
             startTransition(() => {

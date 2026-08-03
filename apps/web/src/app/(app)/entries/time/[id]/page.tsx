@@ -30,7 +30,7 @@ export default async function EditTimeEntryPage({
   return (
     <div>
       <div className="mb-4 flex items-center gap-3">
-        <Link href="/entries" className="btn btn-ghost">
+        <Link href="/entries" className="btn">
           ← Back
         </Link>
         <h1 className="text-xl font-bold tracking-tight">Edit time entry</h1>
