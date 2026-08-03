@@ -10,9 +10,9 @@
  */
 
 import './loadEnv';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { getDb } from './client';
-import { enterprises, properties } from './schema';
+import { actors, enterprises, properties } from './schema';
 import { env } from '@/env';
 
 const PLACEHOLDER_PROPERTIES = [
@@ -23,9 +23,52 @@ const PLACEHOLDER_PROPERTIES = [
   { nickname: 'Property 5', address: '5 Example St' },
 ];
 
+/**
+ * The household, from ALLOWED_EMAILS.
+ *
+ * Work is attributed per person and the two spouses' hours cannot be pooled,
+ * so nothing can be recorded until at least one of them exists. Signing in
+ * creates the record, but that leaves every script - the importer especially -
+ * unable to run on a fresh database until somebody has opened a browser.
+ *
+ * Matched on email, so when they do sign in they land on the row seeded here
+ * rather than getting a second one.
+ */
+async function seedHousehold(): Promise<number> {
+  const db = getDb();
+  const [existing] = await db
+    .select({ c: sql<string>`count(*)::int` })
+    .from(actors)
+    .where(sql`${actors.type} IN ('owner', 'spouse')`);
+
+  if (Number(existing?.c ?? 0) > 0) return 0;
+
+  const emails = env.allowedEmails;
+  if (emails.length === 0) {
+    console.log('No ALLOWED_EMAILS set, so no household members were created.');
+    return 0;
+  }
+
+  await db.insert(actors).values(
+    emails.map((email, index) => ({
+      // A placeholder name, obviously so. Real names go in under People, and
+      // inventing one here would put fiction in a tax record.
+      name: index === 0 ? 'Owner' : `Household member ${index + 1}`,
+      type: (index === 0 ? 'owner' : 'spouse') as 'owner' | 'spouse',
+      email: email.toLowerCase(),
+    })),
+  );
+
+  console.log(`Added ${emails.length} household member(s) from ALLOWED_EMAILS.`);
+  console.log('Rename them under People - the placeholder names are not real ones.');
+  return emails.length;
+}
+
 async function main() {
   const db = getDb();
   const year = new Date().getFullYear();
+
+  await seedHousehold();
 
   let [enterprise] = await db.select().from(enterprises).limit(1);
   if (!enterprise) {

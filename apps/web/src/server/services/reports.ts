@@ -605,11 +605,20 @@ export async function rentReconciliationCsv(taxYear: number): Promise<string> {
           .join(' · '),
       });
     }
+    // Three states, not two. A property with no 1099 has nothing to reconcile
+    // against, and calling that "not reconciled" reads as a problem the owner
+    // has failed to fix rather than a form that was never issued - which is
+    // exactly what a self-managed property looks like every year.
     rows.push({
       property: view.propertyNickname,
       kind: 'Still unexplained',
       amount: view.residualCents,
-      note: view.isReconciled ? 'Reconciled' : 'Not reconciled',
+      note:
+        view.reportedGrossCents === null
+          ? 'No 1099 on file, so there is nothing to reconcile against'
+          : view.isReconciled
+            ? 'Reconciled'
+            : 'Not reconciled - this difference still needs explaining',
     });
   }
 

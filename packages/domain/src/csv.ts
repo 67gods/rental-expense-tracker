@@ -17,18 +17,36 @@ export interface CsvColumn<T> {
 const FORMULA_PREFIXES = ['=', '+', '-', '@', '\t', '\r'];
 
 /**
+ * A plain decimal number, optionally negative. Nothing else.
+ *
+ * Deliberately strict - no thousands separators, no currency symbol, no
+ * exponent - so the exemption below cannot be talked into covering a value
+ * that merely looks numeric.
+ */
+const PLAIN_NUMBER = /^-?\d+(\.\d+)?$/;
+
+/**
  * Escapes one field per RFC 4180, then defuses anything Excel would execute.
  *
  * A vendor legitimately named "-Superior Plumbing" or a note pasted from a
  * spreadsheet starting with "=" would otherwise run as a formula on open. The
  * leading apostrophe keeps the text readable while making it inert.
+ *
+ * A NEGATIVE NUMBER IS NOT A FORMULA, and this used to treat it as one. Every
+ * net loss, every suspended loss carried forward, every held deposit went out
+ * as '-11435.09 - which Excel reads as text, so the column would not sum. On a
+ * file whose whole purpose is to be added up by an accountant that is the worst
+ * possible place to be wrong, and it type-checked perfectly.
  */
 export function escapeCsvField(value: CsvValue): string {
   if (value === null || value === undefined) return '';
 
   let text = typeof value === 'string' ? value : String(value);
 
-  if (FORMULA_PREFIXES.some((prefix) => text.startsWith(prefix))) {
+  const isFormulaRisk =
+    FORMULA_PREFIXES.some((prefix) => text.startsWith(prefix)) && !PLAIN_NUMBER.test(text);
+
+  if (isFormulaRisk) {
     text = `'${text}`;
   }
 

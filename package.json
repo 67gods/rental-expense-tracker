@@ -22,6 +22,8 @@
     "db:migrate": "npm run db:migrate --workspace @rental/web",
     "db:seed": "npm run db:seed --workspace @rental/web",
     "db:check": "npm run db:check --workspace @rental/web",
-    "verify": "npm run typecheck && npm run test && npm run build"
+    "verify": "npm run typecheck && npm run test && npm run build",
+    "db:reset": "npm run db:reset --workspace @rental/web",
+    "db:import": "npm run db:import --workspace @rental/web"
   }
 }

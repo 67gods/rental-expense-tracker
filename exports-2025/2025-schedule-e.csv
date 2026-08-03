@@ -1,0 +1,44 @@
+﻿Property,Address,Schedule E line,Description,Amount,Source,Prior year (2024)
+Arbordale way,"5120 Arbordale Way, Mt Holly, NC 28120",3,Rents received,14238.00,ledger,
+Arbordale way,"5120 Arbordale Way, Mt Holly, NC 28120",5,Advertising,29.99,ledger,0.00
+Arbordale way,"5120 Arbordale Way, Mt Holly, NC 28120",14,Repairs,395.00,ledger,0.00
+Arbordale way,"5120 Arbordale Way, Mt Holly, NC 28120",15,Supplies,416.57,ledger,0.00
+Arbordale way,"5120 Arbordale Way, Mt Holly, NC 28120",19,Other,14167.31,ledger,0.00
+Arbordale way,"5120 Arbordale Way, Mt Holly, NC 28120",12,Mortgage interest paid to banks,6446.90,1098,0.00
+Arbordale way,"5120 Arbordale Way, Mt Holly, NC 28120",16,Taxes,3312.30,1098,0.00
+Arbordale way,"5120 Arbordale Way, Mt Holly, NC 28120",9,Insurance,905.02,1098,0.00
+Arbordale way,"5120 Arbordale Way, Mt Holly, NC 28120",,Total expenses,25673.09,,
+Arbordale way,"5120 Arbordale Way, Mt Holly, NC 28120",,Net,-11435.09,,
+Creedmore ct,"1109 Creedmore Ct, Charlotte, NC 28215",3,Rents received,0.00,ledger,
+Creedmore ct,"1109 Creedmore Ct, Charlotte, NC 28215",5,Advertising,39.99,ledger,0.00
+Creedmore ct,"1109 Creedmore Ct, Charlotte, NC 28215",7,Cleaning and maintenance,282.47,ledger,0.00
+Creedmore ct,"1109 Creedmore Ct, Charlotte, NC 28215",9,Insurance,1072.56,ledger,0.00
+Creedmore ct,"1109 Creedmore Ct, Charlotte, NC 28215",15,Supplies,159.66,ledger,0.00
+Creedmore ct,"1109 Creedmore Ct, Charlotte, NC 28215",16,Taxes,391.83,ledger,0.00
+Creedmore ct,"1109 Creedmore Ct, Charlotte, NC 28215",19,Other,12191.21,ledger,0.00
+Creedmore ct,"1109 Creedmore Ct, Charlotte, NC 28215",12,Mortgage interest paid to banks,631.82,1098,0.00
+Creedmore ct,"1109 Creedmore Ct, Charlotte, NC 28215",,Total expenses,14769.54,,
+Creedmore ct,"1109 Creedmore Ct, Charlotte, NC 28215",,Net,-14769.54,,
+Kettlewell,"16824 Kettlewell Lane, Charlotte, NC 28277",3,Rents received,25400.00,ledger,
+Kettlewell,"16824 Kettlewell Lane, Charlotte, NC 28277",5,Advertising,89.10,ledger,0.00
+Kettlewell,"16824 Kettlewell Lane, Charlotte, NC 28277",14,Repairs,1185.00,ledger,0.00
+Kettlewell,"16824 Kettlewell Lane, Charlotte, NC 28277",15,Supplies,147.83,ledger,0.00
+Kettlewell,"16824 Kettlewell Lane, Charlotte, NC 28277",17,Utilities,78.17,ledger,0.00
+Kettlewell,"16824 Kettlewell Lane, Charlotte, NC 28277",19,Other,1952.37,ledger,0.00
+Kettlewell,"16824 Kettlewell Lane, Charlotte, NC 28277",12,Mortgage interest paid to banks,4919.11,1098,0.00
+Kettlewell,"16824 Kettlewell Lane, Charlotte, NC 28277",16,Taxes,3317.92,1098,0.00
+Kettlewell,"16824 Kettlewell Lane, Charlotte, NC 28277",9,Insurance,886.50,1098,0.00
+Kettlewell,"16824 Kettlewell Lane, Charlotte, NC 28277",,Total expenses,12576.00,,
+Kettlewell,"16824 Kettlewell Lane, Charlotte, NC 28277",,Net,12824.00,,
+Westmill,"17334 Westmill Ln, Charlotte, NC 28277",3,Rents received,26489.00,ledger,
+Westmill,"17334 Westmill Ln, Charlotte, NC 28277",5,Advertising,29.99,ledger,0.00
+Westmill,"17334 Westmill Ln, Charlotte, NC 28277",7,Cleaning and maintenance,1716.31,ledger,0.00
+Westmill,"17334 Westmill Ln, Charlotte, NC 28277",14,Repairs,7744.26,ledger,0.00
+Westmill,"17334 Westmill Ln, Charlotte, NC 28277",15,Supplies,669.72,ledger,0.00
+Westmill,"17334 Westmill Ln, Charlotte, NC 28277",17,Utilities,180.71,ledger,0.00
+Westmill,"17334 Westmill Ln, Charlotte, NC 28277",19,Other,3105.54,ledger,0.00
+Westmill,"17334 Westmill Ln, Charlotte, NC 28277",12,Mortgage interest paid to banks,4215.52,1098,0.00
+Westmill,"17334 Westmill Ln, Charlotte, NC 28277",16,Taxes,4097.75,1098,0.00
+Westmill,"17334 Westmill Ln, Charlotte, NC 28277",9,Insurance,1176.67,1098,0.00
+Westmill,"17334 Westmill Ln, Charlotte, NC 28277",,Total expenses,22936.47,,
+Westmill,"17334 Westmill Ln, Charlotte, NC 28277",,Net,3552.53,,
