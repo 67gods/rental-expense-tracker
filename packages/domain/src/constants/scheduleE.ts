@@ -20,6 +20,7 @@ export type ScheduleECategoryId =
   | 'taxes'
   | 'utilities'
   | 'depreciation'
+  | 'operating'
   | 'other';
 
 export interface ScheduleECategory {
@@ -134,11 +135,37 @@ export const SCHEDULE_E_CATEGORIES: readonly ScheduleECategory[] = [
     helper: 'Entered by your CPA. Not calculated here.',
     triggersCapitalPrompt: false,
   },
+  /*
+   * TWO CATEGORIES SHARE LINE 19, AND THAT IS THE POINT.
+   *
+   * Line 19 is "Other" on the form and takes a list of descriptions, so more
+   * than one row landing there is what the form asks for rather than a
+   * collision. Nothing groups by line number alone - the ledger, the prior-year
+   * comparison and the CSV all key on the category id - so the two stay apart
+   * all the way to the export and reach the CPA as two named figures.
+   *
+   * They are split because they answer the repair-or-improvement question
+   * differently. "Other" is the genuine unknown: spend that fits nowhere and
+   * might well be physical work, so it asks. HOA dues and a storage
+   * subscription are not physical work under any reading, and running them
+   * through a prompt about bettering the property produced a review queue full
+   * of $23 items nobody could act on - which teaches you to ignore the queue,
+   * and the queue is where the real questions live.
+   */
+  {
+    id: 'operating',
+    line: 19,
+    label: 'Operating expense',
+    helper:
+      'Recurring cost of running the rental that fits no line above - HOA dues, subscriptions and software, bank and filing fees. Never physical work.',
+    triggersCapitalPrompt: false,
+  },
   {
     id: 'other',
     line: 19,
     label: 'Other',
-    helper: 'Anything that does not fit a line above. Describe it in the notes.',
+    helper:
+      'Anything that fits nowhere above, including one-off spend on the property itself. Describe it in the notes.',
     triggersCapitalPrompt: true,
   },
 ] as const;
