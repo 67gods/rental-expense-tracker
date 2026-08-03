@@ -143,13 +143,14 @@ export default async function ReportsPage({
                 <th className="num">1098</th>
                 <th className="num">CPA</th>
                 <th className="num">Net</th>
+                <th className="num">Capital</th>
               </tr>
             </thead>
             <tbody>
               {scheduleE.map((summary) => {
                 const bySource = (source: 'ledger' | '1098' | 'cpa') =>
                   summary.expenseLines
-                    .filter((l) => l.source === source)
+                    .filter((l) => l.source === source && !l.isCapital)
                     .reduce((total, l) => total + l.amountCents, 0);
 
                 return (
@@ -163,12 +164,14 @@ export default async function ReportsPage({
                     <td className="num">{formatCents(bySource('1098'))}</td>
                     <td className="num">{formatCents(bySource('cpa'))}</td>
                     <td className="num">{formatCents(summary.netCents)}</td>
+                    {/* Alongside the net, never inside it. */}
+                    <td className="num">{formatCents(summary.capitalAdditionsCents)}</td>
                   </tr>
                 );
               })}
               {scheduleE.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="hint">
+                  <td colSpan={7} className="hint">
                     No properties yet.
                   </td>
                 </tr>
@@ -179,6 +182,11 @@ export default async function ReportsPage({
         <p className="hint mt-2">
           Expense amounts are what actually left the bank in {taxYear}, not what was invoiced.
           An invoice dated December and paid in January belongs to January.
+        </p>
+        <p className="hint mt-1">
+          <strong>Capital is listed separately and is not in the net.</strong> Anything marked
+          an improvement is basis your CPA depreciates, not a deduction this year — it reaches
+          the net only as their depreciation figure on line 18.
         </p>
       </section>
 

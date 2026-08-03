@@ -49,6 +49,20 @@ export interface ScheduleELine {
   label: string;
   amountCents: number;
   source: FigureSource;
+  /**
+   * Spend the owner classified as a capital improvement.
+   *
+   * Reported separately and NOT included in the expense total, because an
+   * improvement is not a Schedule E deduction - it is basis the CPA
+   * depreciates. Summing it into line 19 alongside genuine other-expenses
+   * overstates the year's deductions by whatever was spent on appliances,
+   * flooring and furniture, which in 2025 was $20,869.57.
+   *
+   * This is not the app deciding anything. The classification is already on
+   * the record, put there by whoever entered it; the report just stops
+   * pretending it says something else.
+   */
+  isCapital: boolean;
   /** The same property and line, all sources, in the year before. */
   priorYearCents: number;
 }
@@ -59,7 +73,10 @@ export interface SchedulePropertySummary {
   address: string;
   rentsReceivedCents: number;
   expenseLines: ScheduleELine[];
+  /** Deductible expenses only. Capital additions are not in here. */
   totalExpenseCents: number;
+  /** Capital additions, reported alongside rather than deducted. */
+  capitalAdditionsCents: number;
   netCents: number;
 }
 
@@ -120,7 +137,12 @@ export async function buildScheduleE(
   return properties.map((property) => {
     const expenseLines: ScheduleELine[] = [];
 
-    const push = (categoryId: string, amountCents: number, source: FigureSource) => {
+    const push = (
+      categoryId: string,
+      amountCents: number,
+      source: FigureSource,
+      isCapital = false,
+    ) => {
       if (amountCents === 0) return;
       const category = safeCategory(categoryId);
       expenseLines.push({
@@ -129,12 +151,16 @@ export async function buildScheduleE(
         label: category.label,
         amountCents,
         source,
+        isCapital,
         priorYearCents: priorByKey.get(`${property.id}:${categoryId}`) ?? 0,
       });
     };
 
     for (const category of listScheduleECategories()) {
-      push(category.id, ledger.get(`${property.id}:${category.id}`) ?? 0, 'ledger');
+      push(category.id, ledger.deductible.get(`${property.id}:${category.id}`) ?? 0, 'ledger');
+    }
+    for (const category of listScheduleECategories()) {
+      push(category.id, ledger.capital.get(`${property.id}:${category.id}`) ?? 0, 'ledger', true);
     }
 
     // The 1098 figures. Interest to line 12, property tax to line 16, escrowed
@@ -158,7 +184,12 @@ export async function buildScheduleE(
       push(category.id, cpa.get(`${property.id}:${category.id}`) ?? 0, 'cpa');
     }
 
-    const totalExpenseCents = sumCents(expenseLines.map((l) => l.amountCents));
+    const totalExpenseCents = sumCents(
+      expenseLines.filter((l) => !l.isCapital).map((l) => l.amountCents),
+    );
+    const capitalAdditionsCents = sumCents(
+      expenseLines.filter((l) => l.isCapital).map((l) => l.amountCents),
+    );
     const rentsReceivedCents = rentByProperty.get(property.id) ?? 0;
 
     return {
@@ -168,6 +199,10 @@ export async function buildScheduleE(
       rentsReceivedCents,
       expenseLines,
       totalExpenseCents,
+      capitalAdditionsCents,
+      // Capital is not subtracted. Depreciation reaches this report as a `cpa`
+      // figure on line 18 once the CPA sends one back, which is the only route
+      // by which a capital cost should ever reduce the net.
       netCents: rentsReceivedCents - totalExpenseCents,
     };
   });
@@ -181,7 +216,9 @@ export async function buildScheduleE(
  * total, so a split invoice paid in instalments splits the same way each time
  * and the pieces still sum back to what was paid, to the cent.
  */
-async function ledgerLinesFor(taxYear: number): Promise<Map<string, number>> {
+async function ledgerLinesFor(
+  taxYear: number,
+): Promise<{ deductible: Map<string, number>; capital: Map<string, number> }> {
   const paidByExpense = await paidByExpenseInYear(taxYear);
   const [expenses, properties] = await Promise.all([
     expensesByIds([...paidByExpense.keys()]),
@@ -189,7 +226,8 @@ async function ledgerLinesFor(taxYear: number): Promise<Map<string, number>> {
   ]);
 
   const domainProperties = toDomainProperties(properties);
-  const out = new Map<string, number>();
+  const deductible = new Map<string, number>();
+  const capital = new Map<string, number>();
 
   for (const [expenseId, paidCents] of paidByExpense) {
     const expense = expenses.get(expenseId);
@@ -202,13 +240,18 @@ async function ledgerLinesFor(taxYear: number): Promise<Map<string, number>> {
       expense.propertyId,
     );
 
+    // Split on the classification already stored against the expense. An
+    // improvement is basis, not a deduction, and merging the two would put
+    // appliances and flooring on the same line as consumables.
+    const target = expense.capitalClassification === 'improvement' ? capital : deductible;
+
     for (const line of lines) {
       const key = `${line.propertyId}:${expense.scheduleECategory}`;
-      out.set(key, (out.get(key) ?? 0) + line.amountCents);
+      target.set(key, (target.get(key) ?? 0) + line.amountCents);
     }
   }
 
-  return out;
+  return { deductible, capital };
 }
 
 export async function scheduleECsv(taxYear: number): Promise<string> {
@@ -235,7 +278,7 @@ export async function scheduleECsv(taxYear: number): Promise<string> {
       source: 'ledger',
       prior: null,
     });
-    for (const line of summary.expenseLines) {
+    for (const line of summary.expenseLines.filter((l) => !l.isCapital)) {
       rows.push({
         property: summary.nickname,
         address: summary.address,
@@ -264,6 +307,31 @@ export async function scheduleECsv(taxYear: number): Promise<string> {
       source: '',
       prior: null,
     });
+
+    // Capital last, below the net, with no Schedule E line number - because it
+    // does not have one. Putting it above would invite it into the total.
+    for (const line of summary.expenseLines.filter((l) => l.isCapital)) {
+      rows.push({
+        property: summary.nickname,
+        address: summary.address,
+        line: '',
+        label: `CAPITAL - ${line.label} - not deducted, see the expense detail for what it was`,
+        amount: line.amountCents,
+        source: 'ledger (capital)',
+        prior: null,
+      });
+    }
+    if (summary.capitalAdditionsCents !== 0) {
+      rows.push({
+        property: summary.nickname,
+        address: summary.address,
+        line: '',
+        label: 'Total capital additions - depreciated by your CPA, not deducted here',
+        amount: summary.capitalAdditionsCents,
+        source: '',
+        prior: null,
+      });
+    }
   }
 
   return toCsv(rows, [
