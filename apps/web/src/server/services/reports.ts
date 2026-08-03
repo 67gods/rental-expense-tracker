@@ -71,6 +71,12 @@ export interface SchedulePropertySummary {
   propertyId: string;
   nickname: string;
   address: string;
+  /**
+   * The placed-in-service date. Carried here because the properties are
+   * already loaded to build this summary, and every screen showing these
+   * figures wants to say which side of that line they fall on.
+   */
+  availableFrom: string | null;
   rentsReceivedCents: number;
   expenseLines: ScheduleELine[];
   /** Deductible expenses only. Capital additions are not in here. */
@@ -196,6 +202,7 @@ export async function buildScheduleE(
       propertyId: property.id,
       nickname: property.nickname,
       address: property.address,
+      availableFrom: property.placedInServiceDate,
       rentsReceivedCents,
       expenseLines,
       totalExpenseCents,
