@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/session';
 import { getRunningTimer, LONG_RUNNING_MINUTES } from '@/server/services/timer';
@@ -19,9 +20,10 @@ import { yearChoices } from '@/lib/year';
  * item.
  *
  * The layout cannot read `?year=` - a Next layout receives no searchParams, by
- * design, because it does not re-render when the query changes. So the rail
- * offers the switch using the session year, and each PAGE resolves the real
- * year from its own query string. Offering and honouring are split on purpose.
+ * design, because it does not re-render when the query changes. So it renders
+ * the rail for the SESSION year and `RailFrame`, which is a client component,
+ * reads the URL and takes over from there. What is passed down here is the
+ * fallback and the first paint, not the answer.
  */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
@@ -42,13 +44,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         Skip to content
       </a>
 
-      <RailFrame
-        taxYear={user.taxYear}
-        years={yearChoices(user.taxYear, user.taxYear)}
-        counts={counts}
-        who={`${user.actor.name} · ${user.enterprise.name}`}
-        footer={<SignOutButton />}
-      />
+      {/* `useSearchParams` needs a Suspense boundary above it. The fallback is
+          the rail's own width so the shell never reflows while it resolves. */}
+      <Suspense fallback={<div className="rail" />}>
+        <RailFrame
+          taxYear={user.taxYear}
+          counts={counts}
+          who={`${user.actor.name} · ${user.enterprise.name}`}
+          footer={<SignOutButton />}
+        />
+      </Suspense>
 
       <div className="main">
         {/* Above everything else: a timer left running distorts the year, and

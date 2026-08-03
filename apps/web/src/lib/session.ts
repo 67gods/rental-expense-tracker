@@ -4,6 +4,7 @@ import { currentTaxYear } from '@rental/domain';
 import { getDb } from '@/db/client';
 import { actors, enterprises, type Actor, type Enterprise } from '@/db/schema';
 import { env } from '@/env';
+import { latestYearWithData } from '@/server/services/navigation';
 import { auth } from './auth';
 
 /**
@@ -42,11 +43,17 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   });
   const enterprise = await ensureDefaultEnterprise(db);
 
+  // Open on the newest year that holds records rather than on today's year.
+  // Never later than the current one: a single backdated 2027 row must not
+  // drag the whole app into the future.
+  const thisYear = currentTaxYear(env.timeZone);
+  const latest = await latestYearWithData();
+
   return {
     actor,
     enterprise,
     email,
-    taxYear: currentTaxYear(env.timeZone),
+    taxYear: latest === null ? thisYear : Math.min(latest, thisYear),
     timeZone: env.timeZone,
   };
 });

@@ -33,6 +33,39 @@ export interface RailCountsResult {
   reports: number;
 }
 
+/**
+ * The newest calendar year that actually holds a record.
+ *
+ * The app used to open on whatever year it happened to be, which through 2026
+ * meant landing on an empty screen - $0.00, nothing per property, every count
+ * zero - while a fully reconciled 2025 sat one click away in a switcher nobody
+ * had a reason to touch. An empty year is a fine thing to look at once you have
+ * asked for it, and a bad thing to be shown by default.
+ *
+ * Returns null on an empty database, where the current year is the only
+ * sensible answer.
+ */
+export async function latestYearWithData(): Promise<number | null> {
+  const db = getDb();
+
+  // One round trip. These four dates are stored as text `YYYY-MM-DD`, so max()
+  // over them is an ordinary lexicographic max and needs no casting.
+  const result = await db.execute(sql`
+    select max(d) as d from (
+      select max(${expenses.date}) as d from ${expenses}
+      union all select max(${rentReceipts.date}) from ${rentReceipts}
+      union all select max(${timeEntries.date}) from ${timeEntries}
+      union all select max(${trips.date}) from ${trips}
+    ) as latest
+  `);
+
+  const value = (result.rows[0] as { d?: string | null } | undefined)?.d;
+  if (!value) return null;
+
+  const year = Number(String(value).slice(0, 4));
+  return Number.isInteger(year) ? year : null;
+}
+
 export async function railCounts(
   taxYear: number,
   reportCount: number,

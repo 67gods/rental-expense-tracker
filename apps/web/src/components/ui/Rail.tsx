@@ -84,7 +84,10 @@ export function Rail({
   const groups: { heading: string; items: Item[] }[] = [
     {
       heading: 'Review',
+      // Overview leads this group rather than sitting under Year: it is where
+      // you land and what you check, not part of the January sitting.
       items: [
+        { href: '/', label: 'Overview', icon: 'overview' },
         { href: '/entries?tab=expenses', label: 'Expenses', icon: 'rows', count: counts.expenses },
         { href: '/entries?tab=income', label: 'Rent', icon: 'money', count: counts.income },
         { href: '/entries?tab=time', label: 'Time', icon: 'clock', count: counts.time },
@@ -100,10 +103,11 @@ export function Rail({
       ],
     },
     {
-      heading: 'Year',
+      heading: 'Year end',
       items: [
-        { href: '/', label: 'Overview', icon: 'overview' },
-        { href: '/year-end', label: 'Close the year', icon: 'calendar' },
+        // Named with the year in it. "Close the year" begs the question which
+        // year, and the answer is the one the rail is showing.
+        { href: '/year-end', label: `Close ${taxYear}`, icon: 'calendar' },
         { href: '/reports', label: 'Reports', icon: 'doc', count: counts.reports },
         { href: '/settings', label: 'Settings', icon: 'gear' },
       ],
