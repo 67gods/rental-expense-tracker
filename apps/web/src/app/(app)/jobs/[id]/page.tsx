@@ -77,7 +77,7 @@ export default async function JobPage({
       </p>
 
       <div className="panel panel-body">
-        <p style={{fontWeight:500}}>Add to this job</p>
+        <p className="rowtitle">Add to this job</p>
         <p className="hint">Opens the ordinary form with the job carried across.</p>
         <div className="mt-3">
           <AddToJob jobId={job.job.id} />
@@ -155,8 +155,8 @@ export default async function JobPage({
           <ul className="tablebox">
             {job.timeEntries.map((entry) => (
               <li key={entry.id} className="kv">
-                <div className="">
-                  <p style={{fontWeight:500}}>{entry.description}</p>
+                <div>
+                  <p className="rowtitle">{entry.description}</p>
                   <p className="hint">
                     {formatDateShort(entry.date)} · {safeHour(entry.category)}
                   </p>
@@ -186,8 +186,8 @@ export default async function JobPage({
           <ul className="tablebox">
             {job.trips.map((trip) => (
               <li key={trip.id} className="kv">
-                <div className="">
-                  <p style={{fontWeight:500}}>
+                <div>
+                  <p className="rowtitle">
                     {trip.origin} → {trip.destination}
                   </p>
                   <p className="hint">
@@ -210,8 +210,8 @@ export default async function JobPage({
           <ul className="tablebox">
             {job.expenses.map((expense) => (
               <li key={expense.id} className="kv">
-                <div className="">
-                  <p style={{fontWeight:500}}>{expense.vendor}</p>
+                <div>
+                  <p className="rowtitle">{expense.vendor}</p>
                   <p className="hint">
                     {formatDateShort(expense.date)} · {safeLine(expense.scheduleECategory)}
                   </p>
@@ -241,7 +241,7 @@ export default async function JobPage({
 
       {/* ------------------------------------------------------------- */}
       <div className="panel panel-body">
-        <p style={{fontWeight:500}}>Delete this job</p>
+        <p className="rowtitle">Delete this job</p>
         <p className="hint">
           Only the grouping goes. All {rollup.recordCount}{' '}
           {rollup.recordCount === 1 ? 'record' : 'records'} above stay exactly where they are —

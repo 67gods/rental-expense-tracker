@@ -45,8 +45,8 @@ export default async function JobsPage() {
         <ul className="tablebox">
           {jobs.map((job) => (
             <li key={job.id} className="kv">
-              <div className="">
-                <p style={{fontWeight:500}}>{job.title}</p>
+              <div>
+                <p className="rowtitle">{job.title}</p>
                 <p className="hint">
                   {job.propertyId
                     ? (propertyNames.get(job.propertyId) ?? 'Unknown property')

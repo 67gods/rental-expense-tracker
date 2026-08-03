@@ -27,7 +27,7 @@ export function AddRelated({ kind, recordId }: { kind: Kind; recordId: string })
 
   return (
     <div>
-      <p style={{fontWeight:500}}>Part of something bigger?</p>
+      <p className="rowtitle">Part of something bigger?</p>
       <p className="hint">
         Add the time, miles, or money that went with it and they will be kept together as one
         job.
@@ -62,7 +62,7 @@ export function AddToJob({ jobId }: { jobId: string }) {
         <button
           key={option.kind}
           type="button"
-          className=""
+         
           disabled={pending}
           onClick={() =>
             startTransition(() => {

@@ -60,8 +60,8 @@ export default async function PeoplePage() {
         <ul className="tablebox">
           {people.map((actor) => (
             <li key={actor.id} className="kv">
-              <div className="">
-                <p style={{fontWeight:500}}>{actor.name}</p>
+              <div>
+                <p className="rowtitle">{actor.name}</p>
                 <p className="hint">
                   {TYPE_LABELS[actor.type] ?? actor.type}
                   {actor.email ? ` · ${actor.email}` : ''}
@@ -88,8 +88,8 @@ export default async function PeoplePage() {
             const total = totalsById.get(actor.id);
             return (
               <li key={actor.id} className="kv">
-                <div className="">
-                  <p style={{fontWeight:500}}>{actor.name}</p>
+                <div>
+                  <p className="rowtitle">{actor.name}</p>
                   <p className="hint">
                     {actor.w9OnFile ? 'W-9 on file' : 'No W-9 on file'}
                     {actor.taxIdCollected ? ' · tax ID collected' : ''}

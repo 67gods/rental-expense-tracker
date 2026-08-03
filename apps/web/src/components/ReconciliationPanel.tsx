@@ -78,8 +78,8 @@ export function ReconciliationPanel({
         <ul className="mt-3 grid gap-1">
           {view.items.map((item) => (
             <li key={item.id} className="kv">
-              <span className="">
-                <span style={{fontWeight:500}}>{kindLabel(item.kind)}</span>
+              <span>
+                <span className="rowtitle">{kindLabel(item.kind)}</span>
                 {item.note ? <span className="hint">{item.note}</span> : null}
                 {item.isUnusualSign ? (
                   <span className="hint">

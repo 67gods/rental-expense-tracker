@@ -95,8 +95,8 @@ export default async function SettingsPage() {
           ) : (
             [...errors, ...warnings, ...info].map((finding) => (
               <div key={finding.check} className="kv">
-                <div className="">
-                  <p style={{fontWeight:500}}>
+                <div>
+                  <p className="rowtitle">
                     <span
                       className={
                         finding.severity === 'error'

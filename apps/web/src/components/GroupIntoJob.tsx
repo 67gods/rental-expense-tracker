@@ -65,8 +65,8 @@ export function GroupIntoJob({
         <ul className="max-h-72 overflow-y-auto">
           {records.map((record) => (
             <li key={record.id} className="kv">
-              <label className="">
-                <span style={{fontWeight:500}}>{record.title}</span>
+              <label>
+                <span className="rowtitle">{record.title}</span>
                 <span className="hint">{record.meta}</span>
               </label>
               <input

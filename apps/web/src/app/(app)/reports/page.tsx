@@ -62,7 +62,7 @@ export default async function ReportsPage({
         time to hand something to the CPA.
       */}
       <Link href={`/year-end?year=${taxYear}`} className="panel panel-body">
-        <p style={{fontWeight:500}}>Year-end · {taxYear}</p>
+        <p className="rowtitle">Year-end · {taxYear}</p>
         <p className="hint">
           The 1098s, rent against the 1099, payments still only planned, and the figures your
           CPA sent back. One sitting, one page.
@@ -199,7 +199,7 @@ export default async function ReportsPage({
               href={`/api/v1/export/${id}?taxYear=${taxYear}`}
               download
             >
-              <p style={{fontWeight:500}}>{REPORTS[id].label}</p>
+              <p className="rowtitle">{REPORTS[id].label}</p>
               <p className="hint num">
                 {taxYear}-{id}.csv
               </p>

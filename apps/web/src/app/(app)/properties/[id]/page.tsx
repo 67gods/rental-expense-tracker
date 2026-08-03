@@ -281,8 +281,8 @@ function ManagementHistory({
       <ul className="grid gap-1">
         {periods.map((period) => (
           <li key={period.id} className="kv">
-            <span className="">
-              <span style={{fontWeight:500}}>
+            <span>
+              <span className="rowtitle">
                 {period.managerActorId
                   ? (names.get(period.managerActorId) ?? 'A manager no longer on file')
                   : 'Self-managed'}

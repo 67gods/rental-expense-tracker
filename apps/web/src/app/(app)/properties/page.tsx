@@ -119,8 +119,8 @@ export default async function PropertiesPage({
 
             return (
               <li key={property.id} className="kv">
-                <div className="">
-                  <p style={{fontWeight:500}}>{property.nickname}</p>
+                <div>
+                  <p className="rowtitle">{property.nickname}</p>
                   <p className="hint">{property.address}</p>
                   <p className="mt-1 flex flex-wrap gap-1.5">
                     {managerName ? (

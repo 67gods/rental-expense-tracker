@@ -22,7 +22,7 @@ export function W9Toggle({
   return (
     <button
       type="button"
-      className="btn text-xs"
+      className="btn"
       disabled={pending}
       aria-label={
         w9OnFile ? `Mark ${name} as having no W-9 on file` : `Mark ${name}'s W-9 as received`

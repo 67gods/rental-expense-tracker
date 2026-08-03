@@ -10,11 +10,11 @@ import Link from 'next/link';
 export function JobBanner({ title, jobId }: { title: string; jobId: string }) {
   return (
     <div className="panel panel-body mb-3">
-      <p style={{fontWeight:500}}>Adding to “{title}”</p>
+      <p className="rowtitle">Adding to “{title}”</p>
       <p className="hint">
         This will join the other records in that job. Nothing on the form below changes.
       </p>
-      <Link href={`/jobs/${jobId}`} className="btn mt-2 text-xs">
+      <Link href={`/jobs/${jobId}`} className="btn mt-2">
         See what is in it
       </Link>
     </div>

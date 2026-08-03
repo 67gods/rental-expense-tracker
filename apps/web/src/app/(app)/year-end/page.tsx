@@ -146,7 +146,7 @@ export default async function YearEndPage({
                       className="mt-3 border-t border-[color:var(--border)] pt-3"
                     >
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <p style={{fontWeight:500}}>{row.lenderName}</p>
+                        <p className="rowtitle">{row.lenderName}</p>
                         <DeleteButton
                           what={`the ${row.lenderName} 1098 for ${taxYear}`}
                           onDelete={async () => {
@@ -291,8 +291,8 @@ export default async function YearEndPage({
             {due.length > 0 ? (
               <div className="tablebox">
                 <p className="kv">
-                  <span className="">
-                    <span style={{fontWeight:500}}>Due in {taxYear} or earlier</span>
+                  <span>
+                    <span className="rowtitle">Due in {taxYear} or earlier</span>
                     <span className="hint">
                       Each of these either went out and was never confirmed — so the
                       deduction is missing from {taxYear} — or did not, and needs moving.
@@ -313,8 +313,8 @@ export default async function YearEndPage({
             {upcoming.length > 0 ? (
               <div className="tablebox">
                 <p className="kv">
-                  <span className="">
-                    <span style={{fontWeight:500}}>Coming after {taxYear}</span>
+                  <span>
+                    <span className="rowtitle">Coming after {taxYear}</span>
                     <span className="hint">
                       Deductible in the year they are paid, not now. Listed so the invoice
                       they belong to is not forgotten.
@@ -342,8 +342,8 @@ export default async function YearEndPage({
           <div className="tablebox">
             {figures.map((figure) => (
               <div key={figure.id} className="kv">
-                <div className="">
-                  <p style={{fontWeight:500}}>{figure.label}</p>
+                <div>
+                  <p className="rowtitle">{figure.label}</p>
                   <p className="hint">
                     {figure.propertyId
                       ? (propertyNames.get(figure.propertyId) ?? 'Unknown property')
@@ -408,8 +408,8 @@ function ScheduledRow({
 }) {
   return (
     <div className="kv">
-      <div className="">
-        <p style={{fontWeight:500}}>{row.vendor}</p>
+      <div>
+        <p className="rowtitle">{row.vendor}</p>
         <p className="hint">
           Planned for {row.payment.paidDate} · invoice {row.invoiceDate} for{' '}
           {formatCents(row.invoiceTotalCents)}

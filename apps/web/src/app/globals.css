@@ -429,6 +429,42 @@ a {
     white-space: nowrap;
   }
 
+  /*
+   * Links inside a row.
+   *
+   * The reset strips every anchor of colour and underline, which is right for
+   * the rail and wrong here: a vendor name that opens a record looked exactly
+   * like one that does not. They do not get the accent - accent means one
+   * thing in this system and "clickable" is not it, and 78 blue vendor names
+   * would drown the money beside them. A hairline underline says the same
+   * thing at a fraction of the volume, and firms up on hover.
+   */
+  .table a:not(.act):not(.tag),
+  .kv a:not(.btn):not(.act):not(.tag) {
+    text-decoration: underline;
+    text-decoration-color: var(--line-strong);
+    text-underline-offset: 3px;
+  }
+  .table a:not(.act):not(.tag):hover,
+  .kv a:not(.btn):not(.act):not(.tag):hover {
+    color: #fff;
+    text-decoration-color: var(--accent);
+  }
+
+  /* In a sentence there is no row to hint at, so these read as links. */
+  .note a,
+  .hint a,
+  .link {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .note a:hover,
+  .hint a:hover,
+  .link:hover {
+    color: var(--accent-ink);
+  }
+
   /* --- panels ----------------------------------------------------------- */
 
   .panel {
@@ -468,6 +504,16 @@ a {
   }
   .kv:last-child {
     border-bottom: 0;
+  }
+  /* A .kv used as a list row inside a box needs the box's own gutter; as a
+     definition row inside a panel it already has one. */
+  .tablebox > .kv {
+    padding: 9px 12px;
+  }
+  /* The line that names a list row - the label the row's action belongs to. */
+  .rowtitle {
+    font-weight: 500;
+    color: var(--ink);
   }
   .kv dt {
     color: var(--ink-faint);

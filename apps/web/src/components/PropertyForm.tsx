@@ -173,8 +173,8 @@ export function PropertyForm({
         <legend className="field-label">This year</legend>
 
         <label className="row cursor-pointer">
-          <span className="">
-            <span style={{fontWeight:500}}>Triple-net leased</span>
+          <span>
+            <span className="rowtitle">Triple-net leased</span>
             <span className="hint">
               Takes this property out of the enterprise for the year, so its hours stop
               counting toward the target.
@@ -189,8 +189,8 @@ export function PropertyForm({
         </label>
 
         <label className="row cursor-pointer">
-          <span className="">
-            <span style={{fontWeight:500}}>Personal use this year</span>
+          <span>
+            <span className="rowtitle">Personal use this year</span>
             <span className="hint">
               Same effect: the property leaves the enterprise for the year.
             </span>
@@ -339,8 +339,8 @@ function PurchaseAndCpaDetails({
         <h3 className="section-title">Was this your home first?</h3>
 
         <label className="row cursor-pointer">
-          <span className="">
-            <span style={{fontWeight:500}}>Converted from a personal residence</span>
+          <span>
+            <span className="rowtitle">Converted from a personal residence</span>
             <span className="hint">
               Basis is then the lesser of what it cost and what it was worth on the day it
               became a rental — so both figures matter.

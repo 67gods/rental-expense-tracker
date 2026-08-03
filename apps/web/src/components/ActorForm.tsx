@@ -52,8 +52,8 @@ export function ActorForm() {
       </label>
 
       <label className="row cursor-pointer">
-        <span className="">
-          <span style={{fontWeight:500}}>W-9 on file</span>
+        <span>
+          <span className="rowtitle">W-9 on file</span>
           <span className="hint">
             Without this, a contractor paid $600 or more in a year raises a warning from
             October onward.
@@ -63,8 +63,8 @@ export function ActorForm() {
       </label>
 
       <label className="row cursor-pointer">
-        <span className="">
-          <span style={{fontWeight:500}}>Tax ID collected</span>
+        <span>
+          <span className="rowtitle">Tax ID collected</span>
         </span>
         <input type="checkbox" name="taxIdCollected" className="h-6 w-6 shrink-0" />
       </label>
