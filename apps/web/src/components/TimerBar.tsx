@@ -51,26 +51,17 @@ export function TimerBar({
 
   return (
     <div
-      className="flex items-center gap-3 border-t px-4 py-2 text-sm"
-      style={{
-        borderColor: isLong ? 'var(--color-flag-500)' : 'var(--border)',
-        background: isLong ? 'var(--color-flag-50)' : 'var(--surface-sunken)',
-        color: isLong ? 'var(--color-flag-700)' : 'var(--text)',
-      }}
+      className={isLong ? 'timerbar timerbar-long' : 'timerbar'}
       role="status"
       aria-live="polite"
     >
-      <span
-        className="inline-block h-2 w-2 shrink-0 rounded-full"
-        style={{ background: isLong ? 'var(--color-flag-600)' : 'var(--color-eligible-500)' }}
-        aria-hidden="true"
-      />
-      <span className="min-w-0 flex-1 truncate">
-        <strong className="tnum">{formatMinutes(elapsed)}</strong> · {label}
+      <span className="timerbar-dot" aria-hidden="true" />
+      <span className="timerbar-text">
+        <strong className="num">{formatMinutes(elapsed)}</strong> · {label}
         {propertyName ? ` · ${propertyName}` : ''}
         {isLong ? ' · still running — did you forget to stop it?' : ''}
       </span>
-      <Link href={`/timer/${id}`} className="btn btn-ghost shrink-0 font-bold">
+      <Link href={`/timer/${id}`} className="btn">
         Stop
       </Link>
     </div>

@@ -208,10 +208,12 @@ a {
   }
   .rail-foot {
     margin-top: auto;
-    padding: 8px;
+    padding: 10px 8px 4px;
     border-top: 1px solid var(--line);
     color: var(--ink-faint);
     font-size: 11px;
+    display: grid;
+    gap: 8px;
   }
 
   .main {
@@ -253,6 +255,41 @@ a {
     padding: 18px 20px 64px;
     max-width: 1420px;
     width: 100%;
+  }
+
+  /* The running timer. Sits above everything in the content column, because a
+     timer left running overnight has to be noticed the next morning rather
+     than discovered in April. */
+  .timerbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 20px;
+    font-size: 12.5px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+  }
+  .timerbar-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--pos);
+    flex: none;
+  }
+  .timerbar-text {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .timerbar-long {
+    background: #1d1607;
+    border-bottom-color: #4a3a12;
+    color: var(--warn);
+  }
+  .timerbar-long .timerbar-dot {
+    background: var(--warn);
   }
 
   /* --- typography ------------------------------------------------------- */
