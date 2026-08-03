@@ -16,7 +16,16 @@ export default async function DashboardPage() {
         <h1 className="text-xl font-bold tracking-tight">
           {user.enterprise.name} · {user.taxYear}
         </h1>
-        <p className="hint">Signed in as {user.actor.name}.</p>
+        {/*
+          Said out loud, because it caused real confusion: every figure on this
+          page is for the signed-in year. A year that has been loaded but is not
+          this one looks empty until you change the year on Entries or Reports,
+          and there was nothing on screen to suggest that was the reason.
+        */}
+        <p className="hint">
+          Signed in as {user.actor.name}. Everything below is {user.taxYear} — switch years on{' '}
+          <Link href="/entries">Entries</Link> or <Link href="/reports">Reports</Link>.
+        </p>
       </div>
 
       {/* W-9 warnings first: from October onward this is the item with a
