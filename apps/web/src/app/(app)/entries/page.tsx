@@ -5,7 +5,6 @@ import {
   formatMinutes,
   getHourCategory,
   getScheduleECategory,
-  sumCents,
 } from '@rental/domain';
 import { requireUser } from '@/lib/session';
 import { listTimeEntries } from '@/server/services/timeEntries';
@@ -19,7 +18,7 @@ import {
   deleteIncomeAction,
   deleteTripAction,
 } from '@/app/actions/capture';
-import { DeleteButton } from '@/components/DeleteButton';
+import { DataTable, type DataRow } from '@/components/DataTable';
 import { AddRelated } from '@/components/AddRelated';
 import { GroupIntoJob } from '@/components/GroupIntoJob';
 import { listJobs, jobTitlesById } from '@/server/services/jobs';
@@ -151,20 +150,6 @@ export default async function EntriesPage({
   );
 }
 
-/** A totals strip above each table, so the sum is visible without scrolling. */
-function Totals({ items }: { items: { label: string; value: string }[] }) {
-  return (
-    <dl className="card card-pad grid gap-x-6 gap-y-1 sm:grid-cols-4">
-      {items.map((item) => (
-        <div key={item.label}>
-          <dt className="text-xs text-[color:var(--color-muted)]">{item.label}</dt>
-          <dd className="tnum text-base font-semibold">{item.value}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
 async function ExpenseTable({
   taxYear,
   propertyNames,
@@ -175,104 +160,77 @@ async function ExpenseTable({
   jobTitles: Map<string, string>;
 }) {
   const [expenses, paid] = await Promise.all([
-    listExpenses({ taxYear, limit: 1000 }),
+    listExpenses({ taxYear, limit: 5000 }),
     paidByExpenseInYear(taxYear),
   ]);
 
   if (expenses.length === 0) return <Empty what="expenses" href="/log/expense" year={taxYear} />;
 
-  const invoiced = sumCents(expenses.map((e) => e.amountCents));
-  const paidTotal = sumCents(expenses.map((e) => paid.get(e.id) ?? 0));
+  // Shaped on the server into plain rows: display text, sort keys and the
+  // figures the totals sum. The client component stays dumb and fast, and
+  // nothing but serialisable data crosses the boundary.
+  const rows: DataRow[] = expenses.map((e) => {
+    const paidCents = paid.get(e.id) ?? 0;
+    const line = safeScheduleE(e.scheduleECategory);
+    const property = e.propertyId ? (propertyNames.get(e.propertyId) ?? '') : 'Split';
+    const badges = [];
+    if (e.capitalClassification === 'improvement') badges.push({ label: 'Capital', tone: 'muted' as const });
+    if (needsAnswer(e)) badges.push({ label: 'Review', tone: 'flag' as const });
+    if (e.jobId && jobTitles.get(e.jobId)) {
+      badges.push({ label: 'Job', tone: 'muted' as const, href: `/jobs/${e.jobId}` });
+    }
+
+    return {
+      id: e.id,
+      href: `/entries/expense/${e.id}`,
+      cells: {
+        date: e.date,
+        vendor: e.vendor,
+        property,
+        line: line.label,
+        invoiced: formatCents(e.amountCents),
+        paid: formatCents(paidCents),
+      },
+      sort: {
+        date: e.date,
+        vendor: e.vendor.toLowerCase(),
+        property,
+        line: line.label,
+        invoiced: e.amountCents,
+        paid: paidCents,
+      },
+      numeric: { invoiced: e.amountCents, paid: paidCents },
+      search: [e.vendor, property, line.label, e.notes ?? ''].join(' ').toLowerCase(),
+      badges,
+      // The one row where the two disagree is the one worth seeing.
+      highlight: paidCents === e.amountCents ? [] : ['paid'],
+      deleteLabel: `the ${formatCents(e.amountCents)} expense from ${e.vendor}`,
+    };
+  });
 
   return (
-    <div className="grid gap-3">
-      <Totals
-        items={[
-          { label: 'Rows', value: String(expenses.length) },
-          { label: 'Invoiced', value: formatCents(invoiced) },
-          { label: `Paid in ${taxYear}`, value: formatCents(paidTotal) },
-          {
-            label: 'Needs an answer',
-            value: String(expenses.filter((e) => needsAnswer(e)).length),
-          },
-        ]}
-      />
-
-      <div className="table-wrap card">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Vendor</th>
-              <th>Property</th>
-              <th>Line</th>
-              <th className="num">Invoiced</th>
-              <th className="num">Paid</th>
-              <th>Flags</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {expenses.map((expense) => {
-              const paidCents = paid.get(expense.id) ?? 0;
-              return (
-                <tr key={expense.id}>
-                  <td className="tnum whitespace-nowrap">{formatDateShort(expense.date)}</td>
-                  <td>
-                    <Link href={`/entries/expense/${expense.id}`}>{expense.vendor}</Link>
-                  </td>
-                  <td>
-                    {expense.propertyId
-                      ? (propertyNames.get(expense.propertyId) ?? '')
-                      : 'Split'}
-                  </td>
-                  <td className="whitespace-nowrap">
-                    {safeScheduleE(expense.scheduleECategory).label}
-                  </td>
-                  <td className="num">{formatCents(expense.amountCents)}</td>
-                  {/* Different figures on purpose. They agree on most rows and
-                      the ones where they do not are the point. */}
-                  <td
-                    className={
-                      paidCents === expense.amountCents
-                        ? 'num'
-                        : 'num font-semibold text-[color:var(--color-flag-700)]'
-                    }
-                  >
-                    {formatCents(paidCents)}
-                  </td>
-                  <td className="whitespace-nowrap">
-                    {expense.capitalClassification === 'improvement' ? (
-                      <span className="badge badge-not-eligible">Capital</span>
-                    ) : null}
-                    {needsAnswer(expense) ? (
-                      <span className="badge badge-flag">Review</span>
-                    ) : null}
-                    {expense.jobId && jobTitles.get(expense.jobId) ? (
-                      <Link href={`/jobs/${expense.jobId}`} className="badge badge-not-eligible">
-                        Job
-                      </Link>
-                    ) : null}
-                  </td>
-                  <td className="whitespace-nowrap">
-                    <Link href={`/entries/expense/${expense.id}`} className="btn btn-ghost text-xs">
-                      Open
-                    </Link>
-                    <DeleteButton
-                      what={`the ${formatCents(expense.amountCents)} expense from ${expense.vendor}`}
-                      onDelete={async () => {
-                        'use server';
-                        await deleteExpenseAction(expense.id);
-                      }}
-                    />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <DataTable
+      rows={rows}
+      searchPlaceholder="Vendor, note, category…"
+      columns={[
+        { key: 'date', header: 'Date', nowrap: true },
+        { key: 'vendor', header: 'Vendor', isLink: true },
+        { key: 'property', header: 'Property' },
+        { key: 'line', header: 'Line', nowrap: true },
+        { key: 'invoiced', header: 'Invoiced', numeric: true },
+        { key: 'paid', header: `Paid in ${taxYear}`, numeric: true },
+      ]}
+      facets={[
+        { key: 'property', label: 'Property' },
+        { key: 'line', label: 'Schedule E line' },
+      ]}
+      totals={[
+        { key: '_count', label: 'Rows', count: true },
+        { key: 'invoiced', label: 'Invoiced', money: true },
+        { key: 'paid', label: `Paid in ${taxYear}`, money: true },
+      ]}
+      onDelete={deleteExpenseAction}
+    />
   );
 }
 
@@ -283,55 +241,49 @@ async function IncomeTable({
   taxYear: number;
   propertyNames: Map<string, string>;
 }) {
-  const receipts = await listRentReceipts({ taxYear, limit: 1000 });
+  const receipts = await listRentReceipts({ taxYear, limit: 5000 });
   if (receipts.length === 0) return <Empty what="rent records" href="/log/income" year={taxYear} />;
 
+  const rows: DataRow[] = receipts.map((r) => {
+    const property = propertyNames.get(r.propertyId) ?? '';
+    const source = r.source.replace(/_/g, ' ');
+    return {
+      id: r.id,
+      cells: {
+        date: r.date,
+        property,
+        source,
+        note: r.notes ?? '',
+        amount: formatCents(r.amountCents),
+      },
+      sort: { date: r.date, property, source, note: r.notes ?? '', amount: r.amountCents },
+      numeric: { amount: r.amountCents },
+      search: [property, source, r.notes ?? ''].join(' ').toLowerCase(),
+      deleteLabel: `the ${formatCents(r.amountCents)} rent record`,
+    };
+  });
+
   return (
-    <div className="grid gap-3">
-      <Totals
-        items={[
-          { label: 'Rows', value: String(receipts.length) },
-          {
-            label: `Received in ${taxYear}`,
-            value: formatCents(sumCents(receipts.map((r) => r.amountCents))),
-          },
-        ]}
-      />
-      <div className="table-wrap card">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Property</th>
-              <th>Source</th>
-              <th>Note</th>
-              <th className="num">Amount</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {receipts.map((receipt) => (
-              <tr key={receipt.id}>
-                <td className="tnum whitespace-nowrap">{formatDateShort(receipt.date)}</td>
-                <td>{propertyNames.get(receipt.propertyId) ?? ''}</td>
-                <td className="whitespace-nowrap">{receipt.source.replace(/_/g, ' ')}</td>
-                <td className="text-[color:var(--color-muted)]">{receipt.notes ?? ''}</td>
-                <td className="num">{formatCents(receipt.amountCents)}</td>
-                <td>
-                  <DeleteButton
-                    what={`the ${formatCents(receipt.amountCents)} rent record`}
-                    onDelete={async () => {
-                      'use server';
-                      await deleteIncomeAction(receipt.id);
-                    }}
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <DataTable
+      rows={rows}
+      searchPlaceholder="Property, source, note…"
+      columns={[
+        { key: 'date', header: 'Date', nowrap: true },
+        { key: 'property', header: 'Property' },
+        { key: 'source', header: 'Source', nowrap: true },
+        { key: 'note', header: 'Note' },
+        { key: 'amount', header: 'Amount', numeric: true },
+      ]}
+      facets={[
+        { key: 'property', label: 'Property' },
+        { key: 'source', label: 'Source' },
+      ]}
+      totals={[
+        { key: '_count', label: 'Rows', count: true },
+        { key: 'amount', label: `Received in ${taxYear}`, money: true },
+      ]}
+      onDelete={deleteIncomeAction}
+    />
   );
 }
 
@@ -346,79 +298,75 @@ async function TimeTable({
   actorNames: Map<string, string>;
   jobTitles: Map<string, string>;
 }) {
-  const entries = await listTimeEntries({ taxYear, limit: 1000 });
+  const entries = await listTimeEntries({ taxYear, limit: 5000 });
   if (entries.length === 0) return <Empty what="time entries" href="/log/time" year={taxYear} />;
 
-  const total = entries.reduce((t, e) => t + e.minutes, 0);
-  const eligible = entries.filter((e) => e.shEligible).reduce((t, e) => t + e.minutes, 0);
+  const rows: DataRow[] = entries.map((e) => {
+    const who = actorNames.get(e.actorId) ?? 'Unattributed';
+    const property = e.propertyId ? (propertyNames.get(e.propertyId) ?? '') : '';
+    const category = safeCategory(e.category);
+    const counts = e.shEligible ? 'Yes' : 'No';
+    const badges =
+      e.jobId && jobTitles.get(e.jobId)
+        ? [{ label: 'Job', tone: 'muted' as const, href: `/jobs/${e.jobId}` }]
+        : [];
+
+    return {
+      id: e.id,
+      href: `/entries/time/${e.id}`,
+      cells: {
+        date: e.date,
+        description: e.description,
+        who,
+        property,
+        category,
+        time: formatMinutes(e.minutes),
+        counts,
+      },
+      // Sorted on MINUTES, not on the formatted string - otherwise "1h 30m"
+      // sorts before "45m" because it starts with a one.
+      sort: {
+        date: e.date,
+        description: e.description.toLowerCase(),
+        who,
+        property,
+        category,
+        time: e.minutes,
+        counts,
+      },
+      numeric: { minutes: e.minutes, eligible: e.shEligible ? e.minutes : 0 },
+      search: [e.description, who, property, category].join(' ').toLowerCase(),
+      badges,
+      deleteLabel: `this ${formatMinutes(e.minutes)} entry`,
+    };
+  });
 
   return (
-    <div className="grid gap-3">
-      <Totals
-        items={[
-          { label: 'Entries', value: String(entries.length) },
-          { label: 'Total logged', value: formatMinutes(total) },
-          { label: 'Counts toward 250', value: formatMinutes(eligible) },
-        ]}
-      />
-      <div className="table-wrap card">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>What</th>
-              <th>Who</th>
-              <th>Property</th>
-              <th className="num">Time</th>
-              <th>Counts</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {entries.map((entry) => (
-              <tr key={entry.id}>
-                <td className="tnum whitespace-nowrap">{formatDateShort(entry.date)}</td>
-                <td>
-                  <Link href={`/entries/time/${entry.id}`}>{entry.description}</Link>
-                  {entry.jobId && jobTitles.get(entry.jobId) ? (
-                    <>
-                      {' '}
-                      <Link href={`/jobs/${entry.jobId}`} className="badge badge-not-eligible">
-                        Job
-                      </Link>
-                    </>
-                  ) : null}
-                </td>
-                <td className="whitespace-nowrap">
-                  {actorNames.get(entry.actorId) ?? 'Unattributed'}
-                </td>
-                <td>{entry.propertyId ? (propertyNames.get(entry.propertyId) ?? '') : ''}</td>
-                <td className="num">{formatMinutes(entry.minutes)}</td>
-                <td className="whitespace-nowrap">
-                  <span
-                    className={entry.shEligible ? 'badge badge-eligible' : 'badge badge-not-eligible'}
-                  >
-                    {entry.shEligible ? 'Yes' : 'No'}
-                  </span>
-                </td>
-                <td className="whitespace-nowrap">
-                  <Link href={`/entries/time/${entry.id}`} className="btn btn-ghost text-xs">
-                    Edit
-                  </Link>
-                  <DeleteButton
-                    what={`this ${formatMinutes(entry.minutes)} entry`}
-                    onDelete={async () => {
-                      'use server';
-                      await deleteTimeEntryAction(entry.id);
-                    }}
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <DataTable
+      rows={rows}
+      searchPlaceholder="What you did, who, property…"
+      columns={[
+        { key: 'date', header: 'Date', nowrap: true },
+        { key: 'description', header: 'What', isLink: true },
+        { key: 'who', header: 'Who', nowrap: true },
+        { key: 'property', header: 'Property' },
+        { key: 'category', header: 'Category', nowrap: true },
+        { key: 'time', header: 'Time', numeric: true },
+        { key: 'counts', header: 'Counts', nowrap: true },
+      ]}
+      facets={[
+        { key: 'who', label: 'Who' },
+        { key: 'property', label: 'Property' },
+        { key: 'category', label: 'Category' },
+        { key: 'counts', label: 'Counts toward 250' },
+      ]}
+      totals={[
+        { key: '_count', label: 'Entries', count: true },
+        { key: 'minutes', label: 'Minutes logged' },
+        { key: 'eligible', label: 'Minutes counting' },
+      ]}
+      onDelete={deleteTimeEntryAction}
+    />
   );
 }
 
@@ -431,71 +379,71 @@ async function TripTable({
   propertyNames: Map<string, string>;
   jobTitles: Map<string, string>;
 }) {
-  const trips = await listTrips({ taxYear, limit: 1000 });
+  const trips = await listTrips({ taxYear, limit: 5000 });
   if (trips.length === 0) return <Empty what="trips" href="/log/trip" year={taxYear} />;
 
-  const miles = trips.reduce((t, trip) => t + Number(trip.miles), 0);
-  const acquisition = trips
-    .filter((t) => t.costTreatmentOverride === 'acquisition')
-    .reduce((t, trip) => t + Number(trip.miles), 0);
+  const rows: DataRow[] = trips.map((t) => {
+    const miles = Number(t.miles);
+    const property = t.propertyId ? (propertyNames.get(t.propertyId) ?? '') : 'Portfolio';
+    const treatment = t.costTreatmentOverride === 'acquisition' ? 'Acquisition' : 'Operating';
+    const badges =
+      t.jobId && jobTitles.get(t.jobId)
+        ? [{ label: 'Job', tone: 'muted' as const, href: `/jobs/${t.jobId}` }]
+        : [];
+
+    return {
+      id: t.id,
+      cells: {
+        date: t.date,
+        route: `${t.origin} → ${t.destination}`,
+        purpose: t.purpose,
+        property,
+        treatment,
+        miles: miles.toFixed(1),
+      },
+      sort: {
+        date: t.date,
+        route: t.origin.toLowerCase(),
+        purpose: t.purpose.toLowerCase(),
+        property,
+        treatment,
+        miles,
+      },
+      numeric: {
+        miles,
+        operating: treatment === 'Operating' ? miles : 0,
+        acquisition: treatment === 'Acquisition' ? miles : 0,
+      },
+      search: [t.origin, t.destination, t.purpose, property].join(' ').toLowerCase(),
+      badges,
+      deleteLabel: `this ${miles.toFixed(1)} mile trip and the time entries it created`,
+    };
+  });
 
   return (
-    <div className="grid gap-3">
-      <Totals
-        items={[
-          { label: 'Trips', value: String(trips.length) },
-          { label: 'Miles', value: miles.toFixed(1) },
-          { label: 'Operating', value: (miles - acquisition).toFixed(1) },
-          { label: 'Acquisition side', value: acquisition.toFixed(1) },
-        ]}
-      />
-      <div className="table-wrap card">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Route</th>
-              <th>Purpose</th>
-              <th>Property</th>
-              <th className="num">Miles</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {trips.map((trip) => (
-              <tr key={trip.id}>
-                <td className="tnum whitespace-nowrap">{formatDateShort(trip.date)}</td>
-                <td className="whitespace-nowrap">
-                  {trip.origin} → {trip.destination}
-                </td>
-                <td>
-                  {trip.purpose}
-                  {trip.jobId && jobTitles.get(trip.jobId) ? (
-                    <>
-                      {' '}
-                      <Link href={`/jobs/${trip.jobId}`} className="badge badge-not-eligible">
-                        Job
-                      </Link>
-                    </>
-                  ) : null}
-                </td>
-                <td>{trip.propertyId ? (propertyNames.get(trip.propertyId) ?? '') : ''}</td>
-                <td className="num">{Number(trip.miles).toFixed(1)}</td>
-                <td>
-                  <DeleteButton
-                    what={`this ${Number(trip.miles)} mile trip and the time entries it created`}
-                    onDelete={async () => {
-                      'use server';
-                      await deleteTripAction(trip.id);
-                    }}
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <DataTable
+      rows={rows}
+      searchPlaceholder="Where you went, why…"
+      columns={[
+        { key: 'date', header: 'Date', nowrap: true },
+        { key: 'route', header: 'Route', nowrap: true },
+        { key: 'purpose', header: 'Purpose' },
+        { key: 'property', header: 'Property' },
+        { key: 'treatment', header: 'Side', nowrap: true },
+        { key: 'miles', header: 'Miles', numeric: true },
+      ]}
+      facets={[
+        { key: 'property', label: 'Property' },
+        { key: 'treatment', label: 'Cost treatment' },
+      ]}
+      totals={[
+        { key: '_count', label: 'Trips', count: true },
+        { key: 'miles', label: 'Miles' },
+        { key: 'operating', label: 'Operating' },
+        { key: 'acquisition', label: 'Acquisition side' },
+      ]}
+      onDelete={deleteTripAction}
+    />
   );
 }
 
@@ -593,8 +541,12 @@ function safeScheduleE(id: string) {
   }
 }
 
-/** Kept for the hour-category label if a future column needs it. */
-export function safeCategory(id: string): string {
+/**
+ * Not exported: a route file may only export the handful of names Next
+ * recognises, and anything else fails the build with a type error about an
+ * index signature rather than saying so.
+ */
+function safeCategory(id: string): string {
   try {
     return getHourCategory(id).label;
   } catch {
