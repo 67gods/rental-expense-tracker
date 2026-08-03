@@ -82,7 +82,7 @@ export default async function YearEndPage({
               <a
                 key={year}
                 href={`/year-end?year=${year}`}
-                className={year === taxYear ? 'chip chip-accent' : 'chip'}
+                aria-current={year === taxYear}
               >
                 {year}
               </a>

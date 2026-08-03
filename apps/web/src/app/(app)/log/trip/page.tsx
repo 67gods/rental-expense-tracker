@@ -6,6 +6,7 @@ import { TripForm } from '@/components/TripForm';
 import { JobBanner } from '@/components/JobBanner';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Well } from '@/components/ui';
+import { CaptureTabs } from '@/components/CaptureTabs';
 import { openJob } from '@/server/services/jobs';
 
 export const metadata = { title: 'Log trip' };
@@ -34,6 +35,8 @@ export default async function LogTripPage({
         }
       />
       <Well>
+        <CaptureTabs current="trip" jobId={job?.id ?? null} />
+
         {job ? <JobBanner title={job.title} jobId={job.id} /> : null}
 
         <TripForm

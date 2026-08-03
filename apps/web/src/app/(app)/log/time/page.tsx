@@ -6,6 +6,7 @@ import { TimeEntryForm } from '@/components/TimeEntryForm';
 import { JobBanner } from '@/components/JobBanner';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Well } from '@/components/ui';
+import { CaptureTabs } from '@/components/CaptureTabs';
 import { openJob } from '@/server/services/jobs';
 
 export const metadata = { title: 'Log time' };
@@ -34,6 +35,8 @@ export default async function LogTimePage({
         }
       />
       <Well>
+        <CaptureTabs current="time" jobId={job?.id ?? null} />
+
         {job ? <JobBanner title={job.title} jobId={job.id} /> : null}
 
         <TimeEntryForm

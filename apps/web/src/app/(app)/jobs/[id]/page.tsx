@@ -97,7 +97,7 @@ export default async function JobPage({
                 <a
                   key={year}
                   href={`/jobs/${job.job.id}?year=${year}`}
-                  className={year === rollup.taxYear ? 'chip chip-accent' : 'chip'}
+                  aria-current={year === rollup.taxYear}
                 >
                   {year}
                 </a>

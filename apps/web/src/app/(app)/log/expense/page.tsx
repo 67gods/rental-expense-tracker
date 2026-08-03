@@ -6,6 +6,7 @@ import { ExpenseForm } from '@/components/ExpenseForm';
 import { JobBanner } from '@/components/JobBanner';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Well } from '@/components/ui';
+import { CaptureTabs } from '@/components/CaptureTabs';
 import { openJob } from '@/server/services/jobs';
 
 export const metadata = { title: 'Log expense' };
@@ -35,6 +36,8 @@ export default async function LogExpensePage({
         }
       />
       <Well>
+        <CaptureTabs current="expense" jobId={job?.id ?? null} />
+
         {job ? <JobBanner title={job.title} jobId={job.id} /> : null}
 
         <ExpenseForm

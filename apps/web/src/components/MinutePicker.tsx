@@ -34,7 +34,6 @@ export function MinutePicker({
           <button
             key={preset}
             type="button"
-            className="chip"
             aria-pressed={!custom && minutes === preset}
             onClick={() => {
               setCustom(false);
@@ -47,7 +46,6 @@ export function MinutePicker({
         <button
           key="custom"
           type="button"
-          className="chip"
           aria-pressed={custom}
           onClick={() => {
             setCustom(true);

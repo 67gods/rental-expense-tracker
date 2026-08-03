@@ -5,6 +5,7 @@ import { listPeople, listProperties } from '@/server/services/reference';
 import { IncomeForm } from '@/components/IncomeForm';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Well } from '@/components/ui';
+import { CaptureTabs } from '@/components/CaptureTabs';
 
 export const metadata = { title: 'Record rent' };
 
@@ -23,6 +24,8 @@ export default async function LogIncomePage() {
         }
       />
       <Well>
+        <CaptureTabs current="income" />
+
         <IncomeForm
           today={todayInZone(user.timeZone)}
           actorId={user.actor.id}

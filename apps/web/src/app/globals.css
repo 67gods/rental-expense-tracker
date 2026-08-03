@@ -778,13 +778,20 @@ a {
     font-size: 12px;
     color: var(--ink-dim);
     border: 0;
-    border-right: 1px solid var(--line-strong);
+    /* A divider on the leading edge rather than the trailing one, so a group
+       that wraps to a second row does not leave a rule hanging off the end. */
+    border-left: 1px solid var(--line-strong);
     background: none;
     cursor: pointer;
     font-family: inherit;
+    white-space: nowrap;
   }
-  .seg > *:last-child {
-    border-right: 0;
+  .seg > *:first-child {
+    border-left: 0;
+  }
+  .seg > *:hover {
+    color: var(--ink);
+    background: var(--hover);
   }
   .seg > [aria-current='true'],
   .seg > [aria-pressed='true'] {
@@ -792,22 +799,6 @@ a {
     color: var(--ink);
   }
 
-  .chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: var(--panel);
-    border: 1px solid var(--line);
-    color: var(--ink-dim);
-    border-radius: 5px;
-    padding: 4px 8px;
-    font-size: 11.5px;
-  }
-  .chip-accent {
-    background: var(--accent-dim);
-    border-color: var(--accent-line);
-    color: var(--accent-ink);
-  }
 
   /* --- forms ------------------------------------------------------------ */
 
@@ -881,28 +872,6 @@ a {
     padding-top: 12px;
   }
 
-  /*
-   * Mutually exclusive options as separate pills.
-   *
-   * Not .seg: that is a segmented control, and .seg > * outranks .chip on
-   * specificity, so chips placed inside one lost their border, background and
-   * radius and came out as "Arbordale wayCreedmore ctKettlewellWestmill".
-   * .seg is right for uniform short values (15m, 30m); names need gaps.
-   */
-  .chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-  .chips .chip {
-    cursor: pointer;
-    font-family: inherit;
-  }
-  .chip[aria-pressed='true'] {
-    background: var(--accent-dim);
-    border-color: var(--accent);
-    color: #fff;
-  }
 
   .filters {
     display: flex;

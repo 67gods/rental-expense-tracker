@@ -41,11 +41,10 @@ export function PropertyPicker({
         {required ? '' : ' (optional)'}
       </span>
       <input type="hidden" name={name} value={selected} />
-      <div className="chips">
+      <div className="seg">
         {allowNone ? (
           <button
             type="button"
-            className="chip"
             aria-pressed={selected === ''}
             onClick={() => setSelected('')}
           >
@@ -56,7 +55,6 @@ export function PropertyPicker({
           <button
             key={option.id}
             type="button"
-            className="chip"
             aria-pressed={selected === option.id}
             onClick={() => setSelected(option.id)}
           >
@@ -99,12 +97,11 @@ export function ActorPicker({
     <div className="field">
       <span className="field-label">Who did this?</span>
       <input type="hidden" name={name} value={selected} />
-      <div className="chips">
+      <div className="seg">
         {options.map((option) => (
           <button
             key={option.id}
             type="button"
-            className="chip"
             aria-pressed={selected === option.id}
             onClick={() => setSelected(option.id)}
           >

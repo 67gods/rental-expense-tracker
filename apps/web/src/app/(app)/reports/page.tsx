@@ -47,7 +47,7 @@ export default async function ReportsPage({
               <a
                 key={year}
                 href={`/reports?year=${year}`}
-                className={year === taxYear ? 'chip chip-accent' : 'chip'}
+                aria-current={year === taxYear}
               >
                 {year}
               </a>

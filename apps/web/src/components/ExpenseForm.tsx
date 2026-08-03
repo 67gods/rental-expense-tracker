@@ -56,10 +56,12 @@ export function ExpenseForm({
         </p>
       ) : null}
 
+      {/* The amount is the one figure on this form, so it is set large and
+          monospaced rather than being one box among nine. */}
       <label className="field">
-        <span className="field-label">How much?</span>
+        <span className="field-label">How much</span>
         <input
-          className="input num"
+          className="input input-lg"
           name="amount"
           inputMode="decimal"
           autoComplete="off"
@@ -83,7 +85,7 @@ export function ExpenseForm({
 
       <div className="field">
         <label className="field-label" htmlFor="scheduleECategory">
-          Which Schedule E line?
+          Which Schedule E line
         </label>
         <select
           id="scheduleECategory"
@@ -111,26 +113,30 @@ export function ExpenseForm({
 
       <PropertyPicker
         options={properties}
-        label="Which property?"
+        label="Which property"
         allowNone={false}
         required
         defaultValue={defaultPropertyId}
       />
 
-      <SelectField
-        name="contractorActorId"
-        label="Paid a contractor? (optional)"
-        options={contractors}
-        placeholder="Not a contractor"
-        hint="Naming them here keeps their yearly total running, so the W-9 warning can fire before October."
-      />
+      {/* Two short answers on one line. Neither needs a full row, and stacking
+          them pushed the save button below the fold on a phone. */}
+      <div className="form-row">
+        <label className="field">
+          <span className="field-label">When</span>
+          <input className="input" type="date" name="date" defaultValue={today} required />
+        </label>
+
+        <SelectField
+          name="contractorActorId"
+          label="Contractor (optional)"
+          options={contractors}
+          placeholder="Not a contractor"
+          hint="Keeps their yearly total running, so the W-9 warning can fire before October."
+        />
+      </div>
 
       <ReceiptUpload />
-
-      <label className="field">
-        <span className="field-label">When?</span>
-        <input className="input" type="date" name="date" defaultValue={today} required />
-      </label>
 
       <label className="field">
         <span className="field-label">Notes (optional)</span>
