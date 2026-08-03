@@ -593,6 +593,115 @@ a {
     padding: 8px 10px;
   }
 
+  /*
+   * A choice: a title, and under it the sentence that explains what picking it
+   * means. This is not a .btn - .btn is a 12px inline-block that centres its
+   * content, so a title and a helper put through it come out as one centred
+   * run of text with no break between them.
+   *
+   * The pressed state is not decoration. Several of these are the only record
+   * of what was picked (the category picker writes to a hidden input), so a
+   * choice that does not visibly hold its selection is broken rather than
+   * plain.
+   */
+  .choice {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    width: 100%;
+    text-align: left;
+    font: 500 13px var(--sans);
+    color: var(--ink);
+    background: var(--panel);
+    border: 1px solid var(--line-strong);
+    border-radius: 8px;
+    padding: 10px 12px;
+    cursor: pointer;
+  }
+  .choice:hover {
+    background: var(--hover);
+    border-color: #3a4149;
+  }
+  .choice-body {
+    display: block;
+    flex: 1;
+    min-width: 0;
+  }
+  .choice-title {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .choice .hint {
+    display: block;
+    margin-top: 2px;
+  }
+  .choice[aria-pressed='true'] {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+  }
+  .choice[aria-pressed='true'] .choice-title {
+    color: #fff;
+  }
+  .choice[aria-pressed='true'] .hint {
+    color: var(--accent-ink);
+  }
+  /* The tick is the unambiguous part - a background shift alone reads as hover. */
+  .choice[aria-pressed='true'] .choice-mark::before {
+    content: '✓';
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .choice-mark {
+    flex: 0 0 14px;
+    font-size: 13px;
+    line-height: 1.45;
+    text-align: center;
+  }
+
+  /*
+   * Row actions. These sit on every row of an eighty-row table, so they are
+   * quiet until pointed at: a bordered box per row would draw more attention
+   * than the money beside it. Delete stays muted red and only goes full red on
+   * hover - one accidental glance down a column of bright red Deletes is
+   * exactly the noise the table is meant not to have.
+   */
+  .acts {
+    display: flex;
+    justify-content: flex-end;
+    gap: 2px;
+    white-space: nowrap;
+  }
+  .act {
+    font: 500 11.5px var(--sans);
+    color: var(--ink-faint);
+    background: none;
+    border: 0;
+    border-radius: 4px;
+    padding: 3px 7px;
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .act:hover {
+    color: var(--ink);
+    background: var(--selected);
+  }
+  .act:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .act-danger:hover {
+    color: var(--neg);
+    background: #23161a;
+  }
+  /* Only ever the actions column, so it must not inherit the numeric mono. */
+  .table td.acts-cell {
+    text-align: right;
+    white-space: nowrap;
+    width: 1%;
+  }
+
   .seg {
     display: inline-flex;
     border: 1px solid var(--line-strong);
