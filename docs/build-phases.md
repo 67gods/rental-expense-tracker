@@ -177,3 +177,86 @@ grepping the payload before it is written.
 | 13.6 | `npm run db:check` clean |
 
 **Gate:** all six. **Commit:** `Phase 13: verification`
+
+---
+
+## Verification results
+
+All six passed. 43 assertions against the live database with 2025 loaded, plus
+`npm run verify` (typecheck, 276 unit tests, next build) and `npm run db:check`.
+
+### The year dimension
+
+The test the architecture stands or falls on. The same contractor, the same
+$1,400, run through the same report:
+
+| Year | Threshold | Flagged |
+|---|---|---|
+| 2025 | $600 | yes |
+| 2026 | $2,000 (OBBBA) | no |
+
+If those two agreed, `THRESHOLDS_BY_YEAR` would be decoration and every "keyed
+by tax year" comment in the codebase would be a lie.
+
+### The round trip against Tax-Manager
+
+| Figure | Result |
+|---|---|
+| Mortgage interest | $16,213.35 — exact |
+| Property tax | $10,727.97 — exact |
+| Insurance from escrow | $2,968.19 — exact |
+| Mileage, operating | $695.03 — exact |
+| Mileage, acquisition | $181.72 — exact |
+| Rent banked | $51,889.00 — exact |
+| Kettlewell reconciliation | residual **$0.00** |
+
+**One figure deliberately does not match, and the difference is the point.** The
+expense ledger is Tax-Manager's $44,306.20 **plus $5,744.00** — the balance of
+INV011307 that the workbook never recorded, because a ledger of payments has no
+way to say what was owed. That $5,744 is on file as a scheduled payment and
+reaches no 2025 export.
+
+### Usability
+
+The expense form's named controls, before this work and after:
+
+```
+before: amount, contractorActorId, date, notes, scheduleECategory, vendor
+after:  amount, contractorActorId, date, notes, scheduleECategory, vendor, jobId
+```
+
+`jobId` is a hidden input, rendered only when the form was opened from
+"+ Add related". The words "job", "payment" and "instalment" appear nowhere on
+it. The $8,244 invoice exports as invoiced $8,244 / paid $2,500 in 2025, and
+Schedule E counts the $2,500.
+
+### The laptop errand
+
+One job, five records, two dates, three entry actions. 120 minutes logged of
+which 80 eligible — the 40-minute drive is recorded and excluded. The job title
+appears on all three logs. Asked for 2025 instead of 2026 the same records
+report nothing paid, and the stored rows are unchanged by the asking. Deleting
+the job leaves all five records standing.
+
+### What the audit reports, and why it is right
+
+No errors. Four warnings, all true:
+
+- 2 expenses on physical work with no repair-or-improvement answer
+- 4 work expenses over $600 with no contractor named
+- 5 properties with no placed-in-service date — **the `db:seed` rows, not the
+  imported ones.** Worth clearing out.
+- 1 property-year where rent and the 1099 disagree — Westmill, $4,520
+  unexplained. Left that way deliberately: the workbook's disbursement, fee,
+  withheld repair and retained deposit do not reconcile against the reported
+  gross, and guessing which figure is wrong would be the app reaching a
+  conclusion. The year-end screen exists for the owner to resolve it.
+
+### Still open for the owner
+
+- **The `Prior year` column on `schedule-e`.** The plan flagged it as the
+  closest this work comes to the findings layer that was ruled out. It is data
+  rather than opinion — the same query, one year back — and it is one line to
+  remove.
+- **Westmill's $4,520.**
+- **The five seed properties.**
