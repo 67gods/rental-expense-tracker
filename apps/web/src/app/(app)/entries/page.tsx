@@ -87,15 +87,30 @@ export default async function EntriesPage({
     trips: 'Mileage',
   };
 
+  // Whatever is on screen, you can take away. Sending someone to /reports to
+  // export the list they are already looking at is a detour, and the export is
+  // the one thing a CPA hand-off actually needs.
+  const EXPORTS: Record<Tab, string> = {
+    expenses: 'expense-detail',
+    income: 'income-detail',
+    time: 'time-log',
+    trips: 'mileage-log',
+  };
+
   return (
     <>
       <PageHeader
         title={TITLES[tab]}
         crumb={String(taxYear)}
         actions={
-          <Link className="btn btn-primary" href={withYear('/log', taxYear)}>
-            + Log
-          </Link>
+          <>
+            <a className="btn" href={`/api/v1/export/${EXPORTS[tab]}?taxYear=${taxYear}`} download>
+              Export CSV
+            </a>
+            <Link className="btn btn-primary" href={withYear('/log', taxYear)}>
+              + Log
+            </Link>
+          </>
         }
       />
       <Well>
@@ -212,8 +227,8 @@ async function ExpenseTable({
         { key: 'paid', header: `Paid in ${taxYear}`, numeric: true },
       ]}
       facets={[
-        { key: 'property', label: 'Property' },
-        { key: 'line', label: 'Schedule E line' },
+        { key: 'property', label: 'Property', allLabel: 'All properties' },
+        { key: 'line', label: 'Schedule E line', allLabel: 'All lines' },
       ]}
       totals={[
         { key: '_count', label: 'Rows', count: true },
@@ -266,8 +281,8 @@ async function IncomeTable({
         { key: 'amount', header: 'Amount', numeric: true },
       ]}
       facets={[
-        { key: 'property', label: 'Property' },
-        { key: 'source', label: 'Source' },
+        { key: 'property', label: 'Property', allLabel: 'All properties' },
+        { key: 'source', label: 'Source', allLabel: 'Any source' },
       ]}
       totals={[
         { key: '_count', label: 'Rows', count: true },
@@ -346,10 +361,10 @@ async function TimeTable({
         { key: 'counts', header: 'Counts', nowrap: true },
       ]}
       facets={[
-        { key: 'who', label: 'Who' },
-        { key: 'property', label: 'Property' },
-        { key: 'category', label: 'Category' },
-        { key: 'counts', label: 'Counts toward 250' },
+        { key: 'who', label: 'Who', allLabel: 'Anyone' },
+        { key: 'property', label: 'Property', allLabel: 'All properties' },
+        { key: 'category', label: 'Category', allLabel: 'All categories' },
+        { key: 'counts', label: 'Counts toward 250', allLabel: 'Any status' },
       ]}
       totals={[
         { key: '_count', label: 'Entries', count: true },
@@ -424,8 +439,8 @@ async function TripTable({
         { key: 'miles', header: 'Miles', numeric: true },
       ]}
       facets={[
-        { key: 'property', label: 'Property' },
-        { key: 'treatment', label: 'Cost treatment' },
+        { key: 'property', label: 'Property', allLabel: 'All properties' },
+        { key: 'treatment', label: 'Cost treatment', allLabel: 'Any treatment' },
       ]}
       totals={[
         { key: '_count', label: 'Trips', count: true },

@@ -35,6 +35,8 @@ export interface Column {
 export interface Facet {
   key: string;
   label: string;
+  /** The "no filter" option. Defaults to "All <label>". */
+  allLabel?: string;
 }
 
 export interface TotalSpec {
@@ -157,37 +159,57 @@ export function DataTable({
 
   return (
     <>
+      {/*
+        One row of controls, no visible labels.
+
+        The labels used to sit above each control, which turned four filters
+        into eight stacked elements and pushed the table itself below the fold.
+        The placeholder and the "All …" default carry the same information in
+        the space the control already occupies; each still has an aria-label,
+        so nothing is lost to a screen reader.
+      */}
       <div className="filters">
-        <label className="field filter-search">
-          <span className="field-label">Search</span>
+        <div className="search">
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 14 14"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            aria-hidden="true"
+          >
+            <circle cx="6" cy="6" r="4.2" />
+            <path d="M9.2 9.2 12.5 12.5" />
+          </svg>
           <input
             className="input"
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={searchPlaceholder}
+            aria-label="Search"
             autoComplete="off"
           />
-        </label>
+        </div>
 
         {facets.map((facet) => (
-          <label className="field" key={facet.key}>
-            <span className="field-label">{facet.label}</span>
-            <select
-              className="select"
-              value={chosen[facet.key] ?? ''}
-              onChange={(event) =>
-                setChosen((current) => ({ ...current, [facet.key]: event.target.value }))
-              }
-            >
-              <option value="">All</option>
-              {(facetValues[facet.key] ?? []).map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
-          </label>
+          <select
+            key={facet.key}
+            className="select"
+            aria-label={facet.label}
+            value={chosen[facet.key] ?? ''}
+            onChange={(event) =>
+              setChosen((current) => ({ ...current, [facet.key]: event.target.value }))
+            }
+          >
+            <option value="">{facet.allLabel ?? `All ${facet.label.toLowerCase()}`}</option>
+            {(facetValues[facet.key] ?? []).map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
         ))}
 
         {isFiltered ? (
@@ -202,6 +224,10 @@ export function DataTable({
             Clear
           </button>
         ) : null}
+
+        <span className="badge">
+          <strong>{visible.length}</strong> shown
+        </span>
       </div>
 
       {summary.length > 0 ? (
