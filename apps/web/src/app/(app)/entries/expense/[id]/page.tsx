@@ -172,7 +172,10 @@ export default async function ExpenseDetailPage({
                   {
                     key: 'class',
                     label: 'Repair or improvement',
-                    value: CLASSIFICATION_LABELS[expense.capitalClassification ?? ''] ?? 'Not answered',
+                    value: classificationLabel(
+                      expense.capitalClassification,
+                      expense.classificationAnswers,
+                    ),
                     tone: expense.capitalClassification ? undefined : 'warn',
                   },
                   {
@@ -237,6 +240,34 @@ const CLASSIFICATION_LABELS: Record<string, string> = {
   improvement: 'Capital improvement',
   needs_review: 'Waiting on the CPA',
 };
+
+/**
+ * `needs_review` is one column answering two different questions.
+ *
+ * Usually it means §5.3 is unresolved and the CPA is the one to ask. But a
+ * receipt whose total the reader could not make out lands in the same column,
+ * and telling somebody to ask their accountant about a smudged number would
+ * send them to the wrong place entirely - the receipt is in their hand. The
+ * provenance kept alongside the answer is what tells the two apart.
+ */
+function classificationLabel(
+  classification: string | null,
+  answers: Record<string, unknown> | null,
+): string {
+  if (classification === 'needs_review' && wasRead(answers)) {
+    return 'Read from a receipt - confirm the figures';
+  }
+  return CLASSIFICATION_LABELS[classification ?? ''] ?? 'Not answered';
+}
+
+function wasRead(answers: Record<string, unknown> | null): boolean {
+  const extraction = answers?.extraction;
+  return (
+    typeof extraction === 'object' &&
+    extraction !== null &&
+    (extraction as { source?: unknown }).source === 'receipt'
+  );
+}
 
 function safeLine(id: string): { label: string; line: number | null } {
   try {

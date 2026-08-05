@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { getDb } from '@/db/client';
 import { expensePayments, expenses } from '@/db/schema';
 import { NotFoundError } from '../errors';
+import { slugifyVendor } from './receiptMatches';
 
 /**
  * Reading a receipt back out of storage.
@@ -68,12 +69,7 @@ export async function resolveReceipt(key: string): Promise<ReceiptRef> {
  * CPA gets these as attachments.
  */
 function nameFor(vendor: string, date: string, key: string): string {
-  const slug =
-    vendor
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
-      .slice(0, 60) || 'receipt';
+  const slug = slugifyVendor(vendor) || 'receipt';
   const extension = key.match(/\.[a-z0-9]{1,5}$/i)?.[0]?.toLowerCase() ?? '';
   return `${slug}-${date}${extension}`;
 }

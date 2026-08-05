@@ -71,14 +71,18 @@ export async function saveExpenseAction(
 
     const jobId = str(formData, 'jobId') || null;
 
+    const date = str(formData, 'date') || todayInZone(user.timeZone);
+    const reading = unsureReading(formData, { amountCents, date });
+
     const common = {
-      date: str(formData, 'date') || todayInZone(user.timeZone),
+      date,
       actorId: str(formData, 'actorId') || user.actor.id,
       amountCents,
       vendor: str(formData, 'vendor'),
       scheduleECategory,
       contractorActorId: str(formData, 'contractorActorId') || null,
       receiptKey: str(formData, 'receiptKey') || null,
+      receiptSha256: str(formData, 'receiptSha256') || null,
       notes: str(formData, 'notes') || null,
     };
 
@@ -102,7 +106,18 @@ export async function saveExpenseAction(
       destination = str(formData, 'returnTo') || `/entries/expense/${id}?saved=1`;
     } else {
       const expense = await createExpense(
-        { ...common, propertyId: str(formData, 'propertyId') || null },
+        {
+          ...common,
+          propertyId: str(formData, 'propertyId') || null,
+          // A figure the reader was unsure of, saved unchanged, is the one case
+          // that earns a place on the review list - see unsureReading.
+          ...(reading
+            ? {
+                capitalClassification: 'needs_review' as const,
+                classificationAnswers: { extraction: reading },
+              }
+            : {}),
+        },
         { jobId },
       );
 
@@ -297,4 +312,57 @@ function numberOrNull(value: string): number | null {
   if (!value) return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+/** What the receipt reader returned, as it arrives back on the form. */
+interface ExtractionField {
+  amountCents?: unknown;
+  date?: unknown;
+  vendor?: unknown;
+  confidence?: { amount?: unknown; date?: unknown; vendor?: unknown };
+}
+
+/**
+ * Decides whether a receipt reading has to be checked by a person.
+ *
+ * Deliberately narrow. The temptation is to flag everything a machine read,
+ * but the review list is only useful while everything on it is actionable -
+ * §5.3's own notes record a version that put every small expense through the
+ * repair-or-improvement prompt and produced a queue of $23 items nobody could
+ * act on, which teaches you to ignore the queue. A reader that is confident and
+ * right most of the time would do the same thing again.
+ *
+ * So two conditions both have to hold: the reader said it was unsure of the
+ * date or the total, AND that value is still the one being saved. Retyping the
+ * amount is the check happening - there is nothing left to review.
+ *
+ * Returns the reading to keep as evidence, or null when nothing is owed.
+ */
+function unsureReading(
+  formData: FormData,
+  submitted: { amountCents: number; date: string },
+): Record<string, unknown> | null {
+  const raw = str(formData, 'extraction');
+  if (!raw) return null;
+
+  let parsed: ExtractionField;
+  try {
+    parsed = JSON.parse(raw) as ExtractionField;
+  } catch {
+    // A hidden field that did not survive the round trip is not worth failing
+    // a save over. The expense is still correct; it just loses its provenance.
+    return null;
+  }
+
+  const confidence = parsed.confidence ?? {};
+  const amountUnsure = confidence.amount === 'low' && parsed.amountCents === submitted.amountCents;
+  const dateUnsure = confidence.date === 'low' && parsed.date === submitted.date;
+  if (!amountUnsure && !dateUnsure) return null;
+
+  return {
+    source: 'receipt',
+    readAt: new Date().toISOString(),
+    unsureAbout: [amountUnsure ? 'amount' : null, dateUnsure ? 'date' : null].filter(Boolean),
+    read: { vendor: parsed.vendor, date: parsed.date, amountCents: parsed.amountCents },
+  };
 }

@@ -428,6 +428,16 @@ export const expenses = pgTable(
       onDelete: 'set null',
     }),
     receiptKey: text('receipt_key'),
+    /**
+     * SHA-256 of the receipt file's bytes, so the same photo uploaded twice is
+     * recognised as the same photo.
+     *
+     * Separate from receiptKey because the key is a fresh UUID on every upload -
+     * two uploads of one file collide on nothing. Null for receipts stored
+     * before this column existed, and for expenses with no receipt at all;
+     * neither is a gap, and the vendor/date/amount match covers both.
+     */
+    receiptSha256: text('receipt_sha256'),
     notes: text('notes'),
     /** Splits a shared cost without breaking the parent record (§6). */
     allocationRule: jsonb('allocation_rule').$type<Record<string, unknown>>(),
@@ -450,6 +460,10 @@ export const expenses = pgTable(
     index('expenses_contractor_idx').on(t.contractorActorId),
     index('expenses_classification_idx').on(t.capitalClassification),
     index('expenses_job_idx').on(t.jobId),
+    index('expenses_receipt_sha256_idx').on(t.receiptSha256),
+    // The duplicate check asks "same total, near this date" before it asks
+    // anything about the vendor, so the pair is the useful index.
+    index('expenses_amount_date_idx').on(t.amountCents, t.date),
     check('expenses_amount_non_negative', sql`${t.amountCents} >= 0`),
     check('expenses_vendor_present', sql`length(btrim(${t.vendor})) > 0`),
   ],

@@ -1,11 +1,17 @@
 'use client';
 
+import Link from 'next/link';
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { getScheduleECategory, listScheduleECategories } from '@rental/domain';
+import { formatCents, getScheduleECategory, listScheduleECategories } from '@rental/domain';
 import { saveExpenseAction } from '@/app/actions/capture';
 import { EMPTY_FORM_STATE } from '@/app/actions/formState';
-import { ReceiptUpload } from './ReceiptUpload';
+import {
+  ReceiptUpload,
+  type DuplicateMatch,
+  type ExtractedReceipt,
+  type ReceiptRead,
+} from './ReceiptUpload';
 import { CapitalPicker } from './CapitalPicker';
 import { ActorPicker, PropertyPicker, SelectField, SubmitButton, type Option } from './Pickers';
 
@@ -21,6 +27,7 @@ export interface ExpenseDefaults {
   capitalClassification: string | null;
   contractorActorId: string | null;
   receiptKey: string | null;
+  receiptSha256: string | null;
   notes: string | null;
   /** The cost is divided across properties by a rule (§6) rather than owned by one. */
   isSplit: boolean;
@@ -43,6 +50,10 @@ export interface ExpenseDefaults {
  *     is later.
  *   - The RECEIPT already on file, which has to round-trip or an edit that
  *     ignored it would detach it.
+ *
+ * The money fields are controlled rather than uncontrolled, which they were
+ * until the receipt reader arrived: an uploaded receipt fills them, and a
+ * defaultValue cannot be changed after the field has been rendered.
  */
 export function ExpenseForm({
   today,
@@ -68,12 +79,64 @@ export function ExpenseForm({
   returnTo?: string;
 }) {
   const [state, formAction] = useActionState(saveExpenseAction, EMPTY_FORM_STATE);
+
+  const [amount, setAmount] = useState(defaults ? centsToInput(defaults.amountCents) : '');
+  const [vendor, setVendor] = useState(defaults?.vendor ?? '');
+  const [date, setDate] = useState(defaults?.date ?? today);
+  const [notes, setNotes] = useState(defaults?.notes ?? '');
   const [category, setCategory] = useState(defaults?.scheduleECategory ?? '');
   const [propertyId, setPropertyId] = useState(defaults?.propertyId ?? defaultPropertyId ?? '');
   const [uploading, setUploading] = useState(false);
 
+  const [extracted, setExtracted] = useState<ExtractedReceipt | null>(null);
+  const [duplicate, setDuplicate] = useState<DuplicateMatch | null>(null);
+  const [readNote, setReadNote] = useState<string | null>(null);
+
   const editing = defaults !== null;
   const lineAsks = category ? safeTriggersPrompt(category) : false;
+
+  /**
+   * Applies what the reader found.
+   *
+   * The figures are overwritten even when something is already typed. They are
+   * facts printed on the document that just arrived, so the document wins, and
+   * keeping a typed total while filling in the vendor and date around it
+   * produces a form that is half from one source and half from another with
+   * nothing saying which is which.
+   *
+   * NOTES ARE THE EXCEPTION, and only when they already say something. On the
+   * capture form they never do. But this same form reopens an expense from
+   * months ago, and a receipt attached to it then would otherwise replace a
+   * sentence somebody wrote about the job with a summary of the line items.
+   * The model's version of that field is a convenience; the owner's is a
+   * record.
+   */
+  function handleRead(read: ReceiptRead) {
+    setDuplicate(read.duplicate);
+
+    if (read.extraction.status === 'extracted') {
+      const found = read.extraction.extracted;
+      setExtracted(found);
+      setAmount(centsToInput(found.amountCents));
+      setVendor(found.vendor);
+      setDate(found.date);
+      setCategory(found.scheduleECategory);
+      if (found.notes && notes.trim() === '') setNotes(found.notes);
+
+      const match = contractors.find(
+        (c) => found.contractorName && c.label.toLowerCase() === found.contractorName.toLowerCase(),
+      );
+      setReadNote(
+        found.contractorName && !match
+          ? `Read from the receipt. It looks like an invoice from ${found.contractorName} - set the contractor below if they are on the list.`
+          : 'Read from the receipt. Check the figures before saving.',
+      );
+      return;
+    }
+
+    setExtracted(null);
+    setReadNote(readFailureNote(read));
+  }
 
   return (
     <form action={formAction} className="form">
@@ -86,12 +149,33 @@ export function ExpenseForm({
       {jobId ? <input type="hidden" name="jobId" value={jobId} /> : null}
       {defaults ? <input type="hidden" name="id" value={defaults.id} /> : null}
       {returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}
+      {/*
+        What the reader said, carried to the server so the save can tell an
+        accepted guess from a typed correction. Not a field - see the action.
+      */}
+      {extracted ? (
+        <input type="hidden" name="extraction" value={JSON.stringify(extracted)} />
+      ) : null}
 
       {state.message ? (
         <p role="alert" className="error-text mb-2">
           {state.message}
         </p>
       ) : null}
+
+      {duplicate ? (
+        <p className="note note-warn" role="alert">
+          {duplicate.kind === 'exact'
+            ? 'This exact receipt is already attached to an expense: '
+            : 'This looks like an expense already recorded: '}
+          <Link className="linkbtn" href={`/entries/expense/${duplicate.id}`}>
+            {duplicate.vendor}, {duplicate.date}, {formatCents(duplicate.amountCents)}
+          </Link>
+          . Nothing has been changed there. Saving this form adds a second entry.
+        </p>
+      ) : null}
+
+      {readNote ? <p className="note">{readNote}</p> : null}
 
       {/* The amount is the one figure on this form, so it is set large and
           monospaced rather than being one box among nine. */}
@@ -103,10 +187,12 @@ export function ExpenseForm({
           inputMode="decimal"
           autoComplete="off"
           placeholder="124.99"
-          defaultValue={defaults ? centsToInput(defaults.amountCents) : ''}
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
           required
         />
         {state.fields?.amount ? <span className="error-text">{state.fields.amount}</span> : null}
+        <Unsure level={extracted?.confidence.amount} what="total" />
       </label>
 
       {/* An unsplit expense keeps its single payment in step with the invoice
@@ -130,8 +216,10 @@ export function ExpenseForm({
           maxLength={200}
           placeholder="Home Depot"
           autoComplete="off"
-          defaultValue={defaults?.vendor ?? ''}
+          value={vendor}
+          onChange={(e) => setVendor(e.target.value)}
         />
+        <Unsure level={extracted?.confidence.vendor} what="name" />
       </label>
 
       <div className="field">
@@ -210,9 +298,11 @@ export function ExpenseForm({
             className="input"
             type="date"
             name="date"
-            defaultValue={defaults?.date ?? today}
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
             required
           />
+          <Unsure level={extracted?.confidence.date} what="date" />
         </label>
 
         <SelectField
@@ -225,7 +315,14 @@ export function ExpenseForm({
         />
       </div>
 
-      <ReceiptUpload defaultKey={defaults?.receiptKey ?? null} onBusyChange={setUploading} />
+      <ReceiptUpload
+        defaultKey={defaults?.receiptKey ?? null}
+        defaultSha256={defaults?.receiptSha256 ?? null}
+        propertyId={propertyId || null}
+        expenseId={defaults?.id ?? null}
+        onBusyChange={setUploading}
+        onRead={handleRead}
+      />
 
       <label className="field">
         <span className="field-label">Notes (optional)</span>
@@ -233,7 +330,8 @@ export function ExpenseForm({
           className="textarea"
           name="notes"
           maxLength={2000}
-          defaultValue={defaults?.notes ?? ''}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
         />
       </label>
 
@@ -242,6 +340,37 @@ export function ExpenseForm({
       <Submit editing={editing} uploading={uploading} />
     </form>
   );
+}
+
+/**
+ * Says so when the reader was not sure of a figure.
+ *
+ * Only for `low`. A marker on every merely-medium reading would sit under most
+ * fields most of the time, which is the same as no marker at all.
+ */
+function Unsure({ level, what }: { level?: 'high' | 'medium' | 'low'; what: string }) {
+  if (level !== 'low') return null;
+  return <span className="hint">The {what} was hard to read. Worth checking against the receipt.</span>;
+}
+
+function readFailureNote(read: ReceiptRead): string | null {
+  if (read.extraction.status === 'not_receipt') {
+    return 'That does not look like a receipt, so nothing was filled in. It is still attached.';
+  }
+  if (read.extraction.status !== 'skipped') return null;
+
+  switch (read.extraction.reason) {
+    case 'heic':
+      return 'Receipt attached. HEIC photos cannot be read automatically - fill the fields in below.';
+    case 'duplicate':
+      // The duplicate warning above already says everything worth saying.
+      return null;
+    case 'not_configured':
+      return null;
+    case 'unsupported':
+    case 'unreadable':
+      return 'Receipt attached, but it could not be read. Fill the fields in below.';
+  }
 }
 
 function Submit({ editing, uploading }: { editing: boolean; uploading: boolean }) {

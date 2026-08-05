@@ -36,6 +36,17 @@ const requiredText = (field: string, max = 500) =>
 const optionalText = (max = 2000) =>
   z.string().trim().max(max).optional().nullable().transform((v) => v || null);
 
+/**
+ * A SHA-256 digest as lowercase hex.
+ *
+ * Narrow on purpose: this value arrives from a hidden form field, and the only
+ * thing that makes it safe to look up by is that it cannot be anything except
+ * 64 hex characters.
+ */
+const receiptSha256 = z
+  .string()
+  .regex(/^[0-9a-f]{64}$/, { message: 'Expected a SHA-256 digest.' });
+
 /** Money arrives from forms as a string and is stored as integer cents. */
 const amountCents = z
   .number()
@@ -183,6 +194,8 @@ export const createExpenseSchema = z.object({
   classificationAnswers: z.record(z.unknown()).nullable().optional().default(null),
   contractorActorId: uuid.nullable().optional().default(null),
   receiptKey: z.string().max(500).nullable().optional().default(null),
+  /** Lowercase hex SHA-256 of the receipt bytes. Fixed width by construction. */
+  receiptSha256: receiptSha256.nullable().optional().default(null),
   notes: optionalText(),
   allocationRule: allocationRuleSchema.nullable().optional().default(null),
 });
@@ -201,6 +214,7 @@ export const updateExpenseSchema = z.object({
   classificationAnswers: z.record(z.unknown()).nullable().optional(),
   contractorActorId: uuid.nullable().optional(),
   receiptKey: z.string().max(500).nullable().optional(),
+  receiptSha256: receiptSha256.nullable().optional(),
   notes: optionalText(),
   allocationRule: allocationRuleSchema.nullable().optional(),
 });

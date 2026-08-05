@@ -72,6 +72,7 @@ export async function createExpense(
         classificationAnswers: data.classificationAnswers,
         contractorActorId: data.contractorActorId,
         receiptKey: data.receiptKey,
+        receiptSha256: data.receiptSha256,
         notes: data.notes,
         allocationRule: data.allocationRule as Record<string, unknown> | null,
         isBackdated: isBackdated(data.date, new Date(), env.timeZone),
@@ -148,6 +149,8 @@ export async function updateExpense(input: UpdateExpenseInput): Promise<Expense>
           ? existing.contractorActorId
           : data.contractorActorId,
       receiptKey: data.receiptKey === undefined ? existing.receiptKey : data.receiptKey,
+      receiptSha256:
+        data.receiptSha256 === undefined ? existing.receiptSha256 : data.receiptSha256,
       notes: data.notes === undefined ? existing.notes : data.notes,
       allocationRule: allocationRule as Record<string, unknown> | null,
       isBackdated: isBackdated(date, existing.createdAt, env.timeZone),

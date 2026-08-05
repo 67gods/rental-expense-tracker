@@ -89,6 +89,10 @@ export const env = {
     return required('AWS_SECRET_ACCESS_KEY', 'From the IAM user for this app.');
   },
 
+  get anthropicApiKey(): string {
+    return required('ANTHROPIC_API_KEY', 'From console.anthropic.com. Reads uploaded receipts.');
+  },
+
   /**
    * Every business date is anchored to this zone. Changing it after data exists
    * would move entries near midnight between days, so it is set once at setup.
@@ -104,6 +108,21 @@ export const env = {
         process.env.AWS_ACCESS_KEY_ID &&
         process.env.AWS_SECRET_ACCESS_KEY &&
         !process.env.AWS_ACCESS_KEY_ID.startsWith('replace-me'),
+    );
+  },
+
+  /**
+   * True when receipts can be read automatically.
+   *
+   * Deliberately a separate flag from `hasS3`: reading is an accelerator on top
+   * of storing, and an unset key has to leave the upload working rather than
+   * taking the receipt down with it.
+   */
+  get hasExtraction(): boolean {
+    return Boolean(
+      process.env.ANTHROPIC_API_KEY &&
+        process.env.ANTHROPIC_API_KEY.trim() !== '' &&
+        !process.env.ANTHROPIC_API_KEY.startsWith('replace-me'),
     );
   },
 };

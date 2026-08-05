@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { env } from '@/env';
@@ -39,6 +39,11 @@ export interface PresignedUpload {
   uploadUrl: string;
   /** Store this on the expense record. Never store the signed URL - it expires. */
   key: string;
+  /**
+   * Proof that this key came from a presign of ours. Required to read the
+   * object back before it belongs to a record. Never stored.
+   */
+  readToken: string;
   expiresInSeconds: number;
 }
 
@@ -75,7 +80,60 @@ export async function presignReceiptUpload(input: {
     { expiresIn: 900 },
   );
 
-  return { uploadUrl, key, expiresInSeconds: 900 };
+  return { uploadUrl, key, readToken: readTokenFor(key), expiresInSeconds: 900 };
+}
+
+/**
+ * A token that says "this app issued this key".
+ *
+ * resolveReceipt refuses any key no record claims, which is the right rule for
+ * viewing but locks out the one moment reading is needed: between the upload
+ * finishing and the expense being saved, the object belongs to nothing. This
+ * token fills exactly that gap, and nothing wider - it is minted only by a
+ * presign, so a key that was guessed rather than issued cannot carry one.
+ *
+ * AUTH_SECRET is already the app's signing key for sessions, so there is no
+ * second secret to configure or rotate.
+ */
+function readTokenFor(key: string): string {
+  return createHmac('sha256', env.authSecret).update(`receipt-read:${key}`).digest('hex');
+}
+
+/** Throws unless the token is the one `readTokenFor` would have minted. */
+export function assertReadToken(key: string, token: string): void {
+  const expected = Buffer.from(readTokenFor(key), 'utf8');
+  const actual = Buffer.from(token, 'utf8');
+  // Length is checked first because timingSafeEqual throws on a mismatch, and
+  // the length of a hex digest is not a secret.
+  if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) {
+    throw new ValidationError('That receipt cannot be read.');
+  }
+}
+
+export interface ReceiptBytes {
+  bytes: Buffer;
+  contentType: string;
+}
+
+/**
+ * Pulls a stored receipt back into memory.
+ *
+ * Server-side rather than re-reading the file the browser already holds: the
+ * bytes in the bucket are what every later reader sees, so they are what the
+ * hash and the extraction have to be computed from.
+ */
+export async function getReceiptBytes(key: string): Promise<ReceiptBytes> {
+  const response = await getClient().send(
+    new GetObjectCommand({ Bucket: env.s3Bucket, Key: key }),
+  );
+
+  const body = response.Body;
+  if (!body) throw new ValidationError('That receipt is empty.');
+
+  return {
+    bytes: Buffer.from(await body.transformToByteArray()),
+    contentType: response.ContentType ?? 'application/octet-stream',
+  };
 }
 
 /**

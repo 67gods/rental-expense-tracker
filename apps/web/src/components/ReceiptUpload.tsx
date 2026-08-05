@@ -2,7 +2,48 @@
 
 import { useRef, useState } from 'react';
 
-type Status = 'idle' | 'uploading' | 'done' | 'error';
+type Status = 'idle' | 'uploading' | 'reading' | 'done' | 'error';
+
+/** Confidence the model reported for one figure it read. */
+export type ExtractionConfidence = 'high' | 'medium' | 'low';
+
+/** What the reader found. Mirrors the payload from /api/v1/receipts/extract. */
+export interface ExtractedReceipt {
+  vendor: string;
+  date: string;
+  amountCents: number;
+  scheduleECategory: string;
+  contractorName: string | null;
+  notes: string;
+  confidence: {
+    vendor: ExtractionConfidence;
+    date: ExtractionConfidence;
+    amount: ExtractionConfidence;
+  };
+}
+
+export interface DuplicateMatch {
+  id: string;
+  date: string;
+  vendor: string;
+  amountCents: number;
+  propertyId: string | null;
+  kind: 'exact' | 'likely';
+}
+
+export type ExtractionOutcome =
+  | { status: 'extracted'; extracted: ExtractedReceipt }
+  | { status: 'not_receipt' }
+  | {
+      status: 'skipped';
+      reason: 'heic' | 'unsupported' | 'not_configured' | 'unreadable' | 'duplicate';
+    };
+
+export interface ReceiptRead {
+  sha256: string;
+  extraction: ExtractionOutcome;
+  duplicate: DuplicateMatch | null;
+}
 
 /**
  * Receipt capture.
@@ -14,6 +55,11 @@ type Status = 'idle' | 'uploading' | 'done' | 'error';
  * The file goes directly to S3 with a presigned URL. Routing a 10MB photo
  * through a serverless function to reach a bucket adds a timeout risk and buys
  * nothing.
+ *
+ * Once it lands, the app reads it back and asks what it says. That second step
+ * is deliberately not allowed to hold anything up: the receipt is already
+ * stored and the form is already usable, so a reader that is slow, unconfigured
+ * or wrong costs a few seconds of a progress line and nothing else.
  */
 export function ReceiptUpload({
   name = 'receiptKey',
@@ -25,6 +71,12 @@ export function ReceiptUpload({
    * already attached.
    */
   defaultKey = null,
+  /** The hash already on the record. Round-trips for the same reason. */
+  defaultSha256 = null,
+  /** Narrows the duplicate search. Not used to read the receipt. */
+  propertyId = null,
+  /** Set when editing, so an expense cannot be reported as its own duplicate. */
+  expenseId = null,
   /**
    * Tells the form an upload is in flight.
    *
@@ -33,15 +85,26 @@ export function ReceiptUpload({
    * on it while the object sits orphaned in the bucket. Nothing about that
    * looks like a failure from either end, which is what made it worth wiring
    * the two components together rather than leaving the button to guess.
+   *
+   * Reading is NOT reported as busy. By then the key exists and the expense is
+   * saveable; making somebody wait out an optional convenience would be the
+   * wrong trade for anyone who would rather just type it.
    */
   onBusyChange,
+  /** Fires once the receipt has been read, however that turned out. */
+  onRead,
 }: {
   name?: string;
   defaultKey?: string | null;
+  defaultSha256?: string | null;
+  propertyId?: string | null;
+  expenseId?: string | null;
   onBusyChange?: (busy: boolean) => void;
+  onRead?: (read: ReceiptRead) => void;
 }) {
   const [status, setStatus] = useState<Status>(defaultKey ? 'done' : 'idle');
   const [key, setKey] = useState(defaultKey ?? '');
+  const [sha256, setSha256] = useState(defaultSha256 ?? '');
   const [error, setError] = useState<string | null>(null);
   const [filename, setFilename] = useState(defaultKey ? basename(defaultKey) : '');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -50,7 +113,11 @@ export function ReceiptUpload({
     setStatus('uploading');
     setError(null);
     setFilename(file.name);
+    setSha256('');
     onBusyChange?.(true);
+
+    let uploadedKey: string;
+    let readToken: string;
 
     try {
       let presignResponse: Response;
@@ -71,10 +138,11 @@ export function ReceiptUpload({
       const presign = (await presignResponse.json()) as {
         uploadUrl?: string;
         key?: string;
+        readToken?: string;
         message?: string;
       };
 
-      if (!presignResponse.ok || !presign.uploadUrl || !presign.key) {
+      if (!presignResponse.ok || !presign.uploadUrl || !presign.key || !presign.readToken) {
         throw new Error(presign.message ?? 'Could not prepare the upload.');
       }
 
@@ -111,30 +179,59 @@ export function ReceiptUpload({
       }
 
       // Only the object key is stored. The signed URL expires.
-      setKey(presign.key);
-      setStatus('done');
+      uploadedKey = presign.key;
+      readToken = presign.readToken;
+      setKey(uploadedKey);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'The upload failed.');
       setStatus('error');
-    } finally {
-      // Released on failure too. A receipt that will never arrive must not
-      // leave the expense itself unsavable - the error text below says as much.
       onBusyChange?.(false);
+      return;
+    }
+
+    // The receipt is safely stored from here on. Everything below is optional,
+    // so the form is released before it starts.
+    onBusyChange?.(false);
+    setStatus('reading');
+
+    try {
+      const response = await fetch('/api/v1/receipts/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: uploadedKey, readToken, propertyId, expenseId }),
+      });
+
+      if (!response.ok) throw new Error('unreadable');
+
+      const read = (await response.json()) as ReceiptRead;
+      setSha256(read.sha256 ?? '');
+      onRead?.(read);
+    } catch {
+      // A reader that failed is not an upload that failed. The receipt is
+      // attached, the form works, and saying so would be noise.
+      onRead?.({ sha256: '', extraction: { status: 'skipped', reason: 'unreadable' }, duplicate: null });
+    } finally {
+      setStatus('done');
     }
   }
 
   function clear() {
     setKey('');
+    setSha256('');
     setStatus('idle');
     setError(null);
     setFilename('');
     if (inputRef.current) inputRef.current.value = '';
+    onRead?.({ sha256: '', extraction: { status: 'skipped', reason: 'unreadable' }, duplicate: null });
   }
 
   return (
     <div className="field">
       <span className="field-label">Receipt (optional)</span>
       <input type="hidden" name={name} value={key} />
+      {/* Empty rather than absent when unknown, so an edit that did not touch
+          the receipt posts the hash it arrived with. */}
+      <input type="hidden" name="receiptSha256" value={sha256} />
 
       <input
         ref={inputRef}
@@ -146,13 +243,14 @@ export function ReceiptUpload({
           const file = e.target.files?.[0];
           if (file) void upload(file);
         }}
-        disabled={status === 'uploading'}
+        disabled={status === 'uploading' || status === 'reading'}
         aria-describedby="receipt-status"
       />
 
       <p id="receipt-status" className="hint" role="status">
-        {status === 'idle' ? 'Photo or PDF, up to 12MB. Stored with the expense.' : null}
+        {status === 'idle' ? 'Photo or PDF, up to 12MB. Stored with the expense, and read to fill in the fields.' : null}
         {status === 'uploading' ? `Uploading ${filename}…` : null}
+        {status === 'reading' ? `Reading ${filename}… you can fill it in yourself instead.` : null}
         {status === 'done' ? (
           <>
             <span className="tag tag-pos">Attached</span> {filename}{' '}

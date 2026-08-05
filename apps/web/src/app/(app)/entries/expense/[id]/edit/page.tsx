@@ -94,6 +94,7 @@ export default async function EditExpensePage({
             capitalClassification: expense.capitalClassification,
             contractorActorId: expense.contractorActorId,
             receiptKey: expense.receiptKey,
+            receiptSha256: expense.receiptSha256,
             notes: expense.notes,
             isSplit: expense.allocationRule != null,
             hasOwnPayments,
