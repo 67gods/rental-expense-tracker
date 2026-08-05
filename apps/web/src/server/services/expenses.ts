@@ -18,6 +18,7 @@ import { expensePayments, expenses, properties, type Expense } from '@/db/schema
 import { env } from '@/env';
 import { NotFoundError, ValidationError } from '../errors';
 import { syncEligibilityForExpense } from './timeEntries';
+import { paidByExpenseInYear } from './payments';
 
 export interface ExpenseFilter {
   taxYear?: number;
@@ -284,8 +285,6 @@ export async function listExpenses(filter: ExpenseFilter = {}): Promise<Expense[
   if (filter.needsReviewOnly) {
     // §10: every expense tied to physical work has a classification or sits in
     // needs_review. Unclassified spend on a work category is the same problem.
-    // A portfolio-wide expense with no property and no split (§6) is a third
-    // kind of unresolved - it cannot reach Schedule E until one is set.
     conditions.push(
       or(
         eq(expenses.capitalClassification, 'needs_review'),
@@ -293,7 +292,6 @@ export async function listExpenses(filter: ExpenseFilter = {}): Promise<Expense[
           isNull(expenses.capitalClassification),
           sql`${expenses.scheduleECategory} IN ('repairs', 'cleaning_maintenance', 'supplies', 'other')`,
         ),
-        and(isNull(expenses.propertyId), isNull(expenses.allocationRule)),
       ),
     );
   }
@@ -376,4 +374,30 @@ export function requiresCapitalClassification(scheduleECategory: string): boolea
 export async function countNeedsReview(taxYear: number): Promise<number> {
   const rows = await listExpenses({ taxYear, needsReviewOnly: true, limit: 1000 });
   return rows.length;
+}
+
+/**
+ * Paid expenses that cannot reach Schedule E because nothing says which
+ * property they belong to (§6).
+ *
+ * STARTS FROM THE PAYMENTS, exactly as the ledger does, and not from
+ * `listExpenses({ taxYear })`. That filter reads the invoice date, so an
+ * invoice dated 2024 and settled in 2025 is absent from it - and that is
+ * precisely the expense the 2025 ledger silently dropped. Counting the
+ * invoices of the year would have left the cross-year case unwarned, which is
+ * the case this app exists to get right.
+ */
+export async function countMissingProperty(taxYear: number): Promise<number> {
+  const paidByExpense = await paidByExpenseInYear(taxYear);
+  const rows = await expensesByIds([...paidByExpense.keys()]);
+
+  let count = 0;
+  for (const [expenseId, paidCents] of paidByExpense) {
+    const expense = rows.get(expenseId);
+    if (!expense || paidCents === 0) continue;
+    if (needsPropertyOrSplit(expense.propertyId, expense.allocationRule as AllocationRule | null)) {
+      count += 1;
+    }
+  }
+  return count;
 }

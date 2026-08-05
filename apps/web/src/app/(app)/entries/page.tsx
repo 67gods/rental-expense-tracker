@@ -188,7 +188,11 @@ async function ExpenseTable({
         : 'Split';
     const badges = [];
     if (e.capitalClassification === 'improvement') badges.push({ label: 'Capital', tone: 'capital' as const });
-    if (unresolved || needsAnswer(e)) badges.push({ label: 'Review', tone: 'warn' as const });
+    // Two different questions, so two different badges. One "Review" covering
+    // both meant a flagged row told you nothing about which one it was waiting
+    // on until you opened it.
+    if (needsAnswer(e)) badges.push({ label: 'Review', tone: 'warn' as const });
+    if (unresolved) badges.push({ label: 'No property', tone: 'neg' as const });
     if (e.jobId && jobTitles.get(e.jobId)) {
       badges.push({ label: 'Job', tone: 'muted' as const, href: `/jobs/${e.jobId}` });
     }

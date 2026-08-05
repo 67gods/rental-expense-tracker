@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { formatCents } from '@rental/domain';
 import { DeleteButton } from '@/components/DeleteButton';
@@ -103,7 +103,6 @@ export function DataTable({
     () => new Set(columns.filter((c) => c.defaultHidden).map((c) => c.key)),
   );
   const storageKey = `cols:${id}`;
-  const loadedFrom = useRef<string | null>(null);
 
   useEffect(() => {
     try {
@@ -112,33 +111,42 @@ export function DataTable({
     } catch {
       // Corrupt or blocked storage - fall back to the column defaults already set.
     }
-    loadedFrom.current = storageKey;
   }, [storageKey]);
 
-  useEffect(() => {
-    // Skips the write that would otherwise fire before the load effect above
-    // has run, which would stamp the defaults back over a saved choice.
-    if (loadedFrom.current !== storageKey) return;
-    window.localStorage.setItem(storageKey, JSON.stringify([...hiddenKeys]));
-  }, [hiddenKeys, storageKey]);
+  // WRITTEN FROM THE TOGGLE, not from an effect on `hiddenKeys`. An effect
+  // would also fire on mount, before the load above has been applied, and
+  // write the defaults back over the saved choice - it happened to correct
+  // itself on the next render, which is the kind of accident that stops being
+  // harmless the moment anything else reads the key in between.
+  function persist(next: Set<string>) {
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify([...next]));
+    } catch {
+      // Storage full or blocked. The choice still applies for this page.
+    }
+  }
 
   const visibleColumns = useMemo(
     () => columns.filter((c) => !hiddenKeys.has(c.key)),
     [columns, hiddenKeys],
   );
 
+  // Not a state updater function: this writes to storage as well as to state,
+  // and an updater has to stay pure - React calls it twice in development.
   function toggleColumn(key: string) {
-    setHiddenKeys((current) => {
-      const next = new Set(current);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        // A table with every column off is just an empty box.
-        if (columns.length - next.size <= 1) return current;
-        next.add(key);
-      }
-      return next;
-    });
+    const next = new Set(hiddenKeys);
+    if (next.has(key)) {
+      next.delete(key);
+    } else {
+      // A table with every column off is just an empty box. Counted from the
+      // columns that actually exist, so a stale key left in storage by a
+      // renamed column cannot make the last few look already hidden.
+      const visibleNow = columns.filter((c) => !next.has(c.key)).length;
+      if (visibleNow <= 1) return;
+      next.add(key);
+    }
+    setHiddenKeys(next);
+    persist(next);
   }
 
   // Built from the rows themselves, so a facet can never offer a value that is

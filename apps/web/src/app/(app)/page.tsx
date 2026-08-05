@@ -195,6 +195,26 @@ export default async function OverviewPage({
                     </td>
                   </tr>
                 ) : null}
+                {/* Its own row, not folded into the count above. This one is
+                    money that HAS left the bank and is missing from the
+                    Deductible figure at the top of this page, which is a
+                    different and louder problem than an unanswered question. */}
+                {data.missingPropertyCount > 0 ? (
+                  <tr>
+                    <td className="nowrap">
+                      <Tag tone="neg">Property</Tag>
+                    </td>
+                    <td>
+                      <strong>{data.missingPropertyCount}</strong> paid expenses with no
+                      property or split — not on Schedule E, and not in the figures above
+                    </td>
+                    <td className="num nowrap">
+                      <Link className="btn" href={withYear('/entries?tab=expenses', taxYear)}>
+                        Open
+                      </Link>
+                    </td>
+                  </tr>
+                ) : null}
                 {data.w9Warnings.map((warning) => (
                   <tr key={warning.actorId}>
                     <td className="nowrap">
@@ -248,6 +268,7 @@ export default async function OverviewPage({
                   </tr>
                 ))}
                 {data.needsReviewCount === 0 &&
+                data.missingPropertyCount === 0 &&
                 data.w9Warnings.length === 0 &&
                 scheduled.length === 0 &&
                 unreconciled.length === 0 ? (
