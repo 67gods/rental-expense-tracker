@@ -23,6 +23,7 @@ export interface RailCounts {
   properties: number;
   jobs: number;
   people: number;
+  interest: number;
   reports: number;
 }
 
@@ -36,6 +37,7 @@ const ICONS = {
   link: 'M5.8 8.2a2.2 2.2 0 0 0 3.1 0l1.9-1.9a2.2 2.2 0 0 0-3.1-3.1L6.9 4M8.2 5.8a2.2 2.2 0 0 0-3.1 0L3.2 7.7a2.2 2.2 0 0 0 3.1 3.1L7.1 10',
   users: 'M5 3.3a1.9 1.9 0 1 0 0 3.8 1.9 1.9 0 0 0 0-3.8zM1.6 12c0-2 1.5-3.2 3.4-3.2S8.4 10 8.4 12M10.4 4.2a1.6 1.6 0 1 1 0 3.2M12.4 12c0-1.6-1-2.6-2.4-2.9',
   calendar: 'M2.5 3.5h9v8.5a.5.5 0 0 1-.5.5H3a.5.5 0 0 1-.5-.5zM2.5 6.2h9M5 2v2.4M9 2v2.4',
+  bank: 'M1.6 5.4 7 2.2l5.4 3.2M2.8 5.9v5.2M5.9 5.9v5.2M8.1 5.9v5.2M11.2 5.9v5.2M1.6 11.8h10.8',
   doc: 'M3.2 1.6h4.4l3.2 3.2v7.6a.5.5 0 0 1-.5.5H3.2a.5.5 0 0 1-.5-.5V2.1a.5.5 0 0 1 .5-.5zM7.6 1.6v3.2h3.2',
   gear: 'M7 4.8a2.2 2.2 0 1 0 0 4.4 2.2 2.2 0 0 0 0-4.4zM7 1.2v1.5M7 11.3v1.5M12.8 7h-1.5M2.7 7H1.2M11.1 2.9l-1 1M3.9 10.1l-1 1M11.1 11.1l-1-1M3.9 3.9l-1-1',
 } as const;
@@ -105,6 +107,10 @@ export function Rail({
     {
       heading: 'Year end',
       items: [
+        // Not rental income at all - it belongs on Schedule B - but it arrives
+        // in the same post in the same week, so it sits with the rest of the
+        // January sitting rather than among the rental records above.
+        { href: '/interest', label: 'Interest income', icon: 'bank', count: counts.interest },
         // Named with the year in it. "Close the year" begs the question which
         // year, and the answer is the one the rail is showing.
         { href: '/year-end', label: `Close ${taxYear}`, icon: 'calendar' },

@@ -7,6 +7,7 @@ import {
   formatHoursDecimal,
   getHourCategory,
   getScheduleECategory,
+  interestSource,
   listScheduleECategories,
   needsPropertyOrSplit,
   RECONCILIATION_KINDS,
@@ -31,6 +32,7 @@ import { listCpaFigures, scheduleEFiguresByProperty } from './cpaFigures';
 import { listPayments, paidByExpenseInYear } from './payments';
 import { getJobWithChildren, listJobs, jobTitlesById } from './jobs';
 import { reconciliationsForYear } from './reconciliation';
+import { listBankAccounts, listInterestYears } from './interest';
 
 /**
  * Year-end reports (§7.6, §10).
@@ -908,6 +910,49 @@ export async function incomeDetailCsv(taxYear: number): Promise<string> {
 }
 
 /**
+ * Interest income, one row per account per year.
+ *
+ * A file of its own rather than a block on the Schedule E export, because this
+ * income is not on Schedule E at all - it belongs on Schedule B, and a column
+ * of it sitting under the rental figures is exactly how it would end up added
+ * to them. The holder column names a person or a business and says which.
+ */
+export async function interestIncomeCsv(taxYear: number): Promise<string> {
+  const [rows, accounts] = await Promise.all([
+    listInterestYears({ taxYear }),
+    listBankAccounts({ includeArchived: true }),
+  ]);
+
+  const byId = new Map(accounts.map((a) => [a.id, a]));
+  const sorted = [...rows].sort((a, b) => {
+    const left = byId.get(a.bankAccountId)?.bankName ?? '';
+    const right = byId.get(b.bankAccountId)?.bankName ?? '';
+    return left.localeCompare(right);
+  });
+
+  const money = (cents: number | null) => (cents === null ? '' : formatCentsPlain(cents));
+
+  return toCsv(sorted, [
+    { header: 'Bank', value: (r) => byId.get(r.bankAccountId)?.bankName ?? '' },
+    { header: 'Account', value: (r) => byId.get(r.bankAccountId)?.label ?? '' },
+    { header: 'Held by', value: (r) => byId.get(r.bankAccountId)?.holderLabel ?? '' },
+    { header: 'Holder kind', value: (r) => byId.get(r.bankAccountId)?.holderKind ?? '' },
+    { header: 'Tax year', value: (r) => String(r.taxYear) },
+    { header: 'Interest - box 1', value: (r) => formatCentsPlain(r.interestCents) },
+    { header: 'Tax-exempt interest - box 8', value: (r) => money(r.taxExemptInterestCents) },
+    { header: 'Federal tax withheld - box 4', value: (r) => money(r.federalTaxWithheldCents) },
+    {
+      header: 'Early withdrawal penalty - box 2',
+      value: (r) => money(r.earlyWithdrawalPenaltyCents),
+    },
+    { header: 'Savings bond interest - box 3', value: (r) => money(r.savingsBondInterestCents) },
+    { header: 'Read from', value: (r) => safeInterestSourceLabel(r.documentSource) },
+    { header: 'Note', value: (r) => r.documentNote ?? '' },
+    { header: 'Recorded at', value: (r) => r.createdAt.toISOString() },
+  ]);
+}
+
+/**
  * The CPA hand-off.
  *
  * Ordered as the accountant reads them: the summary first, then the rows
@@ -926,6 +971,9 @@ export const REPORTS = {
   'loan-years': { label: 'Mortgage and escrow, from the 1098s', build: loanYearsCsv },
   'cpa-figures': { label: 'Figures your CPA sent back', build: cpaFiguresCsv },
   'property-facts': { label: 'Property facts and management history', build: propertyFactsCsv },
+  // Last, and separate. Schedule B, not Schedule E - nothing in this file
+  // belongs anywhere near the rental figures above it.
+  'interest-income': { label: 'Interest income, from the 1099-INTs', build: interestIncomeCsv },
 } as const;
 
 export type ReportId = keyof typeof REPORTS;
@@ -940,6 +988,11 @@ function safeCategoryLabel(id: string): string {
   } catch {
     return id;
   }
+}
+
+/** Guarded: an id the picker no longer offers exports as blank, not a crash. */
+function safeInterestSourceLabel(id: string | null): string {
+  return id && interestSource.has(id) ? interestSource.get(id).label : '';
 }
 
 function safeCategory(id: string): { line: number; label: string } {

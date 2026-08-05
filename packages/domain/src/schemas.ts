@@ -12,6 +12,7 @@ import {
   costTreatment,
   cpaFigureKind,
   documentSource,
+  interestSource,
   paymentMethod,
   placedInServiceEvidence,
   reconciliationKind,
@@ -99,6 +100,10 @@ const fromList = <T extends string>(
 export const documentSourceSchema = fromList(
   documentSource,
   'Pick where that figure came from.',
+);
+export const interestSourceSchema = fromList(
+  interestSource,
+  'Pick where that interest figure came from.',
 );
 export const paymentMethodSchema = fromList(paymentMethod, 'Pick how it was paid.');
 export const placedInServiceEvidenceSchema = fromList(
@@ -235,6 +240,69 @@ export type CreateRentReceiptInput = z.input<typeof createRentReceiptSchema>;
 export const updateRentReceiptSchema = createRentReceiptSchema.partial().extend({
   id: uuid,
 });
+
+// --- Interest income --------------------------------------------------------
+// Not rental income and not on Schedule E. A household savings account, or one
+// in a business's name, earns interest that belongs on Schedule B - it is kept
+// here so the January hand-off to the CPA is one hand-off.
+
+/**
+ * Exactly one holder, either a person or a business.
+ *
+ * An account belonging to an LLC or a trust has no actor to point at, and
+ * inventing one would put a company in the People list. An account in a
+ * person's name must not be a loose string that drifts from how they are
+ * spelled everywhere else. So both are offered and neither is optional -
+ * the same rule the database enforces with a check constraint.
+ */
+const holderIsOneOf = <T extends { holderActorId?: unknown; holderName?: unknown }>(
+  value: T,
+) => (value.holderActorId != null) !== (value.holderName != null);
+
+const HOLDER_MESSAGE = 'Say whose name the account is in - a person or a business, not both.';
+
+export const createBankAccountSchema = z
+  .object({
+    /** Name only. No account numbers and no TINs, masked or otherwise. */
+    bankName: requiredText('The bank name', 200),
+    holderActorId: uuid.nullable().optional().default(null),
+    holderName: optionalText(200),
+    /** "Joint savings", "Operating" - tells two accounts at one bank apart. */
+    label: optionalText(200),
+  })
+  .refine(holderIsOneOf, { message: HOLDER_MESSAGE, path: ['holderActorId'] });
+export type CreateBankAccountInput = z.input<typeof createBankAccountSchema>;
+
+export const updateBankAccountSchema = z
+  .object({
+    id: uuid,
+    bankName: requiredText('The bank name', 200),
+    holderActorId: uuid.nullable().optional().default(null),
+    holderName: optionalText(200),
+    label: optionalText(200),
+    isArchived: z.boolean().optional(),
+  })
+  .refine(holderIsOneOf, { message: HOLDER_MESSAGE, path: ['holderActorId'] });
+export type UpdateBankAccountInput = z.input<typeof updateBankAccountSchema>;
+
+/**
+ * One 1099-INT, transcribed. Box 1 is the figure; the rest are the boxes that
+ * are usually blank and occasionally are not.
+ */
+export const upsertInterestYearSchema = z.object({
+  id: uuid.optional(),
+  bankAccountId: uuid,
+  taxYear,
+  actorId: uuid,
+  interestCents: amountCents, // box 1
+  earlyWithdrawalPenaltyCents: optionalAmountCents, // box 2
+  savingsBondInterestCents: optionalAmountCents, // box 3
+  federalTaxWithheldCents: optionalAmountCents, // box 4
+  taxExemptInterestCents: optionalAmountCents, // box 8
+  documentSource: interestSourceSchema.nullable().optional().default(null),
+  documentNote: optionalText(),
+});
+export type UpsertInterestYearInput = z.input<typeof upsertInterestYearSchema>;
 
 // --- Trips -----------------------------------------------------------------
 

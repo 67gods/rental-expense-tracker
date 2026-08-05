@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   assignJobSchema,
+  createBankAccountSchema,
   createExpensePaymentSchema,
   createExpenseSchema,
   createPropertySchema,
   createReconciliationItemSchema,
   planInstalmentsSchema,
   upsertCpaFigureSchema,
+  upsertInterestYearSchema,
   upsertLoanYearSchema,
   upsertRentReconciliationSchema,
 } from '../src/schemas';
@@ -351,5 +353,104 @@ describe('assignJobSchema', () => {
       expenseIds: [OTHER_UUID],
     });
     expect(parsed.timeEntryIds.length + parsed.tripIds.length + parsed.expenseIds.length).toBe(3);
+  });
+});
+
+describe('createBankAccountSchema', () => {
+  const account = (over: Record<string, unknown> = {}) => ({
+    bankName: 'Ally Bank',
+    holderActorId: UUID,
+    ...over,
+  });
+
+  it("accepts an account in a person's name", () => {
+    expect(createBankAccountSchema.safeParse(account()).success).toBe(true);
+  });
+
+  it("accepts an account in a business's name", () => {
+    // An LLC has no actor to point at, and inventing one would put a company in
+    // the People list.
+    const parsed = createBankAccountSchema.parse(
+      account({ holderActorId: null, holderName: 'Gandhi Holdings LLC' }),
+    );
+    expect(parsed.holderName).toBe('Gandhi Holdings LLC');
+    expect(parsed.holderActorId).toBeNull();
+  });
+
+  it('rejects an account claiming both a person and a business', () => {
+    const result = createBankAccountSchema.safeParse(
+      account({ holderName: 'Gandhi Holdings LLC' }),
+    );
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an account with no holder at all', () => {
+    // "Whose name is it in" is the question this record exists to answer.
+    expect(createBankAccountSchema.safeParse(account({ holderActorId: null })).success).toBe(
+      false,
+    );
+  });
+
+  it('rejects a bank name that is only whitespace', () => {
+    expect(createBankAccountSchema.safeParse(account({ bankName: '   ' })).success).toBe(false);
+  });
+
+  it('keeps the label so two accounts at one bank stay apart', () => {
+    const parsed = createBankAccountSchema.parse(account({ label: 'Joint savings' }));
+    expect(parsed.label).toBe('Joint savings');
+  });
+});
+
+describe('upsertInterestYearSchema', () => {
+  const year = (over: Record<string, unknown> = {}) => ({
+    bankAccountId: UUID,
+    taxYear: 2025,
+    actorId: OTHER_UUID,
+    interestCents: 41_237,
+    ...over,
+  });
+
+  it('accepts box 1 on its own, which is all most 1099-INTs carry', () => {
+    const parsed = upsertInterestYearSchema.parse(year());
+    expect(parsed.interestCents).toBe(41_237);
+    expect(parsed.taxExemptInterestCents).toBeNull();
+    expect(parsed.federalTaxWithheldCents).toBeNull();
+    expect(parsed.documentSource).toBeNull();
+  });
+
+  it('accepts the boxes that are usually blank and occasionally are not', () => {
+    const parsed = upsertInterestYearSchema.parse(
+      year({
+        earlyWithdrawalPenaltyCents: 2_500,
+        savingsBondInterestCents: 18_000,
+        federalTaxWithheldCents: 10_309,
+        taxExemptInterestCents: 7_400,
+        documentSource: 'bank_statement',
+        documentNote: 'No 1099-INT issued; figure from the December statement.',
+      }),
+    );
+    expect(parsed.federalTaxWithheldCents).toBe(10_309);
+    expect(parsed.documentSource).toBe('bank_statement');
+  });
+
+  it('rejects a source the picker does not offer', () => {
+    expect(upsertInterestYearSchema.safeParse(year({ documentSource: 'form_1098' })).success)
+      .toBe(false);
+  });
+
+  it('rejects negative interest', () => {
+    expect(upsertInterestYearSchema.safeParse(year({ interestCents: -100 })).success).toBe(
+      false,
+    );
+  });
+
+  it('rejects a missing box 1 - a year with no figure is not a transcription', () => {
+    expect(upsertInterestYearSchema.safeParse(year({ interestCents: undefined })).success).toBe(
+      false,
+    );
+  });
+
+  it('rejects a tax year that is not one', () => {
+    expect(upsertInterestYearSchema.safeParse(year({ taxYear: 25 })).success).toBe(false);
   });
 });

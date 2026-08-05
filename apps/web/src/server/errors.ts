@@ -133,6 +133,20 @@ export function toErrorPayload(error: unknown): ErrorPayload {
       message: 'Pick a property, or set up a split across several.',
     };
   }
+  if (message.includes('bank_accounts_holder_one_of')) {
+    return {
+      status: 400,
+      error: 'rule_violation',
+      message: 'Say whose name the account is in - a person or a business, not both.',
+    };
+  }
+  if (message.includes('bank_accounts_identity')) {
+    return {
+      status: 409,
+      error: 'rule_violation',
+      message: 'That account is already on file.',
+    };
+  }
   if (message.includes('timers_one_running_per_actor')) {
     return {
       status: 409,

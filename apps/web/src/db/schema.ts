@@ -31,6 +31,7 @@ import {
   pgTable,
   text,
   timestamp,
+  unique,
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
@@ -657,6 +658,112 @@ export const propertyLoanYears = pgTable(
   ],
 );
 
+// --- Interest income, per account per year ----------------------------------
+// The one thing in this schema that is not about the rental at all.
+//
+// A household savings account, or an account in a business's name, earns
+// interest that never touches a property, never reaches Schedule E, and lands
+// on Schedule B instead. It is here because the January hand-off to the CPA is
+// one hand-off, and a figure kept somewhere else is a figure that gets found in
+// March.
+//
+// Shaped like the 1098 transcription above rather than like the rent ledger:
+// one form, once a year, copied off a document. Nobody logs interest monthly.
+
+export const bankAccounts = pgTable(
+  'bank_accounts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /** Name only. No account numbers and no TINs, masked or otherwise. */
+    bankName: text('bank_name').notNull(),
+    /**
+     * Whose name the account is in, when that is a person.
+     *
+     * Exactly one of this and `holderName` is set, enforced below. An account
+     * belonging to an LLC or a trust has no actor to point at - actors are the
+     * household's people - and inventing one would put a company in the People
+     * list. An account in a person's name must not be a loose string that
+     * drifts from how they are spelled everywhere else. So: both, and a check
+     * that refuses neither and refuses both.
+     */
+    holderActorId: uuid('holder_actor_id').references(() => actors.id, {
+      onDelete: 'restrict',
+    }),
+    /** Whose name the account is in, when that is a business or a trust. */
+    holderName: text('holder_name'),
+    /** "Joint savings", "Operating" - tells two accounts at one bank apart. */
+    label: text('label'),
+    isArchived: boolean('is_archived').notNull().default(false),
+    createdAt,
+    updatedAt,
+  },
+  (t) => [
+    check('bank_accounts_bank_present', sql`length(btrim(${t.bankName})) > 0`),
+    check(
+      'bank_accounts_holder_one_of',
+      sql`(${t.holderActorId} IS NOT NULL) <> (${t.holderName} IS NOT NULL)`,
+    ),
+    // A table constraint rather than a unique index, because only the
+    // constraint builder carries NULLS NOT DISTINCT - and without it the holder
+    // columns and the label, all null by design, would let the same account be
+    // added twice with the uniqueness never firing.
+    unique('bank_accounts_identity')
+      .on(t.bankName, t.holderActorId, t.holderName, t.label)
+      .nullsNotDistinct(),
+  ],
+);
+
+export const interestYears = pgTable(
+  'interest_years',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    bankAccountId: uuid('bank_account_id')
+      .notNull()
+      .references(() => bankAccounts.id, { onDelete: 'cascade' }),
+    taxYear: bigint('tax_year', { mode: 'number' }).notNull(),
+    /** Who transcribed it. Nothing exists without an attributed actor. */
+    actorId: uuid('actor_id')
+      .notNull()
+      .references(() => actors.id, { onDelete: 'restrict' }),
+    interestCents: bigint('interest_cents', { mode: 'number' }).notNull(), // box 1
+    earlyWithdrawalPenaltyCents: bigint('early_withdrawal_penalty_cents', {
+      mode: 'number',
+    }), // box 2
+    savingsBondInterestCents: bigint('savings_bond_interest_cents', { mode: 'number' }), // box 3
+    federalTaxWithheldCents: bigint('federal_tax_withheld_cents', { mode: 'number' }), // box 4
+    taxExemptInterestCents: bigint('tax_exempt_interest_cents', { mode: 'number' }), // box 8
+    /** Validated against DOCUMENT_SOURCES in @rental/domain. */
+    documentSource: text('document_source'),
+    /** "No 1099-INT issued; figure from the December statement." */
+    documentNote: text('document_note'),
+    createdAt,
+    updatedAt,
+  },
+  (t) => [
+    // The upsert target. Retyping a mistyped box 1 is the second half of the
+    // same task, not a new record.
+    uniqueIndex('interest_years_account_year').on(t.bankAccountId, t.taxYear),
+    index('interest_years_tax_year_idx').on(t.taxYear),
+    check('interest_years_interest_non_negative', sql`${t.interestCents} >= 0`),
+    check(
+      'interest_years_penalty_non_negative',
+      sql`${t.earlyWithdrawalPenaltyCents} IS NULL OR ${t.earlyWithdrawalPenaltyCents} >= 0`,
+    ),
+    check(
+      'interest_years_savings_bond_non_negative',
+      sql`${t.savingsBondInterestCents} IS NULL OR ${t.savingsBondInterestCents} >= 0`,
+    ),
+    check(
+      'interest_years_withheld_non_negative',
+      sql`${t.federalTaxWithheldCents} IS NULL OR ${t.federalTaxWithheldCents} >= 0`,
+    ),
+    check(
+      'interest_years_tax_exempt_non_negative',
+      sql`${t.taxExemptInterestCents} IS NULL OR ${t.taxExemptInterestCents} >= 0`,
+    ),
+  ],
+);
+
 // --- Rent received against rent reported ------------------------------------
 // Three figures describe one year of rent and they never agree: what landed in
 // the bank, what the 1099-MISC reported, and what the leases called for. The
@@ -842,6 +949,8 @@ export type PropertyLoanYear = typeof propertyLoanYears.$inferSelect;
 export type RentReconciliation = typeof rentReconciliations.$inferSelect;
 export type RentReconciliationItem = typeof rentReconciliationItems.$inferSelect;
 export type CpaFigure = typeof cpaFigures.$inferSelect;
+export type BankAccount = typeof bankAccounts.$inferSelect;
+export type InterestYear = typeof interestYears.$inferSelect;
 
 export type NewTimeEntry = typeof timeEntries.$inferInsert;
 export type NewExpense = typeof expenses.$inferInsert;
@@ -852,3 +961,5 @@ export type NewExpensePayment = typeof expensePayments.$inferInsert;
 export type NewPropertyLoanYear = typeof propertyLoanYears.$inferInsert;
 export type NewRentReconciliation = typeof rentReconciliations.$inferInsert;
 export type NewCpaFigure = typeof cpaFigures.$inferInsert;
+export type NewBankAccount = typeof bankAccounts.$inferInsert;
+export type NewInterestYear = typeof interestYears.$inferInsert;

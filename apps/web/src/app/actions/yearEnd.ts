@@ -4,10 +4,12 @@ import { revalidatePath } from 'next/cache';
 import {
   CPA_FIGURE_KINDS,
   DOCUMENT_SOURCES,
+  INTEREST_SOURCES,
   parseAmountToCents,
   RECONCILIATION_KINDS,
   type CpaFigureKind,
   type DocumentSource,
+  type InterestSource,
   type ReconciliationKind,
 } from '@rental/domain';
 import { requireUser } from '@/lib/session';
@@ -19,17 +21,27 @@ import {
   upsertReconciliation,
 } from '@/server/services/reconciliation';
 import { deleteCpaFigure, upsertCpaFigure } from '@/server/services/cpaFigures';
+import {
+  archiveBankAccount,
+  createBankAccount,
+  deleteInterestYear,
+  updateBankAccount,
+  upsertInterestYear,
+} from '@/server/services/interest';
 import { confirmPayment } from '@/server/services/payments';
 import type { FormState } from './formState';
 
 /**
  * The January sitting.
  *
- * Four jobs that all happen in the same week once a year: transcribing the
+ * The jobs that all happen in the same week once a year: transcribing the
  * 1098s, squaring the rent against the 1099, saying which scheduled payments
- * actually went out, and typing in what the CPA sent back. They live on one
- * screen because they are one task, and they live in one actions file for the
- * same reason.
+ * actually went out, typing in what the CPA sent back, and transcribing the
+ * 1099-INTs. They live in one actions file because they are one task.
+ *
+ * The interest actions are the odd ones out - that income has nothing to do
+ * with the rental and lands on Schedule B - but they arrive in the same post,
+ * in the same week, and splitting them off would only mean two places to look.
  *
  * Nothing here computes a tax figure. Every number is copied off a document.
  */
@@ -207,6 +219,128 @@ export async function deleteCpaFigureAction(id: string): Promise<void> {
   revalidateYearEnd();
 }
 
+// --- Interest income --------------------------------------------------------
+// The one thing on this screen that is not about the rental. Interest belongs
+// on Schedule B, never on Schedule E, and it is captured here because January
+// is when the forms arrive and the hand-off is one hand-off.
+
+/**
+ * A bank account, created or corrected.
+ *
+ * The holder is one answer given two ways. `holderKind` picks which of the two
+ * controls the form actually meant, so an abandoned business name left in the
+ * text box does not travel alongside the person who was chosen after it - the
+ * database refuses both at once, and being refused by a check constraint is a
+ * worse way to learn that than not sending it.
+ */
+export async function saveBankAccountAction(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  try {
+    await requireUser();
+
+    const isBusiness = str(formData, 'holderKind') === 'business';
+    const holderActorId = isBusiness ? null : str(formData, 'holderActorId') || null;
+    const holderName = isBusiness ? str(formData, 'holderName') || null : null;
+
+    if (!holderActorId && !holderName) {
+      return {
+        ok: false,
+        message: isBusiness
+          ? 'Whose name is the account in? Type the business or trust name.'
+          : 'Whose name is the account in? Pick a person, or switch to a business.',
+        fields: { holderActorId: 'Required' },
+      };
+    }
+
+    const payload = {
+      bankName: str(formData, 'bankName'),
+      holderActorId,
+      holderName,
+      label: str(formData, 'label') || null,
+    };
+
+    const id = str(formData, 'id');
+    if (id) {
+      await updateBankAccount({ ...payload, id });
+    } else {
+      await createBankAccount(payload);
+    }
+
+    revalidateYearEnd();
+    return { ok: true, saved: `Saved ${payload.bankName}.` };
+  } catch (error) {
+    return asFormState(error);
+  }
+}
+
+export async function archiveBankAccountAction(id: string): Promise<void> {
+  await requireUser();
+  await archiveBankAccount(id);
+  revalidateYearEnd();
+}
+
+/** One 1099-INT, transcribed. Box 1 is required; the rest usually are blank. */
+export async function saveInterestYearAction(
+  _previous: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  try {
+    const user = await requireUser();
+    const money = new MoneyFields(formData);
+
+    // Box 1 is the figure the record exists for, so it is the one box that is
+    // required rather than optional - but it is still collected alongside the
+    // others so a form with two typos reports both.
+    const interestCents = money.optional('interest');
+    const payload = {
+      bankAccountId: str(formData, 'bankAccountId'),
+      taxYear: Number(str(formData, 'taxYear')),
+      actorId: user.actor.id,
+      earlyWithdrawalPenaltyCents: money.optional('earlyWithdrawalPenalty'),
+      savingsBondInterestCents: money.optional('savingsBondInterest'),
+      federalTaxWithheldCents: money.optional('federalTaxWithheld'),
+      taxExemptInterestCents: money.optional('taxExemptInterest'),
+      documentSource: interestSourceOf(str(formData, 'documentSource')),
+      documentNote: str(formData, 'documentNote') || null,
+    };
+
+    if (money.hasErrors) {
+      return { ok: false, message: money.summary, fields: money.errors };
+    }
+
+    if (!payload.bankAccountId) {
+      return {
+        ok: false,
+        message: 'Which account earned this?',
+        fields: { bankAccountId: 'Required' },
+      };
+    }
+
+    if (interestCents === null) {
+      return {
+        ok: false,
+        message: 'How much interest? A year with no figure is not a transcription.',
+        fields: { interest: 'Required' },
+      };
+    }
+
+    await upsertInterestYear({ ...payload, interestCents });
+
+    revalidateYearEnd();
+    return { ok: true, saved: 'Saved.' };
+  } catch (error) {
+    return asFormState(error);
+  }
+}
+
+export async function deleteInterestYearAction(id: string): Promise<void> {
+  await requireUser();
+  await deleteInterestYear(id);
+  revalidateYearEnd();
+}
+
 // --- Scheduled payments that actually went out ------------------------------
 
 /**
@@ -227,6 +361,7 @@ export async function confirmPaymentAction(id: string, paidDate?: string): Promi
 function revalidateYearEnd() {
   revalidatePath('/year-end');
   revalidatePath('/reports');
+  revalidatePath('/interest');
 }
 
 function asFormState(error: unknown): FormState {
@@ -273,6 +408,11 @@ function str(formData: FormData, key: string): string {
 
 function source(value: string): DocumentSource | null {
   return DOCUMENT_SOURCES.some((o) => o.id === value) ? (value as DocumentSource) : null;
+}
+
+/** Its own list: "December statement" is not an answer about a mortgage escrow. */
+function interestSourceOf(value: string): InterestSource | null {
+  return INTEREST_SOURCES.some((o) => o.id === value) ? (value as InterestSource) : null;
 }
 
 function reconciliationKind(value: string): ReconciliationKind {

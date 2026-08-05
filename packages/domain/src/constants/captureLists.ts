@@ -74,6 +74,36 @@ export const DOCUMENT_SOURCES: readonly PickList<DocumentSource>[] = [
 
 export const documentSource = lookup('document source', DOCUMENT_SOURCES);
 
+// --- Where an interest figure was found -------------------------------------
+// A separate list rather than more ids on DOCUMENT_SOURCES, because that list
+// is offered on the Form 1098 screen and "December statement" is not an answer
+// to where a mortgage escrow figure came from. A bank under the $10 reporting
+// threshold issues no 1099-INT at all and the interest is still income, so
+// "no form issued" has to be a recordable answer rather than a blank.
+
+export type InterestSource = 'form_1099_int' | 'bank_statement' | 'no_form_issued' | 'not_found';
+
+export const INTEREST_SOURCES: readonly PickList<InterestSource>[] = [
+  { id: 'form_1099_int', label: 'Form 1099-INT', helper: 'Printed in one of the numbered boxes.' },
+  {
+    id: 'bank_statement',
+    label: 'Bank statement',
+    helper: 'The December or year-to-date statement.',
+  },
+  {
+    id: 'no_form_issued',
+    label: 'No form issued',
+    helper: 'Under the $10 threshold. Still income, still reportable.',
+  },
+  {
+    id: 'not_found',
+    label: 'Not found yet',
+    helper: 'Recorded as missing so it is chased rather than assumed to be zero.',
+  },
+] as const;
+
+export const interestSource = lookup('interest source', INTEREST_SOURCES);
+
 // --- How a payment was made (§3.3) -----------------------------------------
 
 export type PaymentMethod = 'card' | 'check' | 'ach' | 'cash' | 'escrow' | 'other';

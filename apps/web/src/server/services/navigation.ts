@@ -4,6 +4,7 @@ import { getDb } from '@/db/client';
 import {
   actors,
   expenses,
+  interestYears,
   jobs,
   properties,
   rentReceipts,
@@ -30,6 +31,7 @@ export interface RailCountsResult {
   properties: number;
   jobs: number;
   people: number;
+  interest: number;
   reports: number;
 }
 
@@ -44,6 +46,11 @@ export interface RailCountsResult {
  *
  * Returns null on an empty database, where the current year is the only
  * sensible answer.
+ *
+ * Interest years are deliberately not in the union. They carry a tax year
+ * rather than a date, and a household that has typed in a 1099-INT and nothing
+ * else has not started using the app for that year - opening on it would show
+ * an empty rental ledger.
  */
 export async function latestYearWithData(): Promise<number | null> {
   const db = getDb();
@@ -79,7 +86,7 @@ export async function railCounts(
   // here would only be hiding that the query is table-specific anyway.
   const count = sql<number>`count(*)::int`;
 
-  const [expenseRow, incomeRow, timeRow, tripRow, propertyRow, jobRow, peopleRow] =
+  const [expenseRow, incomeRow, timeRow, tripRow, propertyRow, jobRow, peopleRow, interestRow] =
     await Promise.all([
       db
         .select({ c: count })
@@ -106,6 +113,12 @@ export async function railCounts(
         .select({ c: count })
         .from(actors)
         .where(eq(actors.isArchived, false)),
+      // The one count keyed on a tax year rather than filtered by a date:
+      // a 1099-INT is a fact about a year, not something that happened on a day.
+      db
+        .select({ c: count })
+        .from(interestYears)
+        .where(eq(interestYears.taxYear, taxYear)),
     ]);
 
   return {
@@ -116,6 +129,7 @@ export async function railCounts(
     properties: propertyRow[0]?.c ?? 0,
     jobs: jobRow[0]?.c ?? 0,
     people: peopleRow[0]?.c ?? 0,
+    interest: interestRow[0]?.c ?? 0,
     reports: reportCount,
   };
 }

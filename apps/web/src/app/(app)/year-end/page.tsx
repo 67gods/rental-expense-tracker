@@ -10,6 +10,11 @@ import { listLoanYears } from '@/server/services/loanYears';
 import { reconciliationsForYear } from '@/server/services/reconciliation';
 import { scheduledPayments } from '@/server/services/payments';
 import { listCpaFigures } from '@/server/services/cpaFigures';
+import {
+  interestTotalsForYear,
+  listBankAccounts,
+  listInterestYears,
+} from '@/server/services/interest';
 import { listActors, listProperties } from '@/server/services/reference';
 import { LoanYearForm } from '@/components/LoanYearForm';
 import { ReconciliationPanel } from '@/components/ReconciliationPanel';
@@ -25,10 +30,15 @@ export const metadata = { title: 'Year-end' };
 /**
  * The January sitting.
  *
- * Four jobs on one page, because they are one task done in one week: transcribe
- * the 1098s, square the rent against the 1099, say which scheduled payments
- * actually went out, and type in what the CPA sent back. Four routes would be
- * four things to remember eleven months after the last time.
+ * One page, because it is one task done in one week: transcribe the 1098s,
+ * square the rent against the 1099, say which scheduled payments actually went
+ * out, type in what the CPA sent back, and account for the 1099-INTs. Five
+ * routes would be five things to remember eleven months after the last time.
+ *
+ * The interest block is the odd one out - that income has nothing to do with
+ * the rental and never touches Schedule E - and it says so where it sits. It is
+ * here because the forms arrive in the same post, and the editing itself lives
+ * on its own screen rather than lengthening this one.
  *
  * Nothing on this page is computed for you. Every figure is copied off a
  * document, and the one number the app does work out - the unexplained residual
@@ -47,14 +57,29 @@ export default async function YearEndPage({
       ? requested
       : user.taxYear;
 
-  const [properties, actors, loanYears, reconciliations, scheduled, figures] = await Promise.all([
+  const [
+    properties,
+    actors,
+    loanYears,
+    reconciliations,
+    scheduled,
+    figures,
+    bankAccounts,
+    interestRows,
+    interestTotals,
+  ] = await Promise.all([
     listProperties(),
     listActors(),
     listLoanYears({ taxYear }),
     reconciliationsForYear(taxYear),
     scheduledPayments(),
     listCpaFigures({ taxYear }),
+    listBankAccounts(),
+    listInterestYears({ taxYear }),
+    interestTotalsForYear(taxYear),
   ]);
+
+  const interestByAccount = new Map(interestRows.map((row) => [row.bankAccountId, row]));
 
   const propertyOptions = properties.map((p) => ({ id: p.id, label: p.nickname }));
   const propertyNames = new Map(properties.map((p) => [p.id, p.nickname]));
@@ -386,6 +411,59 @@ export default async function YearEndPage({
               <CpaFigureForm taxYear={taxYear} properties={propertyOptions} />
             </div>
           </details>
+        </section>
+
+        {/* 5 --------------------------------------------------------------- */}
+        <section>
+          <h2 className="section-title mb-2">Interest income · from the 1099-INTs</h2>
+          <p className="hint mb-2">
+            Not rental income. Interest on a personal or business account belongs on
+            Schedule B, and none of it reaches Schedule E — it is listed here because the
+            forms arrive in the same post as the rest.
+          </p>
+
+          {bankAccounts.length > 0 ? (
+            <div className="tablebox">
+              {bankAccounts.map((account) => {
+                const row = interestByAccount.get(account.id);
+                return (
+                  <div key={account.id} className="kv">
+                    <div>
+                      <p className="rowtitle">
+                        {account.bankName}
+                        {account.label ? ` · ${account.label}` : ''}
+                      </p>
+                      <p className="hint">In the name of {account.holderLabel}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {row ? (
+                        <span className="num text-sm font-semibold">
+                          {formatCents(row.interestCents)}
+                        </span>
+                      ) : (
+                        <span className="tag tag-warn">Not entered yet</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              <div className="kv">
+                <p className="rowtitle">Total interest in {taxYear}</p>
+                <span className="num text-sm font-semibold">
+                  {formatCents(interestTotals.interestCents)}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <p className="panel panel-body hint">
+              No accounts on file. A savings account paying under $10 issues no 1099-INT and
+              the interest is still income, so the account is worth adding either way.
+            </p>
+          )}
+
+          <Link href={`/interest?year=${taxYear}`} className="btn mt-2">
+            Enter the 1099-INTs
+          </Link>
         </section>
 
         <Link href="/reports" className="btn btn-block">
