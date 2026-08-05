@@ -15,11 +15,24 @@ type Status = 'idle' | 'uploading' | 'done' | 'error';
  * through a serverless function to reach a bucket adds a timeout risk and buys
  * nothing.
  */
-export function ReceiptUpload({ name = 'receiptKey' }: { name?: string }) {
-  const [status, setStatus] = useState<Status>('idle');
-  const [key, setKey] = useState('');
+export function ReceiptUpload({
+  name = 'receiptKey',
+  /**
+   * The key already on the record, when editing.
+   *
+   * It has to round-trip through the form. Without it the field posts an empty
+   * string, and an edit that never touched the receipt would detach the one
+   * already attached.
+   */
+  defaultKey = null,
+}: {
+  name?: string;
+  defaultKey?: string | null;
+}) {
+  const [status, setStatus] = useState<Status>(defaultKey ? 'done' : 'idle');
+  const [key, setKey] = useState(defaultKey ?? '');
   const [error, setError] = useState<string | null>(null);
-  const [filename, setFilename] = useState('');
+  const [filename, setFilename] = useState(defaultKey ? basename(defaultKey) : '');
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function upload(file: File) {
@@ -28,15 +41,20 @@ export function ReceiptUpload({ name = 'receiptKey' }: { name?: string }) {
     setFilename(file.name);
 
     try {
-      const presignResponse = await fetch('/api/v1/receipts/presign', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contentType: file.type || 'application/octet-stream',
-          sizeBytes: file.size,
-          filename: file.name,
-        }),
-      });
+      let presignResponse: Response;
+      try {
+        presignResponse = await fetch('/api/v1/receipts/presign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contentType: file.type || 'application/octet-stream',
+            sizeBytes: file.size,
+            filename: file.name,
+          }),
+        });
+      } catch {
+        throw new Error('Could not reach the app to prepare the upload. Check your connection.');
+      }
 
       const presign = (await presignResponse.json()) as {
         uploadUrl?: string;
@@ -48,11 +66,33 @@ export function ReceiptUpload({ name = 'receiptKey' }: { name?: string }) {
         throw new Error(presign.message ?? 'Could not prepare the upload.');
       }
 
-      const putResponse = await fetch(presign.uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': file.type || 'application/octet-stream' },
-        body: file,
-      });
+      let putResponse: Response;
+      try {
+        putResponse = await fetch(presign.uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': file.type || 'application/octet-stream' },
+          body: file,
+        });
+      } catch {
+        /**
+         * A rejected fetch here is a network-level failure, and the browser
+         * will not say why - a blocked cross-origin PUT and a dropped signal
+         * are the same TypeError. Raw, it reads "Failed to fetch", which sends
+         * you looking at the app when the app is fine: the presign above
+         * already succeeded, so the credentials and the bucket name are right.
+         *
+         * The overwhelmingly likely cause is the bucket's CORS rule not
+         * listing the origin you are browsing from - which is easy to hit from
+         * a phone on the LAN, where the origin is an IP rather than localhost.
+         * So the message names the origin, because that is the exact string
+         * that has to be pasted into the rule.
+         */
+        throw new Error(
+          `The upload to storage was blocked before it started. If you have signal, ` +
+            `the receipt bucket's CORS rule needs to allow ${window.location.origin} ` +
+            `(see infra/aws/README.md).`,
+        );
+      }
 
       if (!putResponse.ok) {
         throw new Error('The image did not finish uploading. Check your signal and try again.');
@@ -100,7 +140,7 @@ export function ReceiptUpload({ name = 'receiptKey' }: { name?: string }) {
         {status === 'done' ? (
           <>
             <span className="tag tag-pos">Attached</span> {filename}{' '}
-            <button type="button" className="underline underline-offset-2" onClick={clear}>
+            <button type="button" className="linkbtn" onClick={clear}>
               Remove
             </button>
           </>
@@ -114,4 +154,9 @@ export function ReceiptUpload({ name = 'receiptKey' }: { name?: string }) {
       ) : null}
     </div>
   );
+}
+
+/** The stored key is a path; only its last segment is worth showing. */
+function basename(key: string): string {
+  return key.split('/').pop() || key;
 }

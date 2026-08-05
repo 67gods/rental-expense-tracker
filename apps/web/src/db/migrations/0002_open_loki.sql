@@ -1,0 +1,1 @@
+ALTER TABLE "expenses" DROP CONSTRAINT "expenses_property_or_allocation";

@@ -181,6 +181,22 @@ export function describeAllocationRule(
   }
 }
 
+/**
+ * True once an expense has neither a property nor a split rule - a
+ * portfolio-wide expense logged before anyone decided how to divide it (§6).
+ *
+ * It cannot be placed on Schedule E, which is filed per property, so callers
+ * building the ledger exclude it rather than calling `allocateExpense` and
+ * hitting `AllocationError`. It surfaces instead as a review item, the same
+ * way an unanswered repair-or-improvement question does.
+ */
+export function needsPropertyOrSplit(
+  propertyId: string | null | undefined,
+  allocationRule: AllocationRule | null | undefined,
+): boolean {
+  return propertyId == null && allocationRule == null;
+}
+
 /** Every property an expense touches, whether directly or through a split. */
 export function propertiesTouchedBy(
   rule: AllocationRule | null | undefined,

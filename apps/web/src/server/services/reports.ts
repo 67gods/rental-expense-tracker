@@ -8,6 +8,7 @@ import {
   getHourCategory,
   getScheduleECategory,
   listScheduleECategories,
+  needsPropertyOrSplit,
   RECONCILIATION_KINDS,
   rollUpHours,
   SCHEDULE_E_RENTS_RECEIVED_LINE,
@@ -239,6 +240,11 @@ async function ledgerLinesFor(
   for (const [expenseId, paidCents] of paidByExpense) {
     const expense = expenses.get(expenseId);
     if (!expense || paidCents === 0) continue;
+    // No property and no split yet - it's a review item (§6), not
+    // Schedule E-ready. Counted once it is resolved, not before.
+    if (needsPropertyOrSplit(expense.propertyId, expense.allocationRule as AllocationRule | null)) {
+      continue;
+    }
 
     const lines = allocateExpense(
       paidCents,
@@ -557,7 +563,12 @@ export async function expenseDetailCsv(taxYear: number): Promise<string> {
     { header: 'Category', value: (e) => safeScheduleELabel(e.scheduleECategory) },
     {
       header: 'Property',
-      value: (e) => (e.propertyId ? propertyNames.get(e.propertyId) ?? '' : 'Split'),
+      value: (e) =>
+        e.propertyId
+          ? propertyNames.get(e.propertyId) ?? ''
+          : needsPropertyOrSplit(e.propertyId, e.allocationRule as AllocationRule | null)
+            ? 'Portfolio-wide (unresolved)'
+            : 'Split',
     },
     {
       header: 'Repair or improvement',
@@ -622,8 +633,12 @@ export async function paymentsCsv(taxYear: number): Promise<string> {
     {
       header: 'Property',
       value: (p) => {
-        const propertyId = expenses.get(p.expenseId)?.propertyId;
-        return propertyId ? (propertyNames.get(propertyId) ?? '') : 'Split';
+        const expense = expenses.get(p.expenseId);
+        if (!expense) return '';
+        if (expense.propertyId) return propertyNames.get(expense.propertyId) ?? '';
+        return needsPropertyOrSplit(expense.propertyId, expense.allocationRule as AllocationRule | null)
+          ? 'Portfolio-wide (unresolved)'
+          : 'Split';
       },
     },
     {

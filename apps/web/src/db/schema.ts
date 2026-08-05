@@ -402,7 +402,11 @@ export const expenses = pgTable(
     actorId: uuid('actor_id')
       .notNull()
       .references(() => actors.id, { onDelete: 'restrict' }),
-    /** Null only when the cost is split across properties (§6). */
+    /**
+     * Null when the cost is split across properties (§6), or when it is
+     * portfolio-wide and not yet resolved to a property or a split - a real,
+     * reviewable state rather than an omission. See needsPropertyOrSplit.
+     */
     propertyId: uuid('property_id').references(() => properties.id, {
       onDelete: 'set null',
     }),
@@ -448,12 +452,6 @@ export const expenses = pgTable(
     index('expenses_job_idx').on(t.jobId),
     check('expenses_amount_non_negative', sql`${t.amountCents} >= 0`),
     check('expenses_vendor_present', sql`length(btrim(${t.vendor})) > 0`),
-    // An expense belongs to a property, or it carries a rule saying how it is
-    // shared between several. Neither is not a valid state.
-    check(
-      'expenses_property_or_allocation',
-      sql`${t.propertyId} IS NOT NULL OR ${t.allocationRule} IS NOT NULL`,
-    ),
   ],
 );
 

@@ -8,7 +8,6 @@ import { REPORTS } from '@/server/services/reports';
 import { RailFrame } from '@/components/ui/RailFrame';
 import { SignOutButton } from '@/components/SignOutButton';
 import { TimerBar } from '@/components/TimerBar';
-import { yearChoices } from '@/lib/year';
 
 /**
  * The signed-in shell.
@@ -49,6 +48,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <Suspense fallback={<div className="rail" />}>
         <RailFrame
           taxYear={user.taxYear}
+          calendarYear={user.calendarYear}
           counts={counts}
           who={`${user.actor.name} · ${user.enterprise.name}`}
           footer={<SignOutButton />}

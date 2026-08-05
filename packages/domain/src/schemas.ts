@@ -168,26 +168,24 @@ export const allocationRuleSchema = z.discriminatedUnion('type', [
   }),
 ]);
 
-export const createExpenseSchema = z
-  .object({
-    date: isoDate,
-    actorId: uuid,
-    propertyId: uuid.nullable().optional().default(null),
-    turnId: uuid.nullable().optional().default(null),
-    amountCents,
-    vendor: requiredText('A vendor', 200),
-    scheduleECategory: scheduleECategorySchema,
-    capitalClassification: capitalClassificationSchema.nullable().optional().default(null),
-    classificationAnswers: z.record(z.unknown()).nullable().optional().default(null),
-    contractorActorId: uuid.nullable().optional().default(null),
-    receiptKey: z.string().max(500).nullable().optional().default(null),
-    notes: optionalText(),
-    allocationRule: allocationRuleSchema.nullable().optional().default(null),
-  })
-  .refine((v) => v.propertyId != null || v.allocationRule != null, {
-    message: 'Pick a property, or set up a split across several.',
-    path: ['propertyId'],
-  });
+export const createExpenseSchema = z.object({
+  date: isoDate,
+  actorId: uuid,
+  // Null with no allocationRule is a real state, not an omission: a
+  // portfolio-wide expense with no split yet (§6). It stays off Schedule E -
+  // see needsPropertyOrSplit - until a property or a split is set.
+  propertyId: uuid.nullable().optional().default(null),
+  turnId: uuid.nullable().optional().default(null),
+  amountCents,
+  vendor: requiredText('A vendor', 200),
+  scheduleECategory: scheduleECategorySchema,
+  capitalClassification: capitalClassificationSchema.nullable().optional().default(null),
+  classificationAnswers: z.record(z.unknown()).nullable().optional().default(null),
+  contractorActorId: uuid.nullable().optional().default(null),
+  receiptKey: z.string().max(500).nullable().optional().default(null),
+  notes: optionalText(),
+  allocationRule: allocationRuleSchema.nullable().optional().default(null),
+});
 export type CreateExpenseInput = z.input<typeof createExpenseSchema>;
 
 export const updateExpenseSchema = z.object({

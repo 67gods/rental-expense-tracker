@@ -7,7 +7,7 @@ import {
   type ContractorYearTotal,
   type SafeHarborProgress,
 } from '@rental/domain';
-import { countNeedsReview, listExpenses } from './expenses';
+import { countMissingProperty, countNeedsReview, listExpenses } from './expenses';
 import { countProvisionalEntries, listTimeEntries } from './timeEntries';
 import { excludedPropertyIds, listContractors, listRentReceipts } from './reference';
 
@@ -21,6 +21,8 @@ export interface DashboardData {
   ytdExpenseCents: number;
   ytdIncomeCents: number;
   needsReviewCount: number;
+  /** Paid, but with no property and no split - so absent from Schedule E (§6). */
+  missingPropertyCount: number;
   provisionalCount: number;
   w9Warnings: ContractorWarning[];
   contractorTotals: ContractorYearTotal[];
@@ -70,8 +72,9 @@ export async function getDashboardData(
     taxYear,
   );
 
-  const [needsReviewCount, provisionalCount] = await Promise.all([
+  const [needsReviewCount, missingPropertyCount, provisionalCount] = await Promise.all([
     countNeedsReview(taxYear),
+    countMissingProperty(taxYear),
     countProvisionalEntries(enterpriseId, taxYear),
   ]);
 
@@ -80,6 +83,7 @@ export async function getDashboardData(
     ytdExpenseCents: sumCents(expenseRows.map((e) => e.amountCents)),
     ytdIncomeCents: sumCents(rentRows.map((r) => r.amountCents)),
     needsReviewCount,
+    missingPropertyCount,
     provisionalCount,
     w9Warnings: contractorW9Warnings(contractorTotals, asOf, taxYear),
     contractorTotals,

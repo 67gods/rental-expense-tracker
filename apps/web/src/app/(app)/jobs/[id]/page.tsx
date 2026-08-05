@@ -8,10 +8,11 @@ import {
   getScheduleECategory,
 } from '@rental/domain';
 import { requireUser } from '@/lib/session';
-import { getJobWithChildren } from '@/server/services/jobs';
+import { getJobWithChildren, listLinkableRecords } from '@/server/services/jobs';
 import { listProperties } from '@/server/services/reference';
 import { NotFoundError } from '@/server/errors';
 import { AddToJob } from '@/components/AddRelated';
+import { LinkExistingToJob } from '@/components/LinkExistingToJob';
 import { DeleteButton } from '@/components/DeleteButton';
 import { deleteJobAction, removeFromJobAction } from '@/app/actions/jobs';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -50,7 +51,7 @@ export default async function JobPage({
     throw error;
   }
 
-  const properties = await listProperties();
+  const [properties, linkable] = await Promise.all([listProperties(), listLinkableRecords()]);
   const propertyNames = new Map(properties.map((p) => [p.id, p.nickname]));
   const { rollup } = job;
 
@@ -80,13 +81,24 @@ export default async function JobPage({
           · {rollup.recordCount} {rollup.recordCount === 1 ? 'record' : 'records'}
         </p>
 
+        {/* Two ways in, because an errand is grouped at two different moments.
+            Capture something new into the job while it is happening, or attach
+            what is already logged once you notice it was all one thing. */}
         <div className="panel panel-body">
-          <p className="rowtitle">Add to this job</p>
+          <p className="rowtitle">Log something new into this job</p>
           <p className="hint">Opens the ordinary form with the job carried across.</p>
           <div className="mt-3">
             <AddToJob jobId={job.job.id} />
           </div>
         </div>
+
+        <LinkExistingToJob
+          jobId={job.job.id}
+          timeEntries={linkable.timeEntries}
+          trips={linkable.trips}
+          expenses={linkable.expenses}
+          truncated={linkable.truncated}
+        />
 
         {/* ------------------------------------------------------------- */}
         <section>

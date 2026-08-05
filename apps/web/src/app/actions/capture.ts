@@ -11,7 +11,7 @@ import {
 import type { DestinationKind } from '@rental/domain';
 import { requireUser } from '@/lib/session';
 import { toErrorPayload } from '@/server/errors';
-import { createExpense, deleteExpense } from '@/server/services/expenses';
+import { createExpense, deleteExpense, updateExpense } from '@/server/services/expenses';
 import { createTrip, deleteTrip } from '@/server/services/trips';
 import { createRentReceipt, deleteRentReceipt } from '@/server/services/reference';
 import type { FormState } from './formState';
@@ -26,6 +26,17 @@ const DESTINATION_KINDS: readonly DestinationKind[] = [
   'other',
 ];
 
+/** §5.3. The empty string is the fourth option - "not answered" - not a miss. */
+const CAPITAL_CLASSIFICATIONS = ['repair', 'improvement', 'needs_review'] as const;
+type CapitalClassification = (typeof CAPITAL_CLASSIFICATIONS)[number];
+
+/**
+ * Logs a new expense, or saves a correction to one.
+ *
+ * One action for both, keyed on a hidden id, so the two paths cannot disagree
+ * about what a valid expense is. The shape follows saveTimeEntryAction, which
+ * had the same problem first.
+ */
 export async function saveExpenseAction(
   _previous: FormState,
   formData: FormData,
@@ -34,6 +45,7 @@ export async function saveExpenseAction(
 
   try {
     const user = await requireUser();
+    const id = str(formData, 'id');
 
     const scheduleECategory = str(formData, 'scheduleECategory');
     if (!isScheduleECategoryId(scheduleECategory)) {
@@ -59,24 +71,45 @@ export async function saveExpenseAction(
 
     const jobId = str(formData, 'jobId') || null;
 
-    const expense = await createExpense(
-      {
-        date: str(formData, 'date') || todayInZone(user.timeZone),
-        actorId: str(formData, 'actorId') || user.actor.id,
-        propertyId: str(formData, 'propertyId') || null,
-        amountCents,
-        vendor: str(formData, 'vendor'),
-        scheduleECategory,
-        contractorActorId: str(formData, 'contractorActorId') || null,
-        receiptKey: str(formData, 'receiptKey') || null,
-        notes: str(formData, 'notes') || null,
-      },
-      { jobId },
-    );
+    const common = {
+      date: str(formData, 'date') || todayInZone(user.timeZone),
+      actorId: str(formData, 'actorId') || user.actor.id,
+      amountCents,
+      vendor: str(formData, 'vendor'),
+      scheduleECategory,
+      contractorActorId: str(formData, 'contractorActorId') || null,
+      receiptKey: str(formData, 'receiptKey') || null,
+      notes: str(formData, 'notes') || null,
+    };
 
-    revalidatePath('/');
-    revalidatePath('/entries');
-    destination = afterSave('expense', expense.id, jobId);
+    if (id) {
+      // The field is ABSENT when the form is a split expense's - there is no
+      // UI for editing the rule, so ExpenseForm never renders the picker and
+      // updateExpense reads undefined as "leave it". Present-but-empty is a
+      // real choice: Portfolio-wide, which is now a value (§6), not a gap.
+      const propertyId = str(formData, 'propertyId');
+
+      await updateExpense({
+        ...common,
+        id,
+        capitalClassification: capitalClassification(formData),
+        ...(formData.has('propertyId') ? { propertyId: propertyId || null } : {}),
+      });
+
+      revalidatePath('/');
+      revalidatePath('/entries');
+      revalidatePath(`/entries/expense/${id}`);
+      destination = str(formData, 'returnTo') || `/entries/expense/${id}?saved=1`;
+    } else {
+      const expense = await createExpense(
+        { ...common, propertyId: str(formData, 'propertyId') || null },
+        { jobId },
+      );
+
+      revalidatePath('/');
+      revalidatePath('/entries');
+      destination = afterSave('expense', expense.id, jobId);
+    }
   } catch (error) {
     const payload = toErrorPayload(error);
     return { ok: false, message: payload.message, fields: payload.fields };
@@ -244,6 +277,20 @@ function afterSave(kind: 'expense' | 'trip' | 'time', recordId: string, jobId: s
 function str(formData: FormData, key: string): string {
   const value = formData.get(key);
   return typeof value === 'string' ? value.trim() : '';
+}
+
+/**
+ * The §5.3 answer, narrowed here rather than asserted.
+ *
+ * Null is a real answer - "not answered yet" - and has to be distinguishable
+ * from an absent field, because clearing an improvement set by mistake is the
+ * whole reason the option is offered.
+ */
+function capitalClassification(formData: FormData): CapitalClassification | null {
+  const value = str(formData, 'capitalClassification');
+  return (CAPITAL_CLASSIFICATIONS as readonly string[]).includes(value)
+    ? (value as CapitalClassification)
+    : null;
 }
 
 function numberOrNull(value: string): number | null {

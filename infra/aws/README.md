@@ -36,21 +36,36 @@ Block Public Access stays **on**. These are tax records. The app serves them
 through signed URLs that expire in an hour, which is an access model; a
 hard-to-guess public URL is not.
 
-## Adding the Vercel URL later
+## The origin list is the thing that breaks
 
-`s3-cors.json` currently allows only `http://localhost:4000`, which is where
-the app runs in development. Local uploads work as soon as the bucket exists.
+`s3-cors.json` ships allowing `http://localhost:4000` and `http://127.0.0.1:4000`,
+which is where the app runs in development.
 
-Once deployed, add the Vercel origin alongside it and paste the rule again:
+**An origin must match exactly — scheme, host and port.** S3 does no
+normalising, so `127.0.0.1` is not `localhost`, `https` is not `http`, and port
+4000 is not port 3000. Anything not on the list is refused.
+
+The case that catches people is photographing a receipt **on a phone**. The
+form opens the rear camera, so it is the natural way to use the feature — but
+the phone reaches the dev server over the LAN, which makes the origin something
+like `http://192.168.1.42:4000`. That is not `localhost`, so the PUT is blocked
+even though the same upload works in the desktop browser.
+
+Add whichever origins you actually browse from, and paste the whole rule again:
 
 ```json
 "AllowedOrigins": [
   "http://localhost:4000",
+  "http://127.0.0.1:4000",
+  "http://192.168.1.42:4000",
   "https://your-app.vercel.app"
 ]
 ```
 
-Without that, uploads from production fail with a CORS error even though the
-credentials are perfectly valid — the presign succeeds and the browser blocks
-the PUT. Note that JSON allows no comments; a `//` line will make S3 reject
-the whole rule.
+The failure is asymmetric and worth recognising: the presign call succeeds, so
+the credentials, the region and the bucket name are all proven correct, and
+only then does the browser block the PUT. The app now reports the origin it is
+browsing from when this happens — paste that string into the list above.
+
+Note that JSON allows no comments; a `//` line will make S3 reject the whole
+rule.

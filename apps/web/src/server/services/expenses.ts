@@ -5,6 +5,7 @@ import {
   formatCents,
   getScheduleECategory,
   isBackdated,
+  needsPropertyOrSplit,
   taxYearRange,
   updateExpenseSchema,
   type AllocationLine,
@@ -17,6 +18,7 @@ import { expensePayments, expenses, properties, type Expense } from '@/db/schema
 import { env } from '@/env';
 import { NotFoundError, ValidationError } from '../errors';
 import { syncEligibilityForExpense } from './timeEntries';
+import { paidByExpenseInYear } from './payments';
 
 export interface ExpenseFilter {
   taxYear?: number;
@@ -322,6 +324,11 @@ export async function expensesByIds(ids: readonly string[]): Promise<Map<string,
  * The stored record is untouched; these are derived for reports and display.
  */
 export async function allocationLinesFor(expense: Expense): Promise<AllocationLine[]> {
+  // No property and no split yet - nothing to allocate until it is resolved (§6).
+  if (needsPropertyOrSplit(expense.propertyId, expense.allocationRule as AllocationRule | null)) {
+    return [];
+  }
+
   const db = getDb();
   const rows = await db
     .select({
@@ -367,4 +374,30 @@ export function requiresCapitalClassification(scheduleECategory: string): boolea
 export async function countNeedsReview(taxYear: number): Promise<number> {
   const rows = await listExpenses({ taxYear, needsReviewOnly: true, limit: 1000 });
   return rows.length;
+}
+
+/**
+ * Paid expenses that cannot reach Schedule E because nothing says which
+ * property they belong to (§6).
+ *
+ * STARTS FROM THE PAYMENTS, exactly as the ledger does, and not from
+ * `listExpenses({ taxYear })`. That filter reads the invoice date, so an
+ * invoice dated 2024 and settled in 2025 is absent from it - and that is
+ * precisely the expense the 2025 ledger silently dropped. Counting the
+ * invoices of the year would have left the cross-year case unwarned, which is
+ * the case this app exists to get right.
+ */
+export async function countMissingProperty(taxYear: number): Promise<number> {
+  const paidByExpense = await paidByExpenseInYear(taxYear);
+  const rows = await expensesByIds([...paidByExpense.keys()]);
+
+  let count = 0;
+  for (const [expenseId, paidCents] of paidByExpense) {
+    const expense = rows.get(expenseId);
+    if (!expense || paidCents === 0) continue;
+    if (needsPropertyOrSplit(expense.propertyId, expense.allocationRule as AllocationRule | null)) {
+      count += 1;
+    }
+  }
+  return count;
 }

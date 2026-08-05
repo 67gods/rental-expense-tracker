@@ -84,7 +84,10 @@ export async function groupIntoJobAction(
 
     revalidatePath('/entries');
     revalidatePath('/jobs');
-    return { ok: true, saved: `Grouped into "${job.title}".` };
+    // The job's own page too - when this runs from there, it IS the page being
+    // looked at, and revalidating '/jobs' does not reach '/jobs/[id]'.
+    revalidatePath(`/jobs/${job.id}`);
+    return { ok: true, saved: `Linked into "${job.title}".` };
   } catch (error) {
     const payload = toErrorPayload(error);
     return { ok: false, message: payload.message, fields: payload.fields };
@@ -123,6 +126,10 @@ export async function removeFromJobAction(
   });
   revalidatePath('/entries');
   revalidatePath('/jobs');
+  // Which job it left is not passed in, so every job page is revalidated. This
+  // is always called FROM one of them, and without it the row stayed on screen
+  // until a manual reload - the removal looked as though it had not worked.
+  revalidatePath('/jobs/[id]', 'page');
 }
 
 /**

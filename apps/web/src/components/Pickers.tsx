@@ -23,6 +23,7 @@ export function PropertyPicker({
   noneLabel = 'Portfolio-wide',
   label = 'Which property?',
   required = false,
+  onChange,
 }: {
   name?: string;
   options: Option[];
@@ -31,8 +32,15 @@ export function PropertyPicker({
   noneLabel?: string;
   label?: string;
   required?: boolean;
+  /** For a caller that needs to react to the live choice - most don't. */
+  onChange?: (value: string) => void;
 }) {
   const [selected, setSelected] = useState<string>(defaultValue ?? '');
+
+  function choose(value: string) {
+    setSelected(value);
+    onChange?.(value);
+  }
 
   return (
     <div className="field">
@@ -46,7 +54,7 @@ export function PropertyPicker({
           <button
             type="button"
             aria-pressed={selected === ''}
-            onClick={() => setSelected('')}
+            onClick={() => choose('')}
           >
             {noneLabel}
           </button>
@@ -56,7 +64,7 @@ export function PropertyPicker({
             key={option.id}
             type="button"
             aria-pressed={selected === option.id}
-            onClick={() => setSelected(option.id)}
+            onClick={() => choose(option.id)}
           >
             {option.label}
           </button>

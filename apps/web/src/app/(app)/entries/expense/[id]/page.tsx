@@ -5,7 +5,9 @@ import {
   formatCents,
   formatDateShort,
   getScheduleECategory,
+  needsPropertyOrSplit,
   taxYearOf,
+  type AllocationRule,
 } from '@rental/domain';
 import { requireUser } from '@/lib/session';
 import { getExpense } from '@/server/services/expenses';
@@ -31,10 +33,13 @@ export const metadata = { title: 'Expense' };
  */
 export default async function ExpenseDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ saved?: string }>;
 }) {
   const { id } = await params;
+  const { saved } = await searchParams;
   await requireUser();
 
   let expense;
@@ -62,6 +67,15 @@ export default async function ExpenseDetailPage({
   const contractor = expense.contractorActorId
     ? actors.find((actor) => actor.id === expense.contractorActorId)
     : null;
+  const unresolved = needsPropertyOrSplit(
+    expense.propertyId,
+    expense.allocationRule as AllocationRule | null,
+  );
+  const propertyLabel = property
+    ? property.nickname
+    : unresolved
+      ? 'Portfolio-wide'
+      : 'Split across properties';
 
   // A date comparison and a label, never a recommendation. What to do with an
   // acquisition-side cost is the CPA's call.
@@ -77,19 +91,28 @@ export default async function ExpenseDetailPage({
         title={expense.vendor}
         crumb={`${formatDateShort(expense.date)} · ${line.label}`}
         actions={
-          <Link className="btn" href={withYear('/entries?tab=expenses', taxYear)}>
-            Back to expenses
-          </Link>
+          <>
+            <Link className="btn" href={withYear('/entries?tab=expenses', taxYear)}>
+              Back to expenses
+            </Link>
+            <Link className="btn btn-primary" href={`/entries/expense/${id}/edit`}>
+              Edit
+            </Link>
+          </>
         }
       />
       <Well>
+        {saved ? (
+          <p className="note note-pos" role="status">
+            Expense saved.
+          </p>
+        ) : null}
         <div className="cols-detail">
           <div className="stack">
             <Panel title="Invoice">
               <div className="panel-figure">{formatCents(expense.amountCents)}</div>
               <p className="muted">
-                {property ? property.nickname : 'Split across properties'} ·{' '}
-                {line.line ? `Schedule E line ${line.line}` : line.label}
+                {propertyLabel} · {line.line ? `Schedule E line ${line.line}` : line.label}
               </p>
 
               <p className="mt-2.5 flex flex-wrap gap-1.5">
@@ -102,6 +125,7 @@ export default async function ExpenseDetailPage({
                 {expense.capitalClassification === 'needs_review' ? (
                   <Tag tone="warn">Needs review</Tag>
                 ) : null}
+                {unresolved ? <Tag tone="warn">Needs a property or split</Tag> : null}
                 <Tag tone={treatment.treatment === 'acquisition' ? 'capital' : 'muted'}>
                   {treatment.treatment === 'acquisition' ? 'Acquisition side' : 'Operating'}
                 </Tag>
@@ -140,13 +164,14 @@ export default async function ExpenseDetailPage({
                   {
                     key: 'property',
                     label: 'Property',
-                    value: property ? property.nickname : 'Split',
+                    value: propertyLabel,
+                    tone: unresolved ? 'warn' : undefined,
                   },
                   { key: 'line', label: 'Schedule E line', value: line.label },
                   {
                     key: 'class',
                     label: 'Repair or improvement',
-                    value: expense.capitalClassification ?? 'Not answered',
+                    value: CLASSIFICATION_LABELS[expense.capitalClassification ?? ''] ?? 'Not answered',
                     tone: expense.capitalClassification ? undefined : 'warn',
                   },
                   {
@@ -200,6 +225,13 @@ export default async function ExpenseDetailPage({
     </>
   );
 }
+
+/** The stored enum is not the word for it. `needs_review` is a database value. */
+const CLASSIFICATION_LABELS: Record<string, string> = {
+  repair: 'Repair',
+  improvement: 'Capital improvement',
+  needs_review: 'Waiting on the CPA',
+};
 
 function safeLine(id: string): { label: string; line: number | null } {
   try {
