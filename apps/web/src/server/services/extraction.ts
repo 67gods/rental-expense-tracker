@@ -54,6 +54,9 @@ export type ExtractionResult =
   | { status: 'not_receipt' }
   | { status: 'skipped'; reason: 'heic' | 'unsupported' | 'not_configured' | 'unreadable' };
 
+/** Just the yes/no, read before anything that depends on the answer. */
+const verdict = z.object({ isReceipt: z.boolean() });
+
 /**
  * Mirrors the JSON schema below.
  *
@@ -151,9 +154,19 @@ export async function extractReceipt(input: {
       .map((block) => block.text)
       .join('');
 
-    const parsed = responseSchema.safeParse(JSON.parse(text));
+    const payload: unknown = JSON.parse(text);
+
+    // Asked first, and on its own. When the answer is no, the rest of the
+    // object is placeholders the prompt asked for and nobody will read - so
+    // validating them here would turn "that is a photo of a wall" into "that
+    // could not be read", which sends somebody looking for a problem with
+    // their camera instead of with their choice of photo.
+    if (verdict.safeParse(payload).data?.isReceipt === false) {
+      return { status: 'not_receipt' };
+    }
+
+    const parsed = responseSchema.safeParse(payload);
     if (!parsed.success) return { status: 'skipped', reason: 'unreadable' };
-    if (!parsed.data.isReceipt) return { status: 'not_receipt' };
 
     const { isReceipt: _isReceipt, ...extracted } = parsed.data;
     return { status: 'extracted', extracted };
