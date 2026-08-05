@@ -70,6 +70,7 @@ export function ExpenseForm({
   const [state, formAction] = useActionState(saveExpenseAction, EMPTY_FORM_STATE);
   const [category, setCategory] = useState(defaults?.scheduleECategory ?? '');
   const [propertyId, setPropertyId] = useState(defaults?.propertyId ?? defaultPropertyId ?? '');
+  const [uploading, setUploading] = useState(false);
 
   const editing = defaults !== null;
   const lineAsks = category ? safeTriggersPrompt(category) : false;
@@ -224,7 +225,7 @@ export function ExpenseForm({
         />
       </div>
 
-      <ReceiptUpload defaultKey={defaults?.receiptKey ?? null} />
+      <ReceiptUpload defaultKey={defaults?.receiptKey ?? null} onBusyChange={setUploading} />
 
       <label className="field">
         <span className="field-label">Notes (optional)</span>
@@ -238,15 +239,21 @@ export function ExpenseForm({
 
       <ActorPicker options={people} defaultValue={defaults?.actorId ?? actorId} />
 
-      <Submit editing={editing} />
+      <Submit editing={editing} uploading={uploading} />
     </form>
   );
 }
 
-function Submit({ editing }: { editing: boolean }) {
+function Submit({ editing, uploading }: { editing: boolean; uploading: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <SubmitButton pending={pending}>{editing ? 'Save changes' : 'Save expense'}</SubmitButton>
+    <SubmitButton
+      pending={pending}
+      blocked={uploading}
+      blockedLabel="Waiting for the receipt…"
+    >
+      {editing ? 'Save changes' : 'Save expense'}
+    </SubmitButton>
   );
 }
 

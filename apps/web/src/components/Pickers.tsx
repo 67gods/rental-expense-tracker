@@ -162,13 +162,21 @@ export function SelectField({
 export function SubmitButton({
   children,
   pending,
+  blocked = false,
+  blockedLabel,
 }: {
   children: React.ReactNode;
   pending: boolean;
+  /**
+   * Something else on the form has not finished yet, so submitting now would
+   * post it half-filled. Distinct from `pending`, which is the save itself.
+   */
+  blocked?: boolean;
+  blockedLabel?: string;
 }) {
   return (
-    <button type="submit" className="btn btn-primary btn-block" disabled={pending}>
-      {pending ? 'Saving…' : children}
+    <button type="submit" className="btn btn-primary btn-block" disabled={pending || blocked}>
+      {pending ? 'Saving…' : blocked ? (blockedLabel ?? children) : children}
     </button>
   );
 }

@@ -25,9 +25,20 @@ export function ReceiptUpload({
    * already attached.
    */
   defaultKey = null,
+  /**
+   * Tells the form an upload is in flight.
+   *
+   * The key only exists once S3 has the bytes, so a save submitted before then
+   * posts an empty field - and the expense saves successfully with no receipt
+   * on it while the object sits orphaned in the bucket. Nothing about that
+   * looks like a failure from either end, which is what made it worth wiring
+   * the two components together rather than leaving the button to guess.
+   */
+  onBusyChange,
 }: {
   name?: string;
   defaultKey?: string | null;
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const [status, setStatus] = useState<Status>(defaultKey ? 'done' : 'idle');
   const [key, setKey] = useState(defaultKey ?? '');
@@ -39,6 +50,7 @@ export function ReceiptUpload({
     setStatus('uploading');
     setError(null);
     setFilename(file.name);
+    onBusyChange?.(true);
 
     try {
       let presignResponse: Response;
@@ -104,6 +116,10 @@ export function ReceiptUpload({
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'The upload failed.');
       setStatus('error');
+    } finally {
+      // Released on failure too. A receipt that will never arrive must not
+      // leave the expense itself unsavable - the error text below says as much.
+      onBusyChange?.(false);
     }
   }
 
