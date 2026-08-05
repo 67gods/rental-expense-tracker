@@ -41,15 +41,20 @@ export function ReceiptUpload({
     setFilename(file.name);
 
     try {
-      const presignResponse = await fetch('/api/v1/receipts/presign', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contentType: file.type || 'application/octet-stream',
-          sizeBytes: file.size,
-          filename: file.name,
-        }),
-      });
+      let presignResponse: Response;
+      try {
+        presignResponse = await fetch('/api/v1/receipts/presign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contentType: file.type || 'application/octet-stream',
+            sizeBytes: file.size,
+            filename: file.name,
+          }),
+        });
+      } catch {
+        throw new Error('Could not reach the app to prepare the upload. Check your connection.');
+      }
 
       const presign = (await presignResponse.json()) as {
         uploadUrl?: string;
@@ -61,11 +66,33 @@ export function ReceiptUpload({
         throw new Error(presign.message ?? 'Could not prepare the upload.');
       }
 
-      const putResponse = await fetch(presign.uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': file.type || 'application/octet-stream' },
-        body: file,
-      });
+      let putResponse: Response;
+      try {
+        putResponse = await fetch(presign.uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': file.type || 'application/octet-stream' },
+          body: file,
+        });
+      } catch {
+        /**
+         * A rejected fetch here is a network-level failure, and the browser
+         * will not say why - a blocked cross-origin PUT and a dropped signal
+         * are the same TypeError. Raw, it reads "Failed to fetch", which sends
+         * you looking at the app when the app is fine: the presign above
+         * already succeeded, so the credentials and the bucket name are right.
+         *
+         * The overwhelmingly likely cause is the bucket's CORS rule not
+         * listing the origin you are browsing from - which is easy to hit from
+         * a phone on the LAN, where the origin is an IP rather than localhost.
+         * So the message names the origin, because that is the exact string
+         * that has to be pasted into the rule.
+         */
+        throw new Error(
+          `The upload to storage was blocked before it started. If you have signal, ` +
+            `the receipt bucket's CORS rule needs to allow ${window.location.origin} ` +
+            `(see infra/aws/README.md).`,
+        );
+      }
 
       if (!putResponse.ok) {
         throw new Error('The image did not finish uploading. Check your signal and try again.');
