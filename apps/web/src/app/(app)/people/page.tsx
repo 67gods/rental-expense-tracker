@@ -4,7 +4,7 @@ import { requireUser } from '@/lib/session';
 import { listActors } from '@/server/services/reference';
 import { listExpenses } from '@/server/services/expenses';
 import { toggleW9Action } from '@/app/actions/admin';
-import { ActorForm } from '@/components/ActorForm';
+import { ActorForm, type EditableActor } from '@/components/ActorForm';
 import { W9Toggle } from '@/components/W9Toggle';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Well } from '@/components/ui';
@@ -18,6 +18,27 @@ const TYPE_LABELS: Record<string, string> = {
   contractor: 'Contractor',
   other: 'Other',
 };
+
+/** Only the columns the form can change - not the whole row. */
+function editable(actor: {
+  id: string;
+  name: string;
+  type: string;
+  email: string | null;
+  w9OnFile: boolean;
+  taxIdCollected: boolean;
+  notes: string | null;
+}): EditableActor {
+  return {
+    id: actor.id,
+    name: actor.name,
+    type: actor.type,
+    email: actor.email,
+    w9OnFile: actor.w9OnFile,
+    taxIdCollected: actor.taxIdCollected,
+    notes: actor.notes,
+  };
+}
 
 export default async function PeoplePage() {
   const user = await requireUser();
@@ -63,7 +84,7 @@ export default async function PeoplePage() {
           <h2 className="section-title mb-2">Household &amp; managers</h2>
           <ul className="tablebox">
             {people.map((actor) => (
-              <li key={actor.id} className="kv">
+              <li key={actor.id} className="kv kv-stack">
                 <div>
                   <p className="rowtitle">{actor.name}</p>
                   <p className="hint">
@@ -71,6 +92,12 @@ export default async function PeoplePage() {
                     {actor.email ? ` · ${actor.email}` : ''}
                   </p>
                 </div>
+                <details className="mt-1">
+                  <summary className="cursor-pointer hint">Edit</summary>
+                  <div className="mt-3">
+                    <ActorForm actor={editable(actor)} />
+                  </div>
+                </details>
               </li>
             ))}
             {people.length === 0 ? (
@@ -91,31 +118,39 @@ export default async function PeoplePage() {
             {contractors.map((actor) => {
               const total = totalsById.get(actor.id);
               return (
-                <li key={actor.id} className="kv">
-                  <div>
-                    <p className="rowtitle">{actor.name}</p>
-                    <p className="hint">
-                      {actor.w9OnFile ? 'W-9 on file' : 'No W-9 on file'}
-                      {actor.taxIdCollected ? ' · tax ID collected' : ''}
-                    </p>
-                    {warned.has(actor.id) ? (
-                      <p className="mt-1">
-                        <span className="tag tag-neg">Needs a W-9 before year end</span>
+                <li key={actor.id} className="kv kv-stack">
+                  <div className="flex justify-between gap-3">
+                    <div>
+                      <p className="rowtitle">{actor.name}</p>
+                      <p className="hint">
+                        {actor.w9OnFile ? 'W-9 on file' : 'No W-9 on file'}
+                        {actor.taxIdCollected ? ' · tax ID collected' : ''}
                       </p>
-                    ) : null}
+                      {warned.has(actor.id) ? (
+                        <p className="mt-1">
+                          <span className="tag tag-neg">Needs a W-9 before year end</span>
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <span className="num">{formatCents(total?.paidCents ?? 0)}</span>
+                      <W9Toggle
+                        id={actor.id}
+                        name={actor.name}
+                        w9OnFile={actor.w9OnFile}
+                        onToggle={async (id, next) => {
+                          'use server';
+                          await toggleW9Action(id, next);
+                        }}
+                      />
+                    </div>
                   </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1">
-                    <span className="num">{formatCents(total?.paidCents ?? 0)}</span>
-                    <W9Toggle
-                      id={actor.id}
-                      name={actor.name}
-                      w9OnFile={actor.w9OnFile}
-                      onToggle={async (id, next) => {
-                        'use server';
-                        await toggleW9Action(id, next);
-                      }}
-                    />
-                  </div>
+                  <details className="mt-1">
+                    <summary className="cursor-pointer hint">Edit</summary>
+                    <div className="mt-3">
+                      <ActorForm actor={editable(actor)} />
+                    </div>
+                  </details>
                 </li>
               );
             })}
