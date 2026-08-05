@@ -45,9 +45,27 @@ export function withYear(href: string, taxYear: number): string {
   return `${path}?${params.toString()}`;
 }
 
-/** The years offered in the switcher: this one and the two behind it. */
-export function yearChoices(current: number, sessionYear: number): number[] {
-  const years = [sessionYear, sessionYear - 1, sessionYear - 2];
-  if (!years.includes(current)) years.unshift(current);
-  return years;
+/**
+ * The years offered in the switcher.
+ *
+ * Anchored on the LATER of the session year and today's calendar year, not on
+ * the session year alone. The session deliberately opens on the newest year
+ * that holds records, so all through 2026 that resolved to 2025 - and a
+ * switcher built from 2025 offered 2025, 2024 and 2023. There was no way to
+ * reach 2026, and the only thing that would have made it reachable was a 2026
+ * record, which there was no way to add. A year you cannot navigate to is a
+ * year you cannot file.
+ *
+ * `current` is kept in the list even when it falls outside the window, so a
+ * link into an older year does not render a switcher that disagrees with the
+ * page beneath it.
+ */
+export function yearChoices(
+  current: number,
+  sessionYear: number,
+  calendarYear: number = sessionYear,
+): number[] {
+  const newest = Math.max(sessionYear, calendarYear);
+  const years = new Set([newest, newest - 1, newest - 2, sessionYear, current]);
+  return [...years].sort((a, b) => b - a);
 }

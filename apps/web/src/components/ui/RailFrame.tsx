@@ -24,12 +24,15 @@ import { Rail, type RailCounts } from './Rail';
  */
 export function RailFrame({
   taxYear: serverYear,
+  calendarYear,
   counts: serverCounts,
   who,
   footer,
 }: {
   /** The year the server rendered - the session's, and the fallback. */
   taxYear: number;
+  /** Today's year, which the switcher offers even before it holds a record. */
+  calendarYear: number;
   counts: RailCounts;
   who: string;
   footer?: React.ReactNode;
@@ -69,7 +72,7 @@ export function RailFrame({
     <Rail
       pathname={pathname}
       taxYear={viewed}
-      years={yearChoices(viewed, serverYear)}
+      years={yearChoices(viewed, serverYear, calendarYear)}
       counts={counts}
       who={who}
       footer={footer}

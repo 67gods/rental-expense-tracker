@@ -21,6 +21,14 @@ export interface CurrentUser {
   enterprise: Enterprise;
   email: string;
   taxYear: number;
+  /**
+   * Today's tax year in the app's zone, regardless of where the data ends.
+   *
+   * Carried separately from `taxYear` because the two answer different
+   * questions: `taxYear` is where the app opens, this is the newest year it
+   * must always let you reach. Collapsing them is what made 2026 unreachable.
+   */
+  calendarYear: number;
   timeZone: string;
 }
 
@@ -54,6 +62,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     enterprise,
     email,
     taxYear: latest === null ? thisYear : Math.min(latest, thisYear),
+    calendarYear: thisYear,
     timeZone: env.timeZone,
   };
 });
