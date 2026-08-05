@@ -5,6 +5,8 @@ import {
   formatMinutes,
   getHourCategory,
   getScheduleECategory,
+  needsPropertyOrSplit,
+  type AllocationRule,
 } from '@rental/domain';
 import { requireUser } from '@/lib/session';
 import { listTimeEntries } from '@/server/services/timeEntries';
@@ -178,10 +180,15 @@ async function ExpenseTable({
   const rows: DataRow[] = expenses.map((e) => {
     const paidCents = paid.get(e.id) ?? 0;
     const line = safeScheduleE(e.scheduleECategory);
-    const property = e.propertyId ? (propertyNames.get(e.propertyId) ?? '') : 'Split';
+    const unresolved = needsPropertyOrSplit(e.propertyId, e.allocationRule as AllocationRule | null);
+    const property = e.propertyId
+      ? (propertyNames.get(e.propertyId) ?? '')
+      : unresolved
+        ? 'Portfolio-wide'
+        : 'Split';
     const badges = [];
     if (e.capitalClassification === 'improvement') badges.push({ label: 'Capital', tone: 'capital' as const });
-    if (needsAnswer(e)) badges.push({ label: 'Review', tone: 'warn' as const });
+    if (unresolved || needsAnswer(e)) badges.push({ label: 'Review', tone: 'warn' as const });
     if (e.jobId && jobTitles.get(e.jobId)) {
       badges.push({ label: 'Job', tone: 'muted' as const, href: `/jobs/${e.jobId}` });
     }
@@ -196,6 +203,7 @@ async function ExpenseTable({
         line: line.label,
         invoiced: formatCents(e.amountCents),
         paid: formatCents(paidCents),
+        written: writtenLabel(e.createdAt),
       },
       sort: {
         date: e.date,
@@ -204,6 +212,7 @@ async function ExpenseTable({
         line: line.label,
         invoiced: e.amountCents,
         paid: paidCents,
+        written: e.createdAt.getTime(),
       },
       numeric: { invoiced: e.amountCents, paid: paidCents },
       search: [e.vendor, property, line.label, e.notes ?? ''].join(' ').toLowerCase(),
@@ -216,6 +225,7 @@ async function ExpenseTable({
 
   return (
     <DataTable
+      id="entries-expenses"
       rows={rows}
       searchPlaceholder="Vendor, note, category…"
       columns={[
@@ -225,6 +235,7 @@ async function ExpenseTable({
         { key: 'line', header: 'Line', nowrap: true },
         { key: 'invoiced', header: 'Invoiced', numeric: true },
         { key: 'paid', header: `Paid in ${taxYear}`, numeric: true },
+        { key: 'written', header: 'Written', nowrap: true, defaultHidden: true },
       ]}
       facets={[
         { key: 'property', label: 'Property', allLabel: 'All properties' },
@@ -261,8 +272,16 @@ async function IncomeTable({
         source,
         note: r.notes ?? '',
         amount: formatCents(r.amountCents),
+        written: writtenLabel(r.createdAt),
       },
-      sort: { date: r.date, property, source, note: r.notes ?? '', amount: r.amountCents },
+      sort: {
+        date: r.date,
+        property,
+        source,
+        note: r.notes ?? '',
+        amount: r.amountCents,
+        written: r.createdAt.getTime(),
+      },
       numeric: { amount: r.amountCents },
       search: [property, source, r.notes ?? ''].join(' ').toLowerCase(),
       deleteLabel: `the ${formatCents(r.amountCents)} rent record`,
@@ -271,6 +290,7 @@ async function IncomeTable({
 
   return (
     <DataTable
+      id="entries-income"
       rows={rows}
       searchPlaceholder="Property, source, note…"
       columns={[
@@ -279,6 +299,7 @@ async function IncomeTable({
         { key: 'source', header: 'Source', nowrap: true },
         { key: 'note', header: 'Note' },
         { key: 'amount', header: 'Amount', numeric: true },
+        { key: 'written', header: 'Written', nowrap: true, defaultHidden: true },
       ]}
       facets={[
         { key: 'property', label: 'Property', allLabel: 'All properties' },
@@ -328,6 +349,7 @@ async function TimeTable({
         category,
         time: formatMinutes(e.minutes),
         counts,
+        written: writtenLabel(e.createdAt),
       },
       // Sorted on MINUTES, not on the formatted string - otherwise "1h 30m"
       // sorts before "45m" because it starts with a one.
@@ -339,6 +361,7 @@ async function TimeTable({
         category,
         time: e.minutes,
         counts,
+        written: e.createdAt.getTime(),
       },
       numeric: { minutes: e.minutes, eligible: e.shEligible ? e.minutes : 0 },
       search: [e.description, who, property, category].join(' ').toLowerCase(),
@@ -349,6 +372,7 @@ async function TimeTable({
 
   return (
     <DataTable
+      id="entries-time"
       rows={rows}
       searchPlaceholder="What you did, who, property…"
       columns={[
@@ -359,6 +383,7 @@ async function TimeTable({
         { key: 'category', header: 'Category', nowrap: true },
         { key: 'time', header: 'Time', numeric: true },
         { key: 'counts', header: 'Counts', nowrap: true },
+        { key: 'written', header: 'Written', nowrap: true, defaultHidden: true },
       ]}
       facets={[
         { key: 'who', label: 'Who', allLabel: 'Anyone' },
@@ -406,6 +431,7 @@ async function TripTable({
         property,
         treatment,
         miles: miles.toFixed(1),
+        written: writtenLabel(t.createdAt),
       },
       sort: {
         date: t.date,
@@ -414,6 +440,7 @@ async function TripTable({
         property,
         treatment,
         miles,
+        written: t.createdAt.getTime(),
       },
       numeric: {
         miles,
@@ -428,6 +455,7 @@ async function TripTable({
 
   return (
     <DataTable
+      id="entries-trips"
       rows={rows}
       searchPlaceholder="Where you went, why…"
       columns={[
@@ -437,6 +465,7 @@ async function TripTable({
         { key: 'property', header: 'Property' },
         { key: 'treatment', header: 'Side', nowrap: true },
         { key: 'miles', header: 'Miles', numeric: true },
+        { key: 'written', header: 'Written', nowrap: true, defaultHidden: true },
       ]}
       facets={[
         { key: 'property', label: 'Property', allLabel: 'All properties' },
@@ -514,6 +543,11 @@ function needsAnswer(expense: {
     (expense.capitalClassification == null &&
       safeScheduleE(expense.scheduleECategory).triggersCapitalPrompt)
   );
+}
+
+/** Same truncation the expense and time detail pages already use for `created_at` (§6). */
+function writtenLabel(createdAt: Date): string {
+  return formatDateShort(createdAt.toISOString().slice(0, 10));
 }
 
 function isTab(value: string | undefined): value is Tab {

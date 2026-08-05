@@ -83,17 +83,17 @@ export async function saveExpenseAction(
     };
 
     if (id) {
+      // The field is ABSENT when the form is a split expense's - there is no
+      // UI for editing the rule, so ExpenseForm never renders the picker and
+      // updateExpense reads undefined as "leave it". Present-but-empty is a
+      // real choice: Portfolio-wide, which is now a value (§6), not a gap.
       const propertyId = str(formData, 'propertyId');
 
       await updateExpense({
         ...common,
         id,
         capitalClassification: capitalClassification(formData),
-        // OMITTED WHEN BLANK, NOT SENT AS NULL. updateExpense reads undefined as
-        // "leave it", which is what a split expense needs - it has no property
-        // of its own and its allocation rule is not editable here. It also means
-        // an ordinary expense can never be saved into having no property at all.
-        ...(propertyId ? { propertyId } : {}),
+        ...(formData.has('propertyId') ? { propertyId: propertyId || null } : {}),
       });
 
       revalidatePath('/');

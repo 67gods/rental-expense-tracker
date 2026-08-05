@@ -69,6 +69,7 @@ export function ExpenseForm({
 }) {
   const [state, formAction] = useActionState(saveExpenseAction, EMPTY_FORM_STATE);
   const [category, setCategory] = useState(defaults?.scheduleECategory ?? '');
+  const [propertyId, setPropertyId] = useState(defaults?.propertyId ?? defaultPropertyId ?? '');
 
   const editing = defaults !== null;
   const lineAsks = category ? safeTriggersPrompt(category) : false;
@@ -178,13 +179,25 @@ export function ExpenseForm({
           </p>
         </div>
       ) : (
-        <PropertyPicker
-          options={properties}
-          label="Which property"
-          allowNone={false}
-          required
-          defaultValue={defaults?.propertyId ?? defaultPropertyId}
-        />
+        <>
+          <PropertyPicker
+            options={properties}
+            label="Which property"
+            noneLabel="Portfolio-wide / shared"
+            defaultValue={defaults?.propertyId ?? defaultPropertyId}
+            onChange={setPropertyId}
+          />
+          {/* Portfolio-wide has no property and no split rule - a real state
+              (§6), not a blank field, but Schedule E cannot use it until one
+              is set. It sits in the review list, the same as an unanswered
+              capital question, same as lineAsks below. */}
+          {propertyId === '' ? (
+            <p className="note note-warn">
+              No property set. This expense will not appear on Schedule E
+              until you give it one, or split it.
+            </p>
+          ) : null}
+        </>
       )}
 
       {/* Two short answers on one line. Neither needs a full row, and stacking

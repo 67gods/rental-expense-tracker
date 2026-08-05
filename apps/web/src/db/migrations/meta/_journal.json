@@ -15,6 +15,13 @@
       "when": 1785713872721,
       "tag": "0001_workable_vindicator",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785890230909,
+      "tag": "0002_open_loki",
+      "breakpoints": true
     }
   ]
 }

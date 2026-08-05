@@ -5,7 +5,9 @@ import {
   formatCents,
   formatDateShort,
   getScheduleECategory,
+  needsPropertyOrSplit,
   taxYearOf,
+  type AllocationRule,
 } from '@rental/domain';
 import { requireUser } from '@/lib/session';
 import { getExpense } from '@/server/services/expenses';
@@ -65,6 +67,15 @@ export default async function ExpenseDetailPage({
   const contractor = expense.contractorActorId
     ? actors.find((actor) => actor.id === expense.contractorActorId)
     : null;
+  const unresolved = needsPropertyOrSplit(
+    expense.propertyId,
+    expense.allocationRule as AllocationRule | null,
+  );
+  const propertyLabel = property
+    ? property.nickname
+    : unresolved
+      ? 'Portfolio-wide'
+      : 'Split across properties';
 
   // A date comparison and a label, never a recommendation. What to do with an
   // acquisition-side cost is the CPA's call.
@@ -101,8 +112,7 @@ export default async function ExpenseDetailPage({
             <Panel title="Invoice">
               <div className="panel-figure">{formatCents(expense.amountCents)}</div>
               <p className="muted">
-                {property ? property.nickname : 'Split across properties'} ·{' '}
-                {line.line ? `Schedule E line ${line.line}` : line.label}
+                {propertyLabel} · {line.line ? `Schedule E line ${line.line}` : line.label}
               </p>
 
               <p className="mt-2.5 flex flex-wrap gap-1.5">
@@ -115,6 +125,7 @@ export default async function ExpenseDetailPage({
                 {expense.capitalClassification === 'needs_review' ? (
                   <Tag tone="warn">Needs review</Tag>
                 ) : null}
+                {unresolved ? <Tag tone="warn">Needs a property or split</Tag> : null}
                 <Tag tone={treatment.treatment === 'acquisition' ? 'capital' : 'muted'}>
                   {treatment.treatment === 'acquisition' ? 'Acquisition side' : 'Operating'}
                 </Tag>
@@ -153,7 +164,8 @@ export default async function ExpenseDetailPage({
                   {
                     key: 'property',
                     label: 'Property',
-                    value: property ? property.nickname : 'Split',
+                    value: propertyLabel,
+                    tone: unresolved ? 'warn' : undefined,
                   },
                   { key: 'line', label: 'Schedule E line', value: line.label },
                   {

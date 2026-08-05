@@ -5,6 +5,7 @@ import {
   formatCents,
   getScheduleECategory,
   isBackdated,
+  needsPropertyOrSplit,
   taxYearRange,
   updateExpenseSchema,
   type AllocationLine,
@@ -283,6 +284,8 @@ export async function listExpenses(filter: ExpenseFilter = {}): Promise<Expense[
   if (filter.needsReviewOnly) {
     // §10: every expense tied to physical work has a classification or sits in
     // needs_review. Unclassified spend on a work category is the same problem.
+    // A portfolio-wide expense with no property and no split (§6) is a third
+    // kind of unresolved - it cannot reach Schedule E until one is set.
     conditions.push(
       or(
         eq(expenses.capitalClassification, 'needs_review'),
@@ -290,6 +293,7 @@ export async function listExpenses(filter: ExpenseFilter = {}): Promise<Expense[
           isNull(expenses.capitalClassification),
           sql`${expenses.scheduleECategory} IN ('repairs', 'cleaning_maintenance', 'supplies', 'other')`,
         ),
+        and(isNull(expenses.propertyId), isNull(expenses.allocationRule)),
       ),
     );
   }
@@ -322,6 +326,11 @@ export async function expensesByIds(ids: readonly string[]): Promise<Map<string,
  * The stored record is untouched; these are derived for reports and display.
  */
 export async function allocationLinesFor(expense: Expense): Promise<AllocationLine[]> {
+  // No property and no split yet - nothing to allocate until it is resolved (§6).
+  if (needsPropertyOrSplit(expense.propertyId, expense.allocationRule as AllocationRule | null)) {
+    return [];
+  }
+
   const db = getDb();
   const rows = await db
     .select({

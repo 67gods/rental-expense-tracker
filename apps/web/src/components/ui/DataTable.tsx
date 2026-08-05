@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { formatCents } from '@rental/domain';
 import { DeleteButton } from '@/components/DeleteButton';
@@ -30,6 +30,8 @@ export interface Column {
   nowrap?: boolean;
   /** Renders the cell as a link to the row's href. */
   isLink?: boolean;
+  /** In the data but not shown until the user turns it on via "Columns". */
+  defaultHidden?: boolean;
 }
 
 export interface Facet {
@@ -70,6 +72,7 @@ export interface DataRow {
 }
 
 export function DataTable({
+  id,
   rows,
   columns,
   facets = [],
@@ -78,6 +81,8 @@ export function DataTable({
   onDelete,
   openLabel = 'Open',
 }: {
+  /** Distinguishes this table's remembered column choices from every other table's. */
+  id: string;
   rows: DataRow[];
   columns: Column[];
   facets?: Facet[];
@@ -91,6 +96,50 @@ export function DataTable({
   const [chosen, setChosen] = useState<Record<string, string>>({});
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [descending, setDescending] = useState(false);
+
+  // Starts from each column's own default so server and first client render
+  // agree; a saved choice (if any) is applied right after, in an effect.
+  const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(
+    () => new Set(columns.filter((c) => c.defaultHidden).map((c) => c.key)),
+  );
+  const storageKey = `cols:${id}`;
+  const loadedFrom = useRef<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(storageKey);
+      if (raw) setHiddenKeys(new Set(JSON.parse(raw) as string[]));
+    } catch {
+      // Corrupt or blocked storage - fall back to the column defaults already set.
+    }
+    loadedFrom.current = storageKey;
+  }, [storageKey]);
+
+  useEffect(() => {
+    // Skips the write that would otherwise fire before the load effect above
+    // has run, which would stamp the defaults back over a saved choice.
+    if (loadedFrom.current !== storageKey) return;
+    window.localStorage.setItem(storageKey, JSON.stringify([...hiddenKeys]));
+  }, [hiddenKeys, storageKey]);
+
+  const visibleColumns = useMemo(
+    () => columns.filter((c) => !hiddenKeys.has(c.key)),
+    [columns, hiddenKeys],
+  );
+
+  function toggleColumn(key: string) {
+    setHiddenKeys((current) => {
+      const next = new Set(current);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        // A table with every column off is just an empty box.
+        if (columns.length - next.size <= 1) return current;
+        next.add(key);
+      }
+      return next;
+    });
+  }
 
   // Built from the rows themselves, so a facet can never offer a value that is
   // absent or miss one that is present.
@@ -225,6 +274,22 @@ export function DataTable({
           </button>
         ) : null}
 
+        <details className="colmenu">
+          <summary className="btn">Columns</summary>
+          <div className="colmenu-panel">
+            {columns.map((column) => (
+              <label key={column.key} className="colmenu-item">
+                <input
+                  type="checkbox"
+                  checked={!hiddenKeys.has(column.key)}
+                  onChange={() => toggleColumn(column.key)}
+                />
+                {column.header}
+              </label>
+            ))}
+          </div>
+        </details>
+
         <span className="badge">
           <strong>{visible.length}</strong> shown
         </span>
@@ -246,7 +311,7 @@ export function DataTable({
           <table className="table">
             <thead>
               <tr>
-                {columns.map((column) => {
+                {visibleColumns.map((column) => {
                   const active = sortKey === column.key;
                   return (
                     <th
@@ -274,7 +339,7 @@ export function DataTable({
             <tbody>
               {visible.map((row) => (
                 <tr key={row.id}>
-                  {columns.map((column) => (
+                  {visibleColumns.map((column) => (
                     <td
                       key={column.key}
                       className={cellClass(column, row)}
@@ -322,7 +387,7 @@ export function DataTable({
               ))}
               {visible.length === 0 ? (
                 <tr>
-                  <td colSpan={columns.length + (onDelete ? 1 : 0)} className="muted">
+                  <td colSpan={visibleColumns.length + (onDelete ? 1 : 0)} className="muted">
                     Nothing matches those filters.
                   </td>
                 </tr>

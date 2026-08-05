@@ -3,6 +3,7 @@ import {
   allocateExpense,
   AllocationError,
   describeAllocationRule,
+  needsPropertyOrSplit,
   propertiesTouchedBy,
   type AllocationRule,
 } from '../src/rules/allocation';
@@ -199,5 +200,11 @@ describe('allocation descriptions', () => {
     expect(
       propertiesTouchedBy({ type: 'custom', shares: [{ propertyId: 'b', pct: 100 }] }),
     ).toEqual(['b']);
+  });
+
+  it('flags a portfolio-wide expense with neither a property nor a split as needing one', () => {
+    expect(needsPropertyOrSplit(null, null)).toBe(true);
+    expect(needsPropertyOrSplit('a', null)).toBe(false);
+    expect(needsPropertyOrSplit(null, { type: 'equal', propertyIds: ['a', 'b'] })).toBe(false);
   });
 });

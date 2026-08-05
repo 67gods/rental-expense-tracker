@@ -987,6 +987,42 @@
     min-width: 190px;
   }
 
+  /* The "Columns" toggle sits in the filter row like any other control; only
+     its panel needs its own layout, floated so opening it does not reflow
+     the search box and selects beside it. */
+  .colmenu {
+    position: relative;
+  }
+  .colmenu > summary {
+    list-style: none;
+    cursor: pointer;
+  }
+  .colmenu > summary::-webkit-details-marker {
+    display: none;
+  }
+  .colmenu-panel {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 4px);
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 150px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  }
+  .colmenu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+    white-space: nowrap;
+  }
+
   /* --- notes ------------------------------------------------------------ */
 
   .note {

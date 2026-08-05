@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   assignJobSchema,
   createExpensePaymentSchema,
+  createExpenseSchema,
   createPropertySchema,
   createReconciliationItemSchema,
   planInstalmentsSchema,
@@ -124,6 +125,33 @@ describe('createExpensePaymentSchema', () => {
   it('rejects a malformed date', () => {
     expect(createExpensePaymentSchema.safeParse(payment({ paidDate: '19/12/2025' })).success)
       .toBe(false);
+  });
+});
+
+describe('createExpenseSchema', () => {
+  const expense = (over: Record<string, unknown> = {}) => ({
+    date: '2025-12-19',
+    actorId: UUID,
+    amountCents: 25_000,
+    vendor: 'Home Depot',
+    scheduleECategory: 'supplies',
+    ...over,
+  });
+
+  it('accepts a property-owned expense', () => {
+    expect(createExpenseSchema.safeParse(expense({ propertyId: OTHER_UUID })).success).toBe(true);
+  });
+
+  it('accepts a split across properties', () => {
+    expect(
+      createExpenseSchema.safeParse(
+        expense({ allocationRule: { type: 'equal', propertyIds: [OTHER_UUID] } }),
+      ).success,
+    ).toBe(true);
+  });
+
+  it('accepts a portfolio-wide expense with neither a property nor a split (§6) - unresolved, not invalid', () => {
+    expect(createExpenseSchema.safeParse(expense()).success).toBe(true);
   });
 });
 
