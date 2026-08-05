@@ -81,13 +81,42 @@ export async function presignReceiptUpload(input: {
 /**
  * A short-lived URL for viewing a stored receipt. The bucket stays private -
  * these are tax records, and a guessable public URL is not an access model.
+ *
+ * `disposition: 'attachment'` asks S3 to set Content-Disposition on the
+ * response, which is the only way to make a browser save a JPEG rather than
+ * render it. A `download` attribute on the anchor cannot do it here: the href
+ * points at another origin, and cross-origin downloads ignore the hint.
  */
-export async function presignReceiptView(key: string, expiresIn = 3600): Promise<string> {
+export async function presignReceiptView(
+  key: string,
+  options: {
+    expiresIn?: number;
+    disposition?: 'inline' | 'attachment';
+    /** What the saved file is called. Defaults to the key's last segment. */
+    filename?: string;
+  } = {},
+): Promise<string> {
+  const { expiresIn = 3600, disposition = 'inline', filename } = options;
+  const name = sanitizeFilename(filename ?? key.split('/').pop() ?? 'receipt');
+
   return getSignedUrl(
     getClient(),
-    new GetObjectCommand({ Bucket: env.s3Bucket, Key: key }),
+    new GetObjectCommand({
+      Bucket: env.s3Bucket,
+      Key: key,
+      ResponseContentDisposition: `${disposition}; filename="${name}"`,
+    }),
     { expiresIn },
   );
+}
+
+/**
+ * Content-Disposition is a header, so a quote or a newline in the name would
+ * end the header early. Vendor names reach this from free text.
+ */
+function sanitizeFilename(name: string): string {
+  const cleaned = name.replace(/[^\w.\- ]+/g, '_').slice(0, 120);
+  return cleaned.trim() || 'receipt';
 }
 
 function extensionFor(contentType: string, filename?: string): string {

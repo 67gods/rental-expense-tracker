@@ -17,6 +17,7 @@ import { openJob } from '@/server/services/jobs';
 import { NotFoundError } from '@/server/errors';
 import { PaymentSplit } from '@/components/PaymentSplit';
 import { AddRelated } from '@/components/AddRelated';
+import { ReceiptLinks } from '@/components/ReceiptLinks';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { KeyValues, Note, Panel, Tag, Well } from '@/components/ui';
 import { withYear } from '@/lib/year';
@@ -188,7 +189,11 @@ export default async function ExpenseDetailPage({
                   {
                     key: 'receipt',
                     label: 'Receipt',
-                    value: expense.receiptKey ? 'On file' : 'None',
+                    value: expense.receiptKey ? (
+                      <ReceiptLinks receiptKey={expense.receiptKey} />
+                    ) : (
+                      'None'
+                    ),
                     tone: expense.receiptKey ? 'pos' : 'muted',
                   },
                   {

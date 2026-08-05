@@ -140,6 +140,24 @@ export function ReceiptUpload({
         {status === 'done' ? (
           <>
             <span className="tag tag-pos">Attached</span> {filename}{' '}
+            {/*
+              Only the receipt already saved on the record can be viewed. A file
+              uploaded a moment ago is in the bucket but not yet on any row, and
+              the view endpoint refuses keys no record claims - so offering the
+              link before the form is submitted would offer a broken one.
+            */}
+            {key && key === defaultKey ? (
+              <>
+                <a
+                  className="linkbtn"
+                  href={`/api/v1/receipts/view?key=${encodeURIComponent(key)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  View
+                </a>{' '}
+              </>
+            ) : null}
             <button type="button" className="linkbtn" onClick={clear}>
               Remove
             </button>
