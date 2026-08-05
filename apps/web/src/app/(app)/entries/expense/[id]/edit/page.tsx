@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { formatDateLong, taxYearOf } from '@rental/domain';
+import { formatDateLong, taxYearOf, todayInZone } from '@rental/domain';
 import { requireUser } from '@/lib/session';
-import { getExpense } from '@/server/services/expenses';
+import { captureHints, getExpense } from '@/server/services/expenses';
+import { propertyOptions } from '@/lib/captureOptions';
 import { paymentSummary } from '@/server/services/payments';
 import { listContractors, listPeople, listProperties } from '@/server/services/reference';
 import { ExpenseForm } from '@/components/ExpenseForm';
@@ -38,11 +39,12 @@ export default async function EditExpensePage({
     throw error;
   }
 
-  const [properties, people, contractors, summary] = await Promise.all([
+  const [properties, people, contractors, summary, hints] = await Promise.all([
     listProperties(),
     listPeople(),
     listContractors(),
     paymentSummary(id),
+    captureHints(),
   ]);
 
   // Whether the payments have a life of their own. One row that still mirrors
@@ -80,7 +82,7 @@ export default async function EditExpensePage({
         <ExpenseForm
           today={expense.date}
           actorId={user.actor.id}
-          properties={properties.map((p) => ({ id: p.id, label: p.nickname }))}
+          properties={propertyOptions(properties, hints, todayInZone(user.timeZone))}
           people={people.map((p) => ({ id: p.id, label: p.name }))}
           contractors={contractors.map((c) => ({ id: c.id, label: c.name }))}
           defaults={{

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { formatCents, getScheduleECategory, listScheduleECategories } from '@rental/domain';
+import { addDays, formatCents, getScheduleECategory, listScheduleECategories } from '@rental/domain';
 import { saveExpenseAction } from '@/app/actions/capture';
 import { EMPTY_FORM_STATE } from '@/app/actions/formState';
 import {
@@ -42,6 +42,19 @@ export interface ExpenseDefaults {
  * is required either way, and a Schedule E line either way. Splitting them is
  * how the create and edit paths drift until only one of them validates.
  *
+ * THE SHAPE OF THE PAGE FOLLOWS THE SHAPE OF THE JOB. Two answers carry this
+ * form - which property, and the receipt - and everything else is either
+ * printed on the receipt or optional. So the property sits across the top as
+ * the first thing on the page, the receipt takes a column of its own, and the
+ * figures sit beside it where they can be checked against the document without
+ * opening anything.
+ *
+ * On a phone that column layout stacks into the order the job actually happens
+ * in: pick the property, photograph the receipt, check what it read. The
+ * figures stay folded away until there is something to check or the owner says
+ * there is no receipt to wait for - see `revealed`. It is one form either way,
+ * one set of fields, and the difference is entirely in the stylesheet.
+ *
  * Two fields exist only when editing, both deliberately:
  *
  *   - REPAIR OR IMPROVEMENT. §5.3 is not asked at capture. The capture form is
@@ -61,6 +74,7 @@ export function ExpenseForm({
   properties,
   people,
   contractors,
+  recentVendors = [],
   jobId = null,
   defaultPropertyId = null,
   defaults = null,
@@ -71,6 +85,8 @@ export function ExpenseForm({
   properties: Option[];
   people: Option[];
   contractors: Option[];
+  /** Names already used, newest first, offered as buttons under the vendor field. */
+  recentVendors?: string[];
   /** Set only when opened from "+ Add related". Hidden - never a field. */
   jobId?: string | null;
   defaultPropertyId?: string | null;
@@ -87,13 +103,32 @@ export function ExpenseForm({
   const [category, setCategory] = useState(defaults?.scheduleECategory ?? '');
   const [propertyId, setPropertyId] = useState(defaults?.propertyId ?? defaultPropertyId ?? '');
   const [uploading, setUploading] = useState(false);
+  const [hasReceipt, setHasReceipt] = useState(defaults?.receiptKey != null);
 
   const [extracted, setExtracted] = useState<ExtractedReceipt | null>(null);
   const [duplicate, setDuplicate] = useState<DuplicateMatch | null>(null);
   const [readNote, setReadNote] = useState<string | null>(null);
 
   const editing = defaults !== null;
+
+  /**
+   * Whether the figures are shown yet - ON A PHONE ONLY. The stylesheet ignores
+   * this above the breakpoint, where both columns are always on screen.
+   *
+   * A receipt answers four of these fields, so presenting all of them before
+   * one has been taken asks somebody to fill in a form and then watch it be
+   * overwritten. Until then the screen is the two questions that matter, and
+   * "no receipt" is a button rather than a state to be inferred from an
+   * untouched file input.
+   *
+   * Corrections start revealed: an expense being edited has its figures
+   * already, and they are the reason the page was opened.
+   */
+  const [revealed, setRevealed] = useState(editing);
+
   const lineAsks = category ? safeTriggersPrompt(category) : false;
+  const vendorPicks = vendor.trim() === '' ? recentVendors.slice(0, 4) : [];
+  const yesterday = addDays(today, -1);
 
   /**
    * Applies what the reader found.
@@ -110,6 +145,10 @@ export function ExpenseForm({
    * sentence somebody wrote about the job with a summary of the line items.
    * The model's version of that field is a convenience; the owner's is a
    * record.
+   *
+   * None of this runs when editing at all - the reader is not called there, so
+   * `read.extraction` arrives as `not_requested` and only the duplicate check
+   * has anything to say.
    */
   function handleRead(read: ReceiptRead) {
     setDuplicate(read.duplicate);
@@ -139,7 +178,7 @@ export function ExpenseForm({
   }
 
   return (
-    <form action={formAction} className="form">
+    <form action={formAction} className="form capture">
       {/*
         The job rides along invisibly. THIS FORM HAS THE SAME FIELDS IT HAS
         ALWAYS HAD - a hidden value is not a field, and the word "job" appears
@@ -157,143 +196,231 @@ export function ExpenseForm({
         <input type="hidden" name="extraction" value={JSON.stringify(extracted)} />
       ) : null}
 
-      {state.message ? (
-        <p role="alert" className="error-text mb-2">
-          {state.message}
-        </p>
-      ) : null}
-
-      {duplicate ? (
-        <p className="note note-warn" role="alert">
-          {duplicate.kind === 'exact'
-            ? 'This exact receipt is already attached to an expense: '
-            : 'This looks like an expense already recorded: '}
-          <Link className="linkbtn" href={`/entries/expense/${duplicate.id}`}>
-            {duplicate.vendor}, {duplicate.date}, {formatCents(duplicate.amountCents)}
-          </Link>
-          . Nothing has been changed there. Saving this form adds a second entry.
-        </p>
-      ) : null}
-
-      {readNote ? <p className="note">{readNote}</p> : null}
-
-      {/* The amount is the one figure on this form, so it is set large and
-          monospaced rather than being one box among nine. */}
-      <label className="field">
-        <span className="field-label">How much</span>
-        <input
-          className="input input-lg"
-          name="amount"
-          inputMode="decimal"
-          autoComplete="off"
-          placeholder="124.99"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          required
-        />
-        {state.fields?.amount ? <span className="error-text">{state.fields.amount}</span> : null}
-        <Unsure level={extracted?.confidence.amount} what="total" />
-      </label>
-
-      {/* An unsplit expense keeps its single payment in step with the invoice
-          automatically. Once the payments are real cash events of their own,
-          they are left alone and a changed total can contradict them - so say
-          so here rather than after the save is refused. */}
-      {defaults?.hasOwnPayments ? (
-        <p className="note note-warn">
-          This invoice has payments recorded against it separately. Changing the
-          total will not move them, and a total below what is already paid will
-          be refused. Adjust the payments on the expense itself.
-        </p>
-      ) : null}
-
-      <label className="field">
-        <span className="field-label">Paid to</span>
-        <input
-          className="input"
-          name="vendor"
-          required
-          maxLength={200}
-          placeholder="Home Depot"
-          autoComplete="off"
-          value={vendor}
-          onChange={(e) => setVendor(e.target.value)}
-        />
-        <Unsure level={extracted?.confidence.vendor} what="name" />
-      </label>
-
-      <div className="field">
-        <label className="field-label" htmlFor="scheduleECategory">
-          Which Schedule E line
-        </label>
-        <select
-          id="scheduleECategory"
-          className="select"
-          name="scheduleECategory"
-          required
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-        >
-          <option value="">Choose…</option>
-          {listScheduleECategories().map((line) => (
-            <option key={line.id} value={line.id}>
-              {line.line}. {line.label}
-            </option>
-          ))}
-        </select>
-        {category ? <span className="hint">{safeHelper(category)}</span> : null}
-        {/* Only worth saying while the question cannot yet be answered. In edit
-            mode the picker is right below, so the warning would point at it. */}
-        {lineAsks && !editing ? (
-          <p className="note note-warn">
-            This is spend on physical work, so it needs a repair-or-improvement
-            answer before year end. It will sit in the review list until then.
-          </p>
-        ) : null}
-      </div>
-
-      {editing ? (
-        <CapitalPicker defaultValue={defaults.capitalClassification} lineAsks={lineAsks} />
-      ) : null}
-
-      {/* A split cost belongs to a rule, not to a property, and there is no UI
-          for editing the rule. Rendering the picker here would offer to break
-          the split with no way to put it back. */}
-      {defaults?.isSplit ? (
-        <div className="field">
-          <span className="field-label">Which property</span>
-          <p className="hint">
-            Split across properties by an allocation rule, so no single property
-            owns it. The split is not editable here.
-          </p>
-        </div>
-      ) : (
-        <>
-          <PropertyPicker
-            options={properties}
-            label="Which property"
-            noneLabel="Portfolio-wide / shared"
-            defaultValue={defaults?.propertyId ?? defaultPropertyId}
-            onChange={setPropertyId}
-          />
-          {/* Portfolio-wide has no property and no split rule - a real state
-              (§6), not a blank field, but Schedule E cannot use it until one
-              is set. It sits in the review list, the same as an unanswered
-              capital question, same as lineAsks below. */}
-          {propertyId === '' ? (
-            <p className="note note-warn">
-              No property set. This expense will not appear on Schedule E
-              until you give it one, or split it.
+      {/* Anything the page has to say about the whole record goes across the
+          top of it, above both columns, rather than beside one of them. */}
+      {state.message || duplicate || readNote ? (
+        <div className="capture-alerts">
+          {state.message ? (
+            <p role="alert" className="error-text">
+              {state.message}
             </p>
           ) : null}
-        </>
-      )}
 
-      {/* Two short answers on one line. Neither needs a full row, and stacking
-          them pushed the save button below the fold on a phone. */}
-      <div className="form-row">
+          {duplicate ? (
+            <p className="note note-warn" role="alert">
+              {duplicate.kind === 'exact'
+                ? 'This exact receipt is already attached to an expense: '
+                : 'This looks like an expense already recorded: '}
+              <Link className="linkbtn" href={`/entries/expense/${duplicate.id}`}>
+                {duplicate.vendor}, {duplicate.date}, {formatCents(duplicate.amountCents)}
+              </Link>
+              . Nothing has been changed there. Saving this form adds a second entry.
+            </p>
+          ) : null}
+
+          {readNote ? <p className="note">{readNote}</p> : null}
+        </div>
+      ) : null}
+
+      <div className="capture-props">
+        {/* A split cost belongs to a rule, not to a property, and there is no UI
+            for editing the rule. Rendering the picker here would offer to break
+            the split with no way to put it back. */}
+        {defaults?.isSplit ? (
+          <div className="field">
+            <span className="field-label">Which property</span>
+            <p className="hint">
+              Split across properties by an allocation rule, so no single property
+              owns it. The split is not editable here.
+            </p>
+          </div>
+        ) : (
+          <>
+            <PropertyPicker
+              options={properties}
+              label="Which property"
+              layout="tiles"
+              noneLabel="Portfolio-wide / shared"
+              noneHint="Split by a rule later. Does not reach Schedule E on its own."
+              defaultValue={defaults?.propertyId ?? defaultPropertyId}
+              onChange={setPropertyId}
+            />
+            {/* Portfolio-wide has no property and no split rule - a real state
+                (§6), not a blank field, but Schedule E cannot use it until one
+                is set. It sits in the review list, the same as an unanswered
+                capital question, same as lineAsks below. */}
+            {propertyId === '' ? (
+              <p className="note note-warn">
+                No property set. This expense will not appear on Schedule E
+                until you give it one, or split it.
+              </p>
+            ) : null}
+          </>
+        )}
+      </div>
+
+      <div className="capture-receipt">
+        <ReceiptUpload
+          defaultKey={defaults?.receiptKey ?? null}
+          defaultSha256={defaults?.receiptSha256 ?? null}
+          propertyId={propertyId || null}
+          expenseId={defaults?.id ?? null}
+          /*
+           * Corrections do not go through the model. The figures on an expense
+           * that already exists were entered or checked by the owner, and a
+           * document attached months later is evidence for them - so it is
+           * filed, not read. See the `mode` note on the extract route.
+           */
+          read={!editing}
+          onBusyChange={(busy) => {
+            setUploading(busy);
+            // A photograph having been taken is itself the answer to "is there
+            // a receipt coming", so the fields open at that moment rather than
+            // waiting for the upload to land.
+            if (busy) setRevealed(true);
+          }}
+          onAttachedChange={setHasReceipt}
+          onRead={handleRead}
+        />
+
+        {/*
+          The manual path, said out loud.
+
+          Phone only - on a desktop the fields are already beside this pane and
+          a button to reveal what is visible would be nonsense. It is a plain
+          reveal rather than a mode: nothing is disabled by taking it, and a
+          receipt photographed afterwards still fills the fields in.
+        */}
+        {revealed ? null : (
+          <button type="button" className="capture-manual" onClick={() => setRevealed(true)}>
+            No receipt — type it instead
+            <span className="hint">Utilities, cash work, anything paid without paper.</span>
+          </button>
+        )}
+      </div>
+
+      <div className={`capture-fields${revealed ? '' : ' capture-fields-folded'}`}>
+        {/* The amount is the one figure on this form, so it is set large and
+            monospaced rather than being one box among nine. */}
+        <label className="field">
+          <span className="field-label">How much</span>
+          <input
+            className="input input-lg"
+            name="amount"
+            inputMode="decimal"
+            autoComplete="off"
+            placeholder="124.99"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            required
+          />
+          {state.fields?.amount ? <span className="error-text">{state.fields.amount}</span> : null}
+          <Unsure level={extracted?.confidence.amount} what="total" />
+        </label>
+
+        {/* An unsplit expense keeps its single payment in step with the invoice
+            automatically. Once the payments are real cash events of their own,
+            they are left alone and a changed total can contradict them - so say
+            so here rather than after the save is refused. */}
+        {defaults?.hasOwnPayments ? (
+          <p className="note note-warn">
+            This invoice has payments recorded against it separately. Changing the
+            total will not move them, and a total below what is already paid will
+            be refused. Adjust the payments on the expense itself.
+          </p>
+        ) : null}
+
+        <label className="field">
+          <span className="field-label">Paid to</span>
+          <input
+            className="input"
+            name="vendor"
+            required
+            maxLength={200}
+            placeholder="Home Depot"
+            autoComplete="off"
+            value={vendor}
+            onChange={(e) => setVendor(e.target.value)}
+          />
+          {/* Four names, and only while the field is empty. A shortcut that
+              stays on screen after it has been used is just clutter, and the
+              same four vendors account for most of a year. */}
+          {vendorPicks.length > 0 ? (
+            <span className="hint capture-recents">
+              Recent:{' '}
+              {vendorPicks.map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  className="linkbtn"
+                  onClick={() => setVendor(name)}
+                >
+                  {name}
+                </button>
+              ))}
+            </span>
+          ) : null}
+          <Unsure level={extracted?.confidence.vendor} what="name" />
+        </label>
+
+        <div className="field">
+          <label className="field-label" htmlFor="scheduleECategory">
+            Which Schedule E line
+          </label>
+          <select
+            id="scheduleECategory"
+            className="select"
+            name="scheduleECategory"
+            required
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+          >
+            <option value="">Choose…</option>
+            {listScheduleECategories().map((line) => (
+              <option key={line.id} value={line.id}>
+                {line.line}. {line.label}
+              </option>
+            ))}
+          </select>
+          {category ? <span className="hint">{safeHelper(category)}</span> : null}
+          {/* Only worth saying while the question cannot yet be answered. In edit
+              mode the picker is right below, so the warning would point at it. */}
+          {lineAsks && !editing ? (
+            <p className="note note-warn">
+              This is spend on physical work, so it needs a repair-or-improvement
+              answer before year end. It will sit in the review list until then.
+            </p>
+          ) : null}
+        </div>
+
+        {editing ? (
+          <CapitalPicker defaultValue={defaults.capitalClassification} lineAsks={lineAsks} />
+        ) : null}
+
         <label className="field">
           <span className="field-label">When</span>
+          {/* The two dates that account for nearly every expense logged by
+              hand, as buttons. The picker is still there for the rest, and the
+              buttons are phone-only - a date field on a desktop is already one
+              click and a keyboard. */}
+          <span className="capture-dates">
+            <button
+              type="button"
+              className="btn"
+              aria-pressed={date === today}
+              onClick={() => setDate(today)}
+            >
+              Today
+            </button>
+            <button
+              type="button"
+              className="btn"
+              aria-pressed={date === yesterday}
+              onClick={() => setDate(yesterday)}
+            >
+              Yesterday
+            </button>
+          </span>
           <input
             className="input"
             type="date"
@@ -305,39 +432,52 @@ export function ExpenseForm({
           <Unsure level={extracted?.confidence.date} what="date" />
         </label>
 
-        <SelectField
-          name="contractorActorId"
-          label="Contractor (optional)"
-          options={contractors}
-          defaultValue={defaults?.contractorActorId ?? null}
-          placeholder="Not a contractor"
-          hint="Keeps their yearly total running, so the W-9 warning can fire before October."
-        />
+        {/*
+          Everything nobody fills in at a counter, behind one line.
+
+          Open when it already has something in it, because a correction that
+          hides the note somebody wrote is a correction that loses it. Closed
+          fields still post - this folds the form, it does not shorten it.
+        */}
+        <details
+          className="capture-more"
+          open={Boolean(defaults?.contractorActorId || defaults?.notes)}
+        >
+          <summary>Contractor, notes, who paid — all optional</summary>
+          <div className="capture-more-body">
+            <SelectField
+              name="contractorActorId"
+              label="Contractor"
+              options={contractors}
+              defaultValue={defaults?.contractorActorId ?? null}
+              placeholder="Not a contractor"
+              hint="Keeps their yearly total running, so the W-9 warning can fire before October."
+            />
+
+            <label className="field">
+              <span className="field-label">Notes</span>
+              <textarea
+                className="textarea"
+                name="notes"
+                maxLength={2000}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+            </label>
+
+            <ActorPicker options={people} defaultValue={defaults?.actorId ?? actorId} />
+          </div>
+        </details>
+
+        <div className="capture-save">
+          <span className="muted">
+            {hasReceipt
+              ? 'Receipt stored with this expense.'
+              : 'No receipt on this one — that is fine, and it is recorded as such.'}
+          </span>
+          <Submit editing={editing} uploading={uploading} />
+        </div>
       </div>
-
-      <ReceiptUpload
-        defaultKey={defaults?.receiptKey ?? null}
-        defaultSha256={defaults?.receiptSha256 ?? null}
-        propertyId={propertyId || null}
-        expenseId={defaults?.id ?? null}
-        onBusyChange={setUploading}
-        onRead={handleRead}
-      />
-
-      <label className="field">
-        <span className="field-label">Notes (optional)</span>
-        <textarea
-          className="textarea"
-          name="notes"
-          maxLength={2000}
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-        />
-      </label>
-
-      <ActorPicker options={people} defaultValue={defaults?.actorId ?? actorId} />
-
-      <Submit editing={editing} uploading={uploading} />
     </form>
   );
 }
@@ -366,6 +506,10 @@ function readFailureNote(read: ReceiptRead): string | null {
       // The duplicate warning above already says everything worth saying.
       return null;
     case 'not_configured':
+      return null;
+    case 'not_requested':
+      // Editing, or the receipt was just removed. The pane says which, and
+      // neither is a failure to report.
       return null;
     case 'unsupported':
     case 'unreadable':

@@ -42,10 +42,20 @@ export interface DuplicateMatch {
  * re-photographed still gets caught by the figures match below, which is the
  * check that was always going to do the work for those.
  */
-export async function findExactDuplicate(sha256: string): Promise<DuplicateMatch | null> {
+export async function findExactDuplicate(
+  sha256: string,
+  /**
+   * Excluded from the search, for the same reason the figures match takes one.
+   *
+   * Re-attaching a receipt to the expense it is already on is the ordinary way
+   * to replace a bad scan, and without this it reports the expense as its own
+   * duplicate - a warning that is both alarming and impossible to act on.
+   */
+  excludeExpenseId: string | null = null,
+): Promise<DuplicateMatch | null> {
   const db = getDb();
 
-  const [row] = await db
+  const rows = await db
     .select({
       id: expenses.id,
       date: expenses.date,
@@ -56,8 +66,9 @@ export async function findExactDuplicate(sha256: string): Promise<DuplicateMatch
     .from(expenses)
     .where(eq(expenses.receiptSha256, sha256))
     .orderBy(desc(expenses.createdAt))
-    .limit(1);
+    .limit(2);
 
+  const row = rows.find((candidate) => candidate.id !== excludeExpenseId);
   return row ? { ...row, kind: 'exact' } : null;
 }
 

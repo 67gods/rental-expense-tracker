@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Log expense · C · Two taps at the counter</title>
+<style>
+:root{
+  --bg:#0b0c0e; --panel:#0f1113; --panel-head:#0c0e10; --rail:#0a0b0d;
+  --hover:#14171a; --selected:#16191d;
+  --line:#1c1f23; --line-soft:#15181b; --line-strong:#2a2f35;
+  --ink:#e6e8eb; --ink-dim:#9aa1a9; --ink-faint:#636b74;
+  --accent:#5b8cff; --accent-dim:#2a3f6b; --accent-line:#33507f; --accent-ink:#cfe0ff;
+  --pos:#3fb950; --neg:#f85149; --warn:#d29922; --plum:#8957e5;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font:13px/1.45 var(--sans);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.topbar{display:flex;align-items:center;gap:12px;padding:0 20px;min-height:46px;border-bottom:1px solid var(--line)}
+.topbar h1{font-size:13px;font-weight:600}
+.crumb{color:var(--ink-faint);font-size:12px}
+.spacer{margin-left:auto}
+.wrap{padding:22px 20px 70px;max-width:1420px;margin:0 auto}
+.lede{color:var(--ink-dim);font-size:13px;max-width:720px;line-height:1.6;margin-bottom:22px}
+.lede strong{color:var(--ink)}
+.btn{font:500 12px var(--sans);color:var(--ink-dim);border:1px solid var(--line-strong);background:#111417;padding:5px 10px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:7px}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#04122e;font-weight:600}
+.btn-block{display:flex;width:100%;padding:12px;font-size:13.5px;border-radius:8px}
+.linkbtn{background:none;border:0;padding:0;font:inherit;color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.tag{display:inline-block;font:500 10.5px var(--sans);padding:2px 6px;border-radius:4px;border:1px solid;white-space:nowrap}
+.tag-pos{color:var(--pos);border-color:#1c4523;background:#0e1f12}
+.tag-warn{color:var(--warn);border-color:#4a3a12;background:#221b0c}
+.note{border-left:2px solid var(--accent);background:#0e1319;padding:9px 11px;border-radius:0 6px 6px 0;font-size:11.5px;color:var(--ink-dim);line-height:1.5;margin:10px 0}
+.note strong{color:var(--ink);font-weight:600}
+.note-warn{border-left-color:var(--warn);background:#171208}
+.note-pos{border-left-color:var(--pos);background:#0c1710}
+.hint{display:block;font-size:11px;color:var(--ink-faint);margin-top:5px;line-height:1.5}
+.field{display:block;margin-bottom:11px}
+.field-label{display:block;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:5px}
+.input,.select,.textarea{width:100%;background:var(--panel-head);border:1px solid var(--line-strong);border-radius:6px;color:var(--ink);padding:9px 10px;font-size:13px;font-family:inherit}
+
+/* ---- device frames ---- */
+.rowphones{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start}
+.device{width:330px;flex:none}
+.devcap{display:flex;align-items:baseline;gap:8px;margin-bottom:9px}
+.devcap b{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+.devcap span{font-size:11.5px;color:var(--ink-faint)}
+.phone{border:1px solid var(--line-strong);border-radius:22px;background:var(--bg);padding:8px;box-shadow:0 12px 40px rgba(0,0,0,.5)}
+.screen{border:1px solid var(--line);border-radius:15px;overflow:hidden;background:var(--bg);min-height:660px;display:flex;flex-direction:column}
+.status{display:flex;align-items:center;padding:7px 14px 4px;font:600 10.5px var(--mono);color:var(--ink-faint)}
+.status .spacer{margin-left:auto}
+.head{display:flex;align-items:center;gap:9px;padding:8px 14px 10px;border-bottom:1px solid var(--line)}
+.head b{font-size:14px;letter-spacing:-.01em}
+.body{padding:13px 14px 16px;flex:1;overflow:hidden}
+
+/* ---- the three-tap stack ---- */
+.tabs{display:flex;border:1px solid var(--line-strong);border-radius:7px;overflow:hidden;margin-bottom:14px}
+.tabs button{flex:1;padding:7px 0;font:500 12px var(--sans);color:var(--ink-dim);background:none;border:0;border-left:1px solid var(--line-strong);cursor:pointer}
+.tabs button:first-child{border-left:0}
+.tabs button[aria-current="true"]{background:var(--selected);color:var(--ink)}
+
+.tapno{display:flex;align-items:center;gap:7px;margin:0 0 7px}
+.tapno i{width:16px;height:16px;border-radius:50%;background:var(--accent-dim);border:1px solid var(--accent-line);color:var(--accent-ink);font:600 9.5px/15px var(--mono);text-align:center;font-style:normal;flex:none}
+.tapno i.ok{background:#0e1f12;border-color:#1c4523;color:var(--pos)}
+.tapno span{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-faint)}
+.tapno em{margin-left:auto;font-style:normal;font-size:11px;color:var(--ink-faint)}
+
+/* shutter */
+.shutter{display:flex;align-items:center;gap:13px;width:100%;border:1px solid var(--accent);background:linear-gradient(#16233c,#111a2b);border-radius:12px;padding:16px 15px;cursor:pointer;text-align:left}
+.shutter .ico{flex:none;width:42px;height:42px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center}
+.shutter b{display:block;font-size:14.5px;font-weight:650}
+.shutter small{display:block;font-size:11.5px;color:var(--accent-ink);margin-top:2px}
+.orline{display:flex;align-items:center;gap:10px;margin:11px 0;color:var(--ink-faint);font-size:11px}
+.orline::before,.orline::after{content:"";flex:1;height:1px;background:var(--line)}
+.typebtn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;border:1px dashed var(--line-strong);background:none;color:var(--ink-dim);border-radius:10px;padding:12px;font:500 12.5px var(--sans);cursor:pointer}
+
+/* property chips, two rows of two */
+.chips{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.chip{border:1px solid var(--line-strong);background:var(--panel-head);color:var(--ink-dim);border-radius:8px;padding:10px 9px;font:500 12.5px var(--sans);cursor:pointer;text-align:left}
+.chip small{display:block;font-size:10px;color:var(--ink-faint);margin-top:2px;font-weight:400}
+.chip[aria-pressed="true"]{background:var(--accent-dim);border-color:var(--accent);color:#fff}
+.chip[aria-pressed="true"] small{color:var(--accent-ink)}
+.chip.full{grid-column:1/-1;text-align:center;border-style:dashed}
+
+/* the read-back card */
+.card{border:1px solid var(--line-strong);border-radius:10px;background:var(--panel);overflow:hidden}
+.card .amt{padding:15px 14px 12px;border-bottom:1px solid var(--line-soft);display:flex;align-items:baseline;gap:9px}
+.card .amt b{font:650 30px/1 var(--mono);letter-spacing:-.02em}
+.card .amt .tag{margin-left:auto}
+.line{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line-soft);font-size:12.5px}
+.line:last-child{border-bottom:0}
+.line dt{color:var(--ink-faint);width:78px;flex:none;font-size:11.5px}
+.line dd{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.line .edit{color:var(--ink-faint);font-size:11px;flex:none}
+.line:hover{background:var(--hover)}
+.line.flag dd{color:var(--warn)}
+
+.thumbstrip{display:flex;align-items:center;gap:10px;border:1px solid var(--line-strong);border-radius:9px;padding:8px 10px;background:var(--panel-head)}
+.mini{flex:none;width:34px;height:44px;border-radius:4px;border:1px solid var(--line-strong);background:repeating-linear-gradient(#171a1e 0 3px,#12151890 3px 6px),#101315}
+.thumbstrip .t{min-width:0;font-size:11.5px}
+.thumbstrip .t small{display:block;color:var(--ink-faint);font-size:10.5px}
+
+details.more{border-top:1px solid var(--line);margin-top:12px;padding-top:10px}
+details.more summary{cursor:pointer;font-size:12px;color:var(--ink-dim);list-style:none}
+details.more summary::-webkit-details-marker{display:none}
+details.more summary::before{content:"›";margin-right:7px;color:var(--ink-faint)}
+details.more[open] summary::before{content:"⌄"}
+.sticky{margin-top:14px}
+.savehint{text-align:center;font-size:11px;color:var(--ink-faint);margin-top:8px}
+@media(max-width:760px){.device{width:100%}}
+</style>
+</head><body>
+  <header class="topbar">
+    <h1>Log expense</h1><span class="crumb">Concept C · two taps at the counter</span>
+    <span class="spacer"></span><a class="btn" href="index.html">← All concepts</a>
+  </header>
+
+<div class="wrap">
+  <p class="lede">
+    Built for the case that actually happens: <strong>you are standing at the till with a receipt in your hand.</strong>
+    Property and receipt are the whole first screen; everything else is either read off the paper or
+    folded away under one line. Typing is the fallback path, not the default one — and it is one tap away.
+  </p>
+
+  <div class="rowphones">
+
+    <!-- ============ 1 ============ -->
+    <div class="device">
+      <div class="devcap"><b>Open</b><span>Two decisions, nothing else on screen</span></div>
+      <div class="phone"><div class="screen">
+        <div class="status">9:41<span class="spacer"></span>LTE ▮</div>
+        <div class="head"><b>Log expense</b><span class="spacer"></span><span class="tag tag-warn">2025</span></div>
+        <div class="body">
+          <div class="tabs">
+            <button aria-current="true">Expense</button><button>Time</button><button>Trip</button><button>Rent</button>
+          </div>
+
+          <div class="tapno"><i>1</i><span>Which property</span><em>Creedmore, today</em></div>
+          <div class="chips">
+            <button class="chip" aria-pressed="true">Creedmore ct<small>used today</small></button>
+            <button class="chip">Kettlewell<small>4 days ago</small></button>
+            <button class="chip">Westmill<small>12 days ago</small></button>
+            <button class="chip">Arbordale way<small>Mt Holly</small></button>
+            <button class="chip full">Portfolio‑wide / shared</button>
+          </div>
+
+          <div class="tapno" style="margin-top:16px"><i>2</i><span>The receipt</span></div>
+          <label class="shutter">
+            <input type="file" accept="image/*" capture="environment" hidden>
+            <span class="ico">
+              <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#04122e" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h2.2l1.2-2h8.2l1.2 2h2.2A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"/>
+                <circle cx="12" cy="13" r="3.4"/>
+              </svg>
+            </span>
+            <span><b>Photograph it</b><small>Fills the amount, vendor, date and line</small></span>
+          </label>
+
+          <div class="orline">no receipt?</div>
+          <button class="typebtn">Type the expense instead</button>
+          <p class="hint" style="text-align:center">Utilities, cash work, anything without paper.</p>
+
+          <div class="note" style="margin-top:16px">
+            Both paths save the same expense. The receipt one just fills four fields for you.
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ============ 2 ============ -->
+    <div class="device">
+      <div class="devcap"><b>After the photo</b><span>A card to confirm, not a form to complete</span></div>
+      <div class="phone"><div class="screen">
+        <div class="status">9:41<span class="spacer"></span>LTE ▮</div>
+        <div class="head"><b>Check and save</b><span class="spacer"></span><button class="btn">Cancel</button></div>
+        <div class="body">
+          <div class="thumbstrip">
+            <span class="mini"></span>
+            <span class="t">IMG_4471.jpeg <span class="tag tag-pos">Attached</span>
+              <small>Read in 3s · tap to view full size</small></span>
+          </div>
+
+          <div class="tapno" style="margin-top:14px"><i class="ok">✓</i><span>Creedmore ct</span><em><button class="linkbtn">change</button></em></div>
+
+          <div class="card" style="margin-top:4px">
+            <div class="amt"><b>$412.86</b><span class="tag tag-pos">from receipt</span></div>
+            <dl>
+              <div class="line"><dt>Paid to</dt><dd>The Home Depot</dd><span class="edit">edit</span></div>
+              <div class="line flag"><dt>When</dt><dd>Aug 4, 2026 · hard to read</dd><span class="edit">edit</span></div>
+              <div class="line"><dt>Sch. E</dt><dd>14. Repairs</dd><span class="edit">edit</span></div>
+              <div class="line"><dt>Notes</dt><dd>Lumber, screws, ext. paint, concrete</dd><span class="edit">edit</span></div>
+            </dl>
+          </div>
+
+          <div class="note note-warn">
+            Needs a <strong>repair or improvement</strong> answer before year end. Saved either way —
+            it waits in the review list.
+          </div>
+
+          <details class="more">
+            <summary>Contractor, who paid, job — all optional</summary>
+            <div style="padding-top:11px">
+              <div class="field"><span class="field-label">Contractor</span>
+                <select class="select"><option>Not a contractor</option></select></div>
+              <div class="field"><span class="field-label">Who paid</span>
+                <select class="select"><option>Amit</option></select></div>
+            </div>
+          </details>
+
+          <div class="sticky">
+            <button class="btn btn-primary btn-block">Save expense</button>
+            <p class="savehint">Two taps from the counter. Everything else was on the paper.</p>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ============ 3 ============ -->
+    <div class="device">
+      <div class="devcap"><b>No receipt</b><span>The manual path, opened deliberately</span></div>
+      <div class="phone"><div class="screen">
+        <div class="status">9:41<span class="spacer"></span>LTE ▮</div>
+        <div class="head"><b>Type the expense</b><span class="spacer"></span><button class="btn">Use camera</button></div>
+        <div class="body">
+          <div class="tapno"><i class="ok">✓</i><span>Kettlewell</span><em><button class="linkbtn">change</button></em></div>
+
+          <div class="field" style="margin-top:6px"><span class="field-label">How much</span>
+            <input class="input" style="font:650 24px var(--mono);padding:12px" placeholder="0.00" value="184.00"></div>
+
+          <div class="field"><span class="field-label">Paid to</span>
+            <input class="input" value="Duke Energy">
+            <span class="hint">Recent here: <button class="linkbtn">Duke Energy</button> ·
+              <button class="linkbtn">Charlotte Water</button> · <button class="linkbtn">JKN Realty</button></span></div>
+
+          <div class="field"><span class="field-label">Which Schedule E line</span>
+            <select class="select"><option>17. Utilities</option></select>
+            <span class="hint">Power, water, gas billed to you rather than the tenant.</span></div>
+
+          <div class="field"><span class="field-label">When</span>
+            <div style="display:flex;gap:6px">
+              <button class="btn" style="flex:1;background:var(--accent-dim);border-color:var(--accent);color:#fff">Today</button>
+              <button class="btn" style="flex:1">Yesterday</button>
+              <button class="btn" style="flex:1">Pick…</button>
+            </div></div>
+
+          <div class="note note-pos">
+            <strong>No receipt on this one.</strong> That is fine and it is recorded as such —
+            you can attach a bill later from the entry itself without anything being re‑read.
+          </div>
+
+          <details class="more">
+            <summary>Contractor, notes, who paid</summary>
+            <div style="padding-top:11px">
+              <div class="field"><span class="field-label">Notes</span><input class="input" placeholder="July bill, vacant month"></div>
+            </div>
+          </details>
+
+          <div class="sticky">
+            <button class="btn btn-primary btn-block">Save expense</button>
+            <p class="savehint">Four fields. The camera button up top is always there.</p>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+  </div>
+</div>
+</body></html>

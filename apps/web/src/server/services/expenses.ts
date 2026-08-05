@@ -369,6 +369,66 @@ async function assertAllocationApplies(amountCents: number, rule: AllocationRule
   );
 }
 
+/**
+ * What the capture form knows only by looking backwards.
+ *
+ * Both of these exist to remove typing from the fifteen-second case, and both
+ * are hints rather than defaults - nothing here is selected or filled on the
+ * owner's behalf. A property that was used this morning is almost certainly the
+ * property being used again now, and saying so beside its name is enough; the
+ * tap is still the owner's. Same for the vendor list, which is four buttons
+ * that fill a field, not an autocomplete that guesses at it.
+ *
+ * One query for both. They are read together on every capture page and the row
+ * set is the same one, so a second round trip would buy nothing.
+ */
+export interface CaptureHints {
+  /** Property id, to the date of the most recent expense recorded against it. */
+  lastUsedByProperty: Record<string, string>;
+  /** Vendor names, most recently used first, deduplicated case-insensitively. */
+  recentVendors: string[];
+}
+
+export async function captureHints(
+  options: { vendorLimit?: number } = {},
+): Promise<CaptureHints> {
+  const db = getDb();
+
+  // Recent rather than all: a vendor last used three years ago is not a
+  // shortcut, and the property dates only need the newest row per property.
+  const rows = await db
+    .select({
+      date: expenses.date,
+      propertyId: expenses.propertyId,
+      vendor: expenses.vendor,
+    })
+    .from(expenses)
+    .orderBy(desc(expenses.date), desc(expenses.createdAt))
+    .limit(300);
+
+  const lastUsedByProperty: Record<string, string> = {};
+  const vendors: string[] = [];
+  const seen = new Set<string>();
+
+  for (const row of rows) {
+    if (row.propertyId && !lastUsedByProperty[row.propertyId]) {
+      lastUsedByProperty[row.propertyId] = row.date;
+    }
+
+    const vendor = row.vendor.trim();
+    const key = vendor.toLowerCase();
+    if (vendor && !seen.has(key)) {
+      seen.add(key);
+      vendors.push(vendor);
+    }
+  }
+
+  return {
+    lastUsedByProperty,
+    recentVendors: vendors.slice(0, options.vendorLimit ?? 4),
+  };
+}
+
 /** Whether this Schedule E line represents physical work needing classification (§5.3). */
 export function requiresCapitalClassification(scheduleECategory: string): boolean {
   return getScheduleECategory(scheduleECategory).triggersCapitalPrompt;

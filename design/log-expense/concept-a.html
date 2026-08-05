@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Log expense · A · Receipt first</title>
+<style>
+:root{
+  --bg:#0b0c0e; --panel:#0f1113; --panel-head:#0c0e10; --rail:#0a0b0d;
+  --hover:#14171a; --selected:#16191d;
+  --line:#1c1f23; --line-soft:#15181b; --line-strong:#2a2f35;
+  --ink:#e6e8eb; --ink-dim:#9aa1a9; --ink-faint:#636b74;
+  --accent:#5b8cff; --accent-dim:#2a3f6b; --accent-line:#33507f; --accent-ink:#cfe0ff;
+  --pos:#3fb950; --neg:#f85149; --warn:#d29922; --plum:#8957e5;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font:13px/1.45 var(--sans);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.app{display:grid;grid-template-columns:212px 1fr;min-height:100vh}
+.rail{background:var(--rail);border-right:1px solid var(--line);padding:14px 10px;display:flex;flex-direction:column;gap:16px}
+.rail-brand{display:flex;align-items:center;gap:8px;padding:4px 8px 0;font-size:13px;font-weight:600}
+.rail-mark{width:7px;height:7px;border-radius:2px;background:var(--accent)}
+.rail-group{display:flex;flex-direction:column;gap:1px}
+.rail-heading{font:600 10px/1 var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--ink-faint);padding:0 8px 6px}
+.rail-link{display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:6px;color:var(--ink-dim);font-size:12.5px}
+.rail-link.on{background:var(--selected);color:var(--ink);box-shadow:inset 2px 0 0 var(--accent)}
+.topbar{display:flex;align-items:center;gap:12px;padding:0 20px;min-height:46px;border-bottom:1px solid var(--line)}
+.topbar h1{font-size:13px;font-weight:600}
+.crumb{color:var(--ink-faint);font-size:12px}
+.spacer{margin-left:auto}
+.well{display:grid;gap:16px;align-content:start;padding:18px 20px 64px;max-width:1420px}
+.seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:6px;overflow:hidden;flex-wrap:wrap}
+.seg a,.seg button{padding:6px 11px;font-size:12px;color:var(--ink-dim);border:0;border-left:1px solid var(--line-strong);background:none;cursor:pointer;font-family:inherit}
+.seg a:first-child,.seg button:first-child{border-left:0}
+.seg [aria-current="true"],.seg [aria-pressed="true"]{background:var(--selected);color:var(--ink)}
+.panel{border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.panel-head{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-faint);padding:10px 14px;border-bottom:1px solid var(--line);font-weight:600;display:flex;align-items:center;gap:10px}
+.panel-body{padding:14px}
+.field{display:block;margin-bottom:12px}
+.field-label{display:block;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:5px}
+.input,.select,.textarea{width:100%;background:var(--panel-head);border:1px solid var(--line-strong);border-radius:6px;color:var(--ink);padding:8px 10px;font-size:13px;font-family:inherit}
+.input-lg{font:600 20px var(--mono);padding:11px 12px}
+.textarea{min-height:64px}
+.hint{display:block;font-size:11.5px;color:var(--ink-faint);margin-top:5px;line-height:1.5}
+.note{border-left:2px solid var(--accent);background:#0e1319;padding:9px 12px;border-radius:0 6px 6px 0;font-size:12px;color:var(--ink-dim);margin:12px 0;line-height:1.55}
+.note strong{color:var(--ink);font-weight:600}
+.note-warn{border-left-color:var(--warn);background:#171208}
+.note-pos{border-left-color:var(--pos);background:#0c1710}
+.tag{display:inline-block;font:500 10.5px var(--sans);padding:2px 6px;border-radius:4px;border:1px solid;white-space:nowrap}
+.tag-pos{color:var(--pos);border-color:#1c4523;background:#0e1f12}
+.tag-warn{color:var(--warn);border-color:#4a3a12;background:#221b0c}
+.tag-muted{color:var(--ink-dim);border-color:var(--line-strong);background:var(--panel-head)}
+.btn{font:500 12px var(--sans);color:var(--ink-dim);border:1px solid var(--line-strong);background:#111417;padding:5px 10px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:7px}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#04122e;font-weight:600}
+.btn-block{display:flex;width:100%;padding:10px}
+.linkbtn{background:none;border:0;padding:0;font:inherit;color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--ink-faint);font-size:12px}
+
+/* ---- state captions, mockup only ---- */
+.statebar{display:flex;align-items:baseline;gap:10px;margin:26px 0 2px;padding-top:22px;border-top:1px dashed #23262b}
+.statebar:first-of-type{border-top:0;padding-top:0;margin-top:0}
+.statebar b{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+.statebar span{font-size:12px;color:var(--ink-faint)}
+
+/* ---- concept A ---- */
+.form{max-width:620px}
+.stepline{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.stepno{width:18px;height:18px;border-radius:50%;background:var(--accent-dim);border:1px solid var(--accent-line);color:var(--accent-ink);font:600 10px/17px var(--mono);text-align:center;flex:none}
+.stepno.done{background:#0e1f12;border-color:#1c4523;color:var(--pos)}
+.steptitle{font-size:13px;font-weight:600}
+.stephint{font-size:11.5px;color:var(--ink-faint);margin-left:auto}
+
+.fork{display:grid;grid-template-columns:1.35fr 1fr;gap:12px}
+.drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;
+  border:1px dashed var(--accent-line);background:linear-gradient(#101724,#0d1117);border-radius:10px;padding:26px 18px;cursor:pointer}
+.drop:hover{border-color:var(--accent);background:#111a2b}
+.drop .big{font-size:14px;font-weight:600;color:var(--ink)}
+.drop .sub{font-size:11.5px;color:var(--ink-dim)}
+.drop svg{opacity:.9}
+.alt{display:flex;flex-direction:column;justify-content:center;gap:6px;border:1px solid var(--line-strong);border-radius:10px;padding:18px 16px;background:var(--panel-head);cursor:pointer}
+.alt .big{font-size:13px;font-weight:600}
+.alt .sub{font-size:11.5px;color:var(--ink-faint);line-height:1.5}
+
+.props{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.prop{display:flex;align-items:flex-start;gap:9px;border:1px solid var(--line-strong);border-radius:8px;padding:9px 11px;background:var(--panel);cursor:pointer;text-align:left}
+.prop:hover{background:var(--hover)}
+.prop[aria-pressed="true"]{background:var(--accent-dim);border-color:var(--accent)}
+.prop .mark{flex:none;width:14px;color:var(--accent);font-weight:700}
+.prop b{display:block;font-size:13px;font-weight:600}
+.prop small{display:block;font-size:11px;color:var(--ink-faint);margin-top:1px}
+.prop[aria-pressed="true"] small{color:var(--accent-ink)}
+.prop.wide{grid-column:1 / -1}
+
+.pending{opacity:.45;pointer-events:none}
+.readrow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.rcpt{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line-strong);border-radius:8px;padding:10px;background:var(--panel-head)}
+.thumb{flex:none;width:64px;height:82px;border-radius:5px;border:1px solid var(--line-strong);background:
+  repeating-linear-gradient(#171a1e 0 3px,#12151890 3px 6px),#101315;position:relative;overflow:hidden}
+.thumb::after{content:"";position:absolute;inset:8px 8px auto 8px;height:9px;border-radius:2px;background:#2a3038}
+.rcpt .meta{min-width:0}
+.rcpt .name{font-size:12.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:960px){.app{grid-template-columns:1fr}.rail{flex-direction:row;overflow-x:auto}.rail-heading{display:none}
+  .fork,.props,.readrow{grid-template-columns:1fr}}
+</style>
+</head><body>
+<div class="app">
+<aside class="rail">
+  <div class="rail-brand"><span class="rail-mark"></span>Ledger</div>
+  <nav class="rail-group">
+    <div class="rail-heading">Capture</div>
+    <a class="rail-link on" href="#">Log</a>
+    <a class="rail-link" href="#">Entries</a>
+    <a class="rail-link" href="#">Jobs</a>
+  </nav>
+  <nav class="rail-group">
+    <div class="rail-heading">Records</div>
+    <a class="rail-link" href="#">Properties</a>
+    <a class="rail-link" href="#">People</a>
+    <a class="rail-link" href="#">Reports</a>
+  </nav>
+</aside>
+
+<div class="main">
+  <header class="topbar">
+    <h1>Log expense</h1><span class="crumb">Concept A · receipt first</span>
+    <span class="spacer"></span><a class="btn" href="index.html">← All concepts</a>
+  </header>
+
+  <div class="well">
+
+  <!-- ================= STATE 1 ================= -->
+  <div class="statebar"><b>State 1</b><span>Page as it opens. Two questions only: what is this, and where.</span></div>
+
+  <div class="seg" style="align-self:start">
+    <a href="#" aria-current="true">Expense</a><a href="#">Time</a><a href="#">Trip</a><a href="#">Rent</a>
+  </div>
+
+  <form class="form">
+    <div class="panel">
+      <div class="panel-body">
+
+        <div class="stepline">
+          <span class="stepno">1</span><span class="steptitle">Do you have the receipt?</span>
+          <span class="stephint">Fills in everything below</span>
+        </div>
+
+        <div class="fork">
+          <label class="drop">
+            <input type="file" accept="image/*,application/pdf" capture="environment" hidden>
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#5b8cff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h2.2l1.2-2h8.2l1.2 2h2.2A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"/>
+              <circle cx="12" cy="13" r="3.4"/>
+            </svg>
+            <span class="big">Photograph the receipt</span>
+            <span class="sub">or drop a photo / PDF · up to 12MB</span>
+          </label>
+
+          <label class="alt">
+            <input type="radio" name="mode" hidden>
+            <span class="big">No receipt — I'll type it</span>
+            <span class="sub">Utilities, cash jobs, anything paid without paper. Same fields, you fill them.</span>
+          </label>
+        </div>
+
+        <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
+
+        <div class="stepline">
+          <span class="stepno">2</span><span class="steptitle">Which property?</span>
+          <span class="stephint">The one thing a receipt can't tell us</span>
+        </div>
+
+        <div class="props">
+          <button type="button" class="prop"><span class="mark"></span><span><b>Kettlewell</b><small>16824 Kettlewell Ln · last used 4d ago</small></span></button>
+          <button type="button" class="prop"><span class="mark"></span><span><b>Westmill</b><small>17334 Westmill Ln · last used 12d ago</small></span></button>
+          <button type="button" class="prop" aria-pressed="true"><span class="mark">✓</span><span><b>Creedmore ct</b><small>1109 Creedmore Ct · last used today</small></span></button>
+          <button type="button" class="prop"><span class="mark"></span><span><b>Arbordale way</b><small>5120 Arbordale Way, Mt Holly</small></span></button>
+          <button type="button" class="prop wide"><span class="mark"></span><span><b>Portfolio-wide / shared</b><small>Split by rule later. Will not reach Schedule E until it has one.</small></span></button>
+        </div>
+
+        <div class="pending" style="margin-top:18px">
+          <div class="stepline">
+            <span class="stepno">3</span><span class="steptitle">The figures</span>
+            <span class="stephint">Waiting on the receipt</span>
+          </div>
+          <div class="field"><span class="field-label">How much</span>
+            <input class="input input-lg" placeholder="124.99"></div>
+          <div class="readrow">
+            <div class="field"><span class="field-label">Paid to</span><input class="input" placeholder="Home Depot"></div>
+            <div class="field"><span class="field-label">When</span><input class="input" value="2026-08-05"></div>
+          </div>
+          <div class="field"><span class="field-label">Which Schedule E line</span>
+            <select class="select"><option>Choose…</option></select></div>
+        </div>
+
+        <button class="btn btn-primary btn-block" disabled style="opacity:.5">Save expense</button>
+      </div>
+    </div>
+  </form>
+
+  <!-- ================= STATE 2 ================= -->
+  <div class="statebar"><b>State 2</b><span>Receipt read. Step 3 becomes a check, not a form to fill.</span></div>
+
+  <form class="form">
+    <div class="panel">
+      <div class="panel-body">
+
+        <div class="stepline">
+          <span class="stepno done">✓</span><span class="steptitle">Receipt attached</span>
+          <span class="stephint">Read in 3s</span>
+        </div>
+
+        <div class="rcpt">
+          <div class="thumb"></div>
+          <div class="meta">
+            <div class="name">IMG_4471.jpeg <span class="tag tag-pos">Attached</span></div>
+            <p class="hint">Home Depot · 2026‑08‑04 · $412.86 read off the document.
+              <button type="button" class="linkbtn">View</button> ·
+              <button type="button" class="linkbtn">Replace</button> ·
+              <button type="button" class="linkbtn">Remove</button></p>
+          </div>
+        </div>
+
+        <div class="stepline" style="margin-top:18px">
+          <span class="stepno done">✓</span><span class="steptitle">Creedmore ct</span>
+          <span class="stephint"><button type="button" class="linkbtn">Change property</button></span>
+        </div>
+
+        <div class="note note-warn">
+          Looks like an expense already recorded:
+          <button type="button" class="linkbtn">Home Depot, 2026‑08‑04, $412.86</button>.
+          Nothing has been changed there — saving this adds a second entry.
+        </div>
+
+        <div class="stepline" style="margin-top:18px">
+          <span class="stepno">3</span><span class="steptitle">Check the figures</span>
+          <span class="stephint">Three of four came off the receipt</span>
+        </div>
+
+        <div class="field"><span class="field-label">How much</span>
+          <input class="input input-lg" value="412.86">
+        </div>
+        <div class="readrow">
+          <div class="field"><span class="field-label">Paid to</span><input class="input" value="The Home Depot"></div>
+          <div class="field"><span class="field-label">When</span><input class="input" value="2026-08-04">
+            <span class="hint">The date was hard to read. Worth checking.</span></div>
+        </div>
+        <div class="field"><span class="field-label">Which Schedule E line</span>
+          <select class="select"><option>14. Repairs</option></select>
+          <span class="hint">Work that keeps the place as it was. Improvements are line 18.</span>
+        </div>
+
+        <div class="note note-warn">
+          This is spend on physical work, so it needs a repair‑or‑improvement answer
+          before year end. It will sit in the review list until then.
+        </div>
+
+        <details style="margin:12px 0">
+          <summary style="cursor:pointer;color:var(--ink-dim);font-size:12.5px">Contractor, notes, who paid — optional</summary>
+          <div style="padding-top:12px">
+            <div class="field"><span class="field-label">Contractor</span>
+              <select class="select"><option>Not a contractor</option></select></div>
+            <div class="field"><span class="field-label">Notes</span><textarea class="textarea"></textarea></div>
+          </div>
+        </details>
+
+        <button class="btn btn-primary btn-block">Save expense</button>
+      </div>
+    </div>
+  </form>
+
+  <!-- ================= STATE 3 ================= -->
+  <div class="statebar"><b>State 3</b><span>Editing an existing expense. The receipt attaches — nothing is re‑read.</span></div>
+
+  <form class="form">
+    <div class="panel">
+      <div class="panel-head">Correct expense · Big Alz · 2025‑11‑28</div>
+      <div class="panel-body">
+        <div class="rcpt">
+          <div class="thumb"></div>
+          <div class="meta">
+            <div class="name">invoice-011307.pdf <span class="tag tag-pos">On file</span></div>
+            <p class="hint">Attached to this expense. Replacing it swaps the document only —
+              <strong style="color:var(--ink)">the figures below are yours and stay as you left them.</strong>
+              <button type="button" class="linkbtn">View</button> ·
+              <button type="button" class="linkbtn">Replace</button></p>
+          </div>
+        </div>
+        <div class="field" style="margin-top:14px"><span class="field-label">How much</span>
+          <input class="input input-lg" value="8244.00"></div>
+        <div class="readrow">
+          <div class="field"><span class="field-label">Paid to</span><input class="input" value="Big Alz Moving n Handyman"></div>
+          <div class="field"><span class="field-label">When</span><input class="input" value="2025-11-28"></div>
+        </div>
+        <button class="btn btn-primary btn-block">Save changes</button>
+      </div>
+    </div>
+  </form>
+
+  </div>
+</div>
+</div>
+</body></html>

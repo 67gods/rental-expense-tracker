@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Log expense · B · Receipt beside the form</title>
+<style>
+:root{
+  --bg:#0b0c0e; --panel:#0f1113; --panel-head:#0c0e10; --rail:#0a0b0d;
+  --hover:#14171a; --selected:#16191d;
+  --line:#1c1f23; --line-soft:#15181b; --line-strong:#2a2f35;
+  --ink:#e6e8eb; --ink-dim:#9aa1a9; --ink-faint:#636b74;
+  --accent:#5b8cff; --accent-dim:#2a3f6b; --accent-line:#33507f; --accent-ink:#cfe0ff;
+  --pos:#3fb950; --neg:#f85149; --warn:#d29922; --plum:#8957e5;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font:13px/1.45 var(--sans);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.app{display:grid;grid-template-columns:212px 1fr;min-height:100vh}
+.rail{background:var(--rail);border-right:1px solid var(--line);padding:14px 10px;display:flex;flex-direction:column;gap:16px}
+.rail-brand{display:flex;align-items:center;gap:8px;padding:4px 8px 0;font-size:13px;font-weight:600}
+.rail-mark{width:7px;height:7px;border-radius:2px;background:var(--accent)}
+.rail-group{display:flex;flex-direction:column;gap:1px}
+.rail-heading{font:600 10px/1 var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--ink-faint);padding:0 8px 6px}
+.rail-link{display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:6px;color:var(--ink-dim);font-size:12.5px}
+.rail-link.on{background:var(--selected);color:var(--ink);box-shadow:inset 2px 0 0 var(--accent)}
+.topbar{display:flex;align-items:center;gap:12px;padding:0 20px;min-height:46px;border-bottom:1px solid var(--line)}
+.topbar h1{font-size:13px;font-weight:600}
+.crumb{color:var(--ink-faint);font-size:12px}
+.spacer{margin-left:auto}
+.well{display:grid;gap:16px;align-content:start;padding:18px 20px 64px;max-width:1420px}
+.seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:6px;overflow:hidden;flex-wrap:wrap}
+.seg a,.seg button{padding:6px 11px;font-size:12px;color:var(--ink-dim);border:0;border-left:1px solid var(--line-strong);background:none;cursor:pointer;font-family:inherit}
+.seg a:first-child,.seg button:first-child{border-left:0}
+.seg [aria-current="true"],.seg [aria-pressed="true"]{background:var(--selected);color:var(--ink)}
+.panel{border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.panel-head{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-faint);padding:10px 14px;border-bottom:1px solid var(--line);font-weight:600;display:flex;align-items:center;gap:10px}
+.panel-body{padding:14px}
+.field{display:block;margin-bottom:12px}
+.field-label{display:block;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:5px}
+.input,.select,.textarea{width:100%;background:var(--panel-head);border:1px solid var(--line-strong);border-radius:6px;color:var(--ink);padding:8px 10px;font-size:13px;font-family:inherit}
+.input-lg{font:600 20px var(--mono);padding:11px 12px}
+.textarea{min-height:60px}
+.hint{display:block;font-size:11.5px;color:var(--ink-faint);margin-top:5px;line-height:1.5}
+.note{border-left:2px solid var(--accent);background:#0e1319;padding:9px 12px;border-radius:0 6px 6px 0;font-size:12px;color:var(--ink-dim);margin:12px 0;line-height:1.55}
+.note strong{color:var(--ink);font-weight:600}
+.note-warn{border-left-color:var(--warn);background:#171208}
+.note-pos{border-left-color:var(--pos);background:#0c1710}
+.tag{display:inline-block;font:500 10.5px var(--sans);padding:2px 6px;border-radius:4px;border:1px solid;white-space:nowrap}
+.tag-pos{color:var(--pos);border-color:#1c4523;background:#0e1f12}
+.tag-warn{color:var(--warn);border-color:#4a3a12;background:#221b0c}
+.tag-muted{color:var(--ink-dim);border-color:var(--line-strong);background:var(--panel-head)}
+.btn{font:500 12px var(--sans);color:var(--ink-dim);border:1px solid var(--line-strong);background:#111417;padding:5px 10px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:7px}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#04122e;font-weight:600}
+.btn-block{display:flex;width:100%;padding:10px}
+.linkbtn{background:none;border:0;padding:0;font:inherit;color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.muted{color:var(--ink-faint);font-size:12px}
+.statebar{display:flex;align-items:baseline;gap:10px;margin:26px 0 2px;padding-top:22px;border-top:1px dashed #23262b}
+.statebar:first-of-type{border-top:0;padding-top:0;margin-top:0}
+.statebar b{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+.statebar span{font-size:12px;color:var(--ink-faint)}
+
+/* ---- concept B ---- */
+.bench{display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:16px;align-items:start}
+
+/* property strip: the first thing on the page, always one tap */
+.propbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:10px 12px}
+.propbar .lbl{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-faint)}
+.pill{border:1px solid var(--line-strong);background:var(--panel-head);color:var(--ink-dim);border-radius:999px;padding:6px 13px;font-size:12.5px;cursor:pointer;font-family:inherit;display:inline-flex;gap:7px;align-items:center}
+.pill:hover{color:var(--ink);border-color:#3a4149}
+.pill[aria-pressed="true"]{background:var(--accent-dim);border-color:var(--accent);color:#fff;font-weight:600}
+.pill small{font-size:10.5px;color:var(--ink-faint)}
+.pill[aria-pressed="true"] small{color:var(--accent-ink)}
+.pill.ghost{border-style:dashed}
+.reqdot{width:6px;height:6px;border-radius:50%;background:var(--warn);display:inline-block}
+
+/* left pane */
+.viewer{border:1px solid var(--line);border-radius:8px;background:var(--panel);overflow:hidden;position:sticky;top:16px}
+.viewer-head{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--line);background:var(--panel-head);font-size:12px;color:var(--ink-dim)}
+.viewer-body{padding:12px;min-height:420px;display:flex;align-items:center;justify-content:center}
+.dropbig{width:100%;min-height:396px;border:1px dashed var(--accent-line);border-radius:10px;background:linear-gradient(#101724,#0d1117);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:24px;cursor:pointer}
+.dropbig:hover{border-color:var(--accent);background:#111a2b}
+.dropbig .big{font-size:15px;font-weight:600}
+.dropbig .sub{font-size:12px;color:var(--ink-dim);max-width:260px;line-height:1.55}
+.dropbig .or{font-size:11.5px;color:var(--ink-faint);margin-top:6px}
+
+/* the fake receipt image */
+.paper{width:100%;max-width:300px;background:#f4f1ea;color:#22242a;border-radius:3px;padding:16px 16px 22px;font:12px/1.5 var(--mono);box-shadow:0 8px 26px rgba(0,0,0,.45);transform:rotate(-.5deg)}
+.paper h4{font:700 13px var(--sans);letter-spacing:.06em;text-align:center;margin-bottom:2px}
+.paper .addr{text-align:center;font-size:10px;color:#6a6a72;margin-bottom:10px}
+.paper .ln{display:flex;justify-content:space-between;gap:10px;font-size:10.5px}
+.paper .rule{border-top:1px dashed #b9b3a6;margin:8px 0}
+.paper .tot{display:flex;justify-content:space-between;font:700 13px var(--mono)}
+.paper mark{background:#ffe58a;padding:0 2px;border-radius:2px}
+.zoombar{display:flex;gap:6px;margin-left:auto}
+
+/* right pane */
+.readfield .input,.readfield .select{border-color:var(--accent-line);background:#0d1117}
+.fromreceipt{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;color:var(--accent-ink);background:var(--accent-dim);border:1px solid var(--accent-line);border-radius:4px;padding:1px 5px;margin-left:6px;vertical-align:middle}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.savebar{display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);padding-top:12px;margin-top:4px}
+.savebar .muted{margin-right:auto}
+@media(max-width:1100px){.bench{grid-template-columns:1fr}.viewer{position:static}}
+@media(max-width:960px){.app{grid-template-columns:1fr}.rail{flex-direction:row;overflow-x:auto}.rail-heading{display:none}.row2{grid-template-columns:1fr}}
+</style>
+</head><body>
+<div class="app">
+<aside class="rail">
+  <div class="rail-brand"><span class="rail-mark"></span>Ledger</div>
+  <nav class="rail-group">
+    <div class="rail-heading">Capture</div>
+    <a class="rail-link on" href="#">Log</a><a class="rail-link" href="#">Entries</a><a class="rail-link" href="#">Jobs</a>
+  </nav>
+  <nav class="rail-group">
+    <div class="rail-heading">Records</div>
+    <a class="rail-link" href="#">Properties</a><a class="rail-link" href="#">People</a><a class="rail-link" href="#">Reports</a>
+  </nav>
+</aside>
+
+<div class="main">
+  <header class="topbar">
+    <h1>Log expense</h1><span class="crumb">Concept B · receipt beside the form</span>
+    <span class="spacer"></span><a class="btn" href="index.html">← All concepts</a>
+  </header>
+
+  <div class="well">
+
+  <!-- ================= STATE 1 ================= -->
+  <div class="statebar"><b>State 1</b><span>Empty. Property first, then the receipt pane offers the camera — the form beside it is already usable if there is no receipt.</span></div>
+
+  <div class="seg" style="align-self:start">
+    <a href="#" aria-current="true">Expense</a><a href="#">Time</a><a href="#">Trip</a><a href="#">Rent</a>
+  </div>
+
+  <div class="propbar">
+    <span class="lbl">Property</span>
+    <button class="pill" aria-pressed="true">Creedmore ct <small>today</small></button>
+    <button class="pill">Kettlewell <small>4d</small></button>
+    <button class="pill">Westmill <small>12d</small></button>
+    <button class="pill">Arbordale way</button>
+    <button class="pill ghost">Portfolio‑wide</button>
+  </div>
+
+  <div class="bench">
+    <div class="viewer">
+      <div class="viewer-head"><span class="reqdot"></span> Receipt · none yet</div>
+      <div class="viewer-body">
+        <label class="dropbig">
+          <input type="file" accept="image/*,application/pdf" capture="environment" hidden>
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#5b8cff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h2.2l1.2-2h8.2l1.2 2h2.2A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"/>
+            <circle cx="12" cy="13" r="3.4"/>
+          </svg>
+          <span class="big">Photograph or drop the receipt</span>
+          <span class="sub">It fills the form on the right, and stays here so you can check the figures against it.</span>
+          <span class="or">No receipt? Just fill the form — this pane stays empty and the expense saves fine.</span>
+        </label>
+      </div>
+    </div>
+
+    <form class="panel">
+      <div class="panel-head">The expense</div>
+      <div class="panel-body">
+        <div class="field"><span class="field-label">How much</span>
+          <input class="input input-lg" placeholder="124.99"></div>
+        <div class="field"><span class="field-label">Paid to</span>
+          <input class="input" placeholder="Home Depot">
+          <span class="hint">Recent: <button type="button" class="linkbtn">Lowe's</button> ·
+            <button type="button" class="linkbtn">The Home Depot</button> ·
+            <button type="button" class="linkbtn">Sherwin‑Williams</button> ·
+            <button type="button" class="linkbtn">Big Alz</button></span>
+        </div>
+        <div class="row2">
+          <div class="field"><span class="field-label">When</span><input class="input" type="date" value="2026-08-05"></div>
+          <div class="field"><span class="field-label">Contractor (optional)</span>
+            <select class="select"><option>Not a contractor</option></select></div>
+        </div>
+        <div class="field"><span class="field-label">Which Schedule E line</span>
+          <select class="select"><option>Choose…</option></select></div>
+        <div class="field"><span class="field-label">Notes (optional)</span><textarea class="textarea"></textarea></div>
+        <div class="savebar">
+          <span class="muted">Saving without a receipt is fine — it will show as <span class="tag tag-muted">No receipt</span> in Entries.</span>
+          <button class="btn btn-primary">Save expense</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- ================= STATE 2 ================= -->
+  <div class="statebar"><b>State 2</b><span>Receipt read. It stays on screen at full size, so every figure is checkable without opening anything.</span></div>
+
+  <div class="propbar">
+    <span class="lbl">Property</span>
+    <button class="pill" aria-pressed="true">Creedmore ct <small>today</small></button>
+    <button class="pill">Kettlewell <small>4d</small></button>
+    <button class="pill">Westmill <small>12d</small></button>
+    <button class="pill">Arbordale way</button>
+    <button class="pill ghost">Portfolio‑wide</button>
+  </div>
+
+  <div class="bench">
+    <div class="viewer">
+      <div class="viewer-head">
+        <span class="tag tag-pos">Attached</span> IMG_4471.jpeg
+        <span class="zoombar"><button class="btn">−</button><button class="btn">+</button><button class="btn">Replace</button></span>
+      </div>
+      <div class="viewer-body">
+        <div class="paper">
+          <h4>THE HOME DEPOT</h4>
+          <div class="addr">9709 NORTHLAKE CENTRE PKWY<br>CHARLOTTE NC 28216</div>
+          <div class="ln"><span>08/04/2026</span><span>14:22</span></div>
+          <div class="rule"></div>
+          <div class="ln"><span>2×6×8 PT LUMBER ×14</span><span>128.66</span></div>
+          <div class="ln"><span>DECK SCREWS 5LB</span><span>44.97</span></div>
+          <div class="ln"><span>EXT PAINT SATIN 2GAL</span><span>112.00</span></div>
+          <div class="ln"><span>ROLLER KIT / DROP</span><span>36.14</span></div>
+          <div class="ln"><span>CONCRETE MIX ×6</span><span>63.42</span></div>
+          <div class="rule"></div>
+          <div class="ln"><span>SUBTOTAL</span><span>385.19</span></div>
+          <div class="ln"><span>NC TAX 7.25%</span><span>27.67</span></div>
+          <div class="rule"></div>
+          <div class="tot"><span>TOTAL</span><span><mark>412.86</mark></span></div>
+          <div class="ln" style="margin-top:8px"><span>VISA ****4417</span><span>APPROVED</span></div>
+        </div>
+      </div>
+    </div>
+
+    <form class="panel">
+      <div class="panel-head">The expense <span class="tag tag-pos" style="margin-left:auto">4 fields read</span></div>
+      <div class="panel-body">
+        <div class="note">Read from the receipt on the left. Anything you retype wins — the highlight goes away when you do.</div>
+
+        <div class="field readfield"><span class="field-label">How much <span class="fromreceipt">from receipt</span></span>
+          <input class="input input-lg" value="412.86"></div>
+        <div class="field readfield"><span class="field-label">Paid to <span class="fromreceipt">from receipt</span></span>
+          <input class="input" value="The Home Depot"></div>
+        <div class="row2">
+          <div class="field readfield"><span class="field-label">When <span class="fromreceipt">from receipt</span></span>
+            <input class="input" type="date" value="2026-08-04"></div>
+          <div class="field"><span class="field-label">Contractor (optional)</span>
+            <select class="select"><option>Not a contractor</option></select></div>
+        </div>
+        <div class="field readfield"><span class="field-label">Which Schedule E line <span class="fromreceipt">suggested</span></span>
+          <select class="select"><option>14. Repairs</option></select>
+          <span class="hint">Work that keeps the place as it was. Improvements are line 18.</span></div>
+        <div class="field"><span class="field-label">Notes (optional)</span>
+          <textarea class="textarea">Lumber, deck screws, exterior paint, concrete</textarea></div>
+
+        <div class="note note-warn">Needs a repair‑or‑improvement answer before year end. It sits in the review list until then.</div>
+
+        <div class="savebar">
+          <span class="muted">Receipt stored · hash matches nothing on file</span>
+          <button class="btn btn-primary">Save expense</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- ================= STATE 3 ================= -->
+  <div class="statebar"><b>State 3</b><span>Editing. The pane shows the document already on file; attaching a new one swaps the paper and touches no field.</span></div>
+
+  <div class="bench">
+    <div class="viewer">
+      <div class="viewer-head"><span class="tag tag-pos">On file</span> invoice-011307.pdf
+        <span class="zoombar"><button class="btn">Open</button><button class="btn">Replace</button></span></div>
+      <div class="viewer-body">
+        <div class="paper" style="transform:none">
+          <h4>BIG ALZ MOVING N HANDYMAN</h4>
+          <div class="addr">INVOICE INV011307 · 11/28/2025</div>
+          <div class="rule"></div>
+          <div class="ln"><span>INTERIOR PAINTING</span><span>3,900.00</span></div>
+          <div class="ln"><span>LVP FLOORING — LABOR</span><span>3,344.00</span></div>
+          <div class="ln"><span>MATERIALS</span><span>1,000.00</span></div>
+          <div class="rule"></div>
+          <div class="tot"><span>TOTAL</span><span>8,244.00</span></div>
+        </div>
+      </div>
+    </div>
+    <form class="panel">
+      <div class="panel-head">Correct expense</div>
+      <div class="panel-body">
+        <div class="note note-pos">
+          <strong>Nothing was re‑read.</strong> This expense already has its figures; a document attached
+          here is filed against it, not scanned over it. Change a figure by typing it.
+        </div>
+        <div class="field"><span class="field-label">How much</span><input class="input input-lg" value="8244.00"></div>
+        <div class="field"><span class="field-label">Paid to</span><input class="input" value="Big Alz Moving n Handyman Service LLC"></div>
+        <div class="row2">
+          <div class="field"><span class="field-label">When</span><input class="input" type="date" value="2025-11-28"></div>
+          <div class="field"><span class="field-label">Contractor</span><select class="select"><option>Big Alz</option></select></div>
+        </div>
+        <div class="field"><span class="field-label">Repair or improvement</span>
+          <select class="select"><option>Not answered yet</option></select></div>
+        <div class="savebar"><span class="muted">Last edited 2025‑12‑02</span>
+          <button class="btn btn-primary">Save changes</button></div>
+      </div>
+    </form>
+  </div>
+
+  </div>
+</div>
+</div>
+</body></html>

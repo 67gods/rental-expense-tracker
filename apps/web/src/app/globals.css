@@ -1099,6 +1099,483 @@
 }
 
 /*
+ * The expense capture form.
+ *
+ * Two answers carry this page - which property, and the receipt - and the
+ * layout says so before a word is read. The property runs across the top; the
+ * receipt takes a column of its own and stays on screen at a size you can
+ * actually read, because checking the figures against the document is the
+ * reason a person is still in the loop; the fields sit beside it.
+ *
+ * WRITTEN PHONE-FIRST, which is the opposite of the rest of this file and
+ * deliberate: the phone arrangement is the one that has to be right. An expense
+ * is logged one-handed at a hardware store counter far more often than it is
+ * typed at a desk. So the small screen gets the plain stack - property,
+ * camera, then the figures - and the two-column bench is what a wide window
+ * adds, at the bottom of the file.
+ */
+@layer components {
+  .capture {
+    display: grid;
+    gap: 14px;
+    max-width: 1120px;
+    align-content: start;
+  }
+
+  .capture-alerts {
+    display: grid;
+    gap: 8px;
+  }
+  /* The notes carry their own vertical rhythm inside a stack that already has
+     a gap; doubled, they push the property row off a phone screen. */
+  .capture-alerts .note {
+    margin: 0;
+  }
+
+  .capture-props .field {
+    margin-bottom: 0;
+  }
+  .capture-props .note {
+    margin-bottom: 0;
+  }
+
+  /*
+   * The figures, folded away until there is something to check.
+   *
+   * Only ever on a phone - the wide layout below unsets this, where both
+   * columns are on screen at once and hiding one would be theatre. Fields
+   * inside are hidden, not removed: they still post, and the reveal is a class
+   * change rather than a re-render that would lose what the reader filled in.
+   */
+  .capture-fields-folded {
+    display: none;
+  }
+
+  /* The manual path, said out loud rather than left to be inferred from an
+     untouched file input. Phone only; see the wide layout. */
+  .capture-manual {
+    display: block;
+    width: 100%;
+    text-align: left;
+    font: 500 13px var(--sans);
+    color: var(--ink-dim);
+    background: none;
+    border: 1px dashed var(--line-strong);
+    border-radius: 10px;
+    padding: 11px 13px;
+    margin-top: 10px;
+    cursor: pointer;
+  }
+  .capture-manual:hover {
+    color: var(--ink);
+    border-color: #3a4149;
+  }
+  .capture-manual .hint {
+    margin-top: 2px;
+  }
+
+  /* Four vendor buttons on one line, wrapping rather than pushing the field
+     out. They sit inside a .hint, so they inherit its size and only the accent
+     marks them as pressable. */
+  .capture-recents {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+  }
+
+  .capture-dates {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+  .capture-dates .btn {
+    flex: 1;
+  }
+  .capture-dates .btn[aria-pressed='true'] {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  .capture-more {
+    border-top: 1px solid var(--line);
+    padding-top: 10px;
+    margin-bottom: 12px;
+  }
+  .capture-more > summary {
+    cursor: pointer;
+    font-size: 12.5px;
+    color: var(--ink-dim);
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .capture-more > summary::-webkit-details-marker {
+    display: none;
+  }
+  .capture-more > summary::before {
+    content: '›';
+    color: var(--ink-faint);
+  }
+  .capture-more[open] > summary::before {
+    content: '⌄';
+  }
+  .capture-more > summary:hover {
+    color: var(--ink);
+  }
+  .capture-more-body {
+    padding-top: 12px;
+  }
+  .capture-more-body .field:last-child {
+    margin-bottom: 0;
+  }
+
+  .capture-save {
+    display: grid;
+    gap: 8px;
+    border-top: 1px solid var(--line);
+    padding-top: 12px;
+  }
+  .capture-save .muted {
+    order: 2;
+    text-align: center;
+  }
+
+  /* --- property tiles --------------------------------------------------- */
+
+  .prop-field {
+    border: 0;
+  }
+  .prop-field > legend {
+    padding: 0;
+  }
+  .prop-tiles {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+  }
+  .prop-tile {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    text-align: left;
+    background: var(--panel-head);
+    border: 1px solid var(--line-strong);
+    border-radius: 8px;
+    padding: 10px 11px;
+    color: var(--ink-dim);
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .prop-tile:hover {
+    background: var(--hover);
+    border-color: #3a4149;
+    color: var(--ink);
+  }
+  .prop-tile b {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .prop-tile small {
+    display: block;
+    font-size: 10.5px;
+    color: var(--ink-faint);
+    margin-top: 2px;
+  }
+  .prop-tile[aria-pressed='true'] {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+  }
+  .prop-tile[aria-pressed='true'] b {
+    color: #fff;
+  }
+  .prop-tile[aria-pressed='true'] small {
+    color: var(--accent-ink);
+  }
+  /* The tick, not the background, is what says "chosen" - a shift in ground
+     colour alone reads as hover, which is the same mistake .choice fixed. */
+  .prop-tile-mark {
+    flex: 0 0 12px;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--accent);
+  }
+  .prop-tile[aria-pressed='true'] .prop-tile-mark::before {
+    content: '✓';
+    font-weight: 700;
+  }
+  .prop-tile-body {
+    min-width: 0;
+  }
+  /* Portfolio-wide is a decision, not a fifth property, so it gets its own row
+     under the ones that are. */
+  .prop-tile-wide {
+    grid-column: 1 / -1;
+    border-style: dashed;
+  }
+
+  /* --- the receipt pane ------------------------------------------------- */
+
+  .receipt-pane {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel);
+    overflow: hidden;
+  }
+  .receipt-pane-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px 8px 12px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel-head);
+  }
+  .receipt-pane-title {
+    font-size: 11px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 600;
+  }
+  .receipt-pane-optional {
+    font-size: 11.5px;
+    color: var(--ink-faint);
+  }
+  .receipt-pane-acts {
+    margin-left: auto;
+    display: flex;
+    gap: 2px;
+  }
+  .receipt-pane-body {
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  /* Zoomed, the pane becomes a window onto a document larger than itself.
+     Bounded by the viewport rather than by a fixed height, so a long receipt
+     scrolls inside the pane instead of taking the page with it. */
+  .receipt-pane-body-zoom {
+    overflow: auto;
+    max-height: 70vh;
+    align-items: flex-start;
+    justify-content: flex-start;
+  }
+  .receipt-pane-foot {
+    padding: 0 12px 10px;
+    margin-top: 0;
+    overflow-wrap: anywhere;
+  }
+
+  /*
+   * The native file input is the control; everything visible is its label.
+   *
+   * Clipped rather than `display: none` so it stays in the tab order - a
+   * hidden-by-display input cannot be reached by keyboard at all, and the
+   * label is not focusable in its place. The focus ring is drawn on the label
+   * instead, which is the thing a person can actually see.
+   */
+  .receipt-file {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+  .receipt-file:focus-visible ~ .receipt-drop {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /*
+   * The capture target. On a phone this is a shutter button - a filled accent
+   * row with the camera at the head of it, because at a counter it is the only
+   * thing on screen anybody wants to hit. The wide layout turns it back into a
+   * drop zone that fills the column.
+   */
+  .receipt-drop {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    text-align: left;
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    padding: 13px 14px;
+    background: linear-gradient(#16233c, #111a2b);
+    cursor: pointer;
+  }
+  .receipt-drop:hover {
+    background: #16233c;
+  }
+  .receipt-drop b {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .receipt-drop .hint {
+    color: var(--accent-ink);
+    opacity: 0.8;
+  }
+  .receipt-drop-icon {
+    flex: none;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #04122e;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .receipt-drop-text {
+    min-width: 0;
+  }
+
+  .receipt-image {
+    display: block;
+    max-width: 100%;
+    max-height: 300px;
+    border-radius: 5px;
+    background: #fff;
+  }
+  .receipt-image-zoom {
+    max-height: none;
+    max-width: none;
+    width: auto;
+    cursor: zoom-out;
+  }
+  .receipt-doc {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    text-align: center;
+    color: var(--ink-dim);
+    padding: 22px 12px;
+  }
+  .receipt-doc b {
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--ink);
+    overflow-wrap: anywhere;
+  }
+  .receipt-doc .hint {
+    margin-top: 0;
+  }
+}
+
+/*
+ * The wide arrangement: the receipt beside the figures rather than above them.
+ *
+ * 1240px rather than the 960 the rest of the file breaks at, and the extra is
+ * not caution. The rail takes 212px of any window this wide, so the content
+ * column is some 250px narrower than the number in the query - split a 1024px
+ * window and the receipt pane and the fields beside it are both too small to
+ * use. The stack is the better layout right up until there is genuinely room
+ * for two.
+ */
+@layer components {
+  @media (min-width: 1240px) {
+    .capture {
+      grid-template-columns: minmax(0, 380px) minmax(0, 1fr);
+      gap: 16px;
+      align-items: start;
+    }
+    .capture-alerts,
+    .capture-props {
+      grid-column: 1 / -1;
+    }
+    .capture-receipt {
+      grid-column: 1;
+      /* Clears the sticky topbar, so scrolling down the fields keeps the
+         document in view - which is the entire argument for two columns. */
+      position: sticky;
+      top: calc(var(--top-h) + 14px);
+    }
+    .capture-fields {
+      grid-column: 2;
+    }
+    /* Nothing to fold: both halves are on screen at once. */
+    .capture-fields-folded {
+      display: block;
+    }
+    .capture-manual,
+    .capture-dates {
+      display: none;
+    }
+
+    .prop-tiles {
+      grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+    }
+    .prop-tile-wide {
+      grid-column: auto;
+    }
+
+    /* A pane, not a button: dashed, tall, and captioned with what dropping a
+       file here will do. */
+    .receipt-drop {
+      flex-direction: column;
+      justify-content: center;
+      text-align: center;
+      gap: 10px;
+      min-height: 300px;
+      padding: 28px 22px;
+      border-style: dashed;
+      border-color: var(--accent-line);
+      background: linear-gradient(#101724, #0d1117);
+    }
+    .receipt-drop:hover {
+      border-color: var(--accent);
+      background: #111a2b;
+    }
+    .receipt-drop-icon {
+      width: 46px;
+      height: 46px;
+      background: none;
+      border: 1px solid var(--accent-line);
+      color: var(--accent);
+    }
+    .receipt-drop-text {
+      max-width: 280px;
+    }
+
+    .receipt-pane-body {
+      padding: 12px;
+      min-height: 324px;
+    }
+    .receipt-image {
+      max-height: 460px;
+    }
+
+    .capture-save {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .capture-save .muted {
+      order: 0;
+      text-align: left;
+      margin-right: auto;
+    }
+    /* The button stops being the width of the phone once it is one control in
+       a row rather than the last thing on a screen. */
+    .capture-save .btn-block {
+      width: auto;
+      padding: 9px 20px;
+    }
+  }
+}
+
+/*
  * Under 960px the rail becomes a horizontal strip at the top rather than
  * hiding behind a menu button. Navigation that needs a tap to reveal is
  * navigation you stop using, and this app is opened one-handed in a hardware

@@ -5,6 +5,7 @@ import { useState } from 'react';
 export interface Option {
   id: string;
   label: string;
+  /** A second line under the label. Only the tile layout shows it. */
   hint?: string;
 }
 
@@ -14,6 +15,13 @@ export interface Option {
  * Five properties fit on one screen, so a native select would add two taps and
  * a scroll wheel for no gain. Chips also make "portfolio-wide" a visible
  * option instead of something hidden at the top of a list.
+ *
+ * TWO LAYOUTS, ONE CONTROL. `seg` is the joined strip every capture form has
+ * always used and is right for a question that sits among ten others. `tiles`
+ * is for the one form where the property is half of what is being asked - the
+ * expense - and gets targets big enough to hit one-handed, room for a line
+ * saying when each was last used, and a portfolio-wide option that reads as a
+ * decision rather than as the item somebody forgot to remove from the strip.
  */
 export function PropertyPicker({
   name = 'propertyId',
@@ -23,6 +31,8 @@ export function PropertyPicker({
   noneLabel = 'Portfolio-wide',
   label = 'Which property?',
   required = false,
+  layout = 'seg',
+  noneHint,
   onChange,
 }: {
   name?: string;
@@ -32,6 +42,9 @@ export function PropertyPicker({
   noneLabel?: string;
   label?: string;
   required?: boolean;
+  layout?: 'seg' | 'tiles';
+  /** The sub-line on the portfolio-wide tile. Tiles only. */
+  noneHint?: string;
   /** For a caller that needs to react to the live choice - most don't. */
   onChange?: (value: string) => void;
 }) {
@@ -40,6 +53,57 @@ export function PropertyPicker({
   function choose(value: string) {
     setSelected(value);
     onChange?.(value);
+  }
+
+  const empty =
+    options.length === 0 ? (
+      <p className="hint mt-2">
+        No properties yet. Add them under Places before logging against one.
+      </p>
+    ) : null;
+
+  if (layout === 'tiles') {
+    return (
+      <fieldset className="field prop-field">
+        <legend className="field-label">
+          {label}
+          {required ? '' : ' (optional)'}
+        </legend>
+        <input type="hidden" name={name} value={selected} />
+        <div className="prop-tiles">
+          {options.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              className="prop-tile"
+              aria-pressed={selected === option.id}
+              onClick={() => choose(option.id)}
+            >
+              <span className="prop-tile-mark" aria-hidden="true" />
+              <span className="prop-tile-body">
+                <b>{option.label}</b>
+                {option.hint ? <small>{option.hint}</small> : null}
+              </span>
+            </button>
+          ))}
+          {allowNone ? (
+            <button
+              type="button"
+              className="prop-tile prop-tile-wide"
+              aria-pressed={selected === ''}
+              onClick={() => choose('')}
+            >
+              <span className="prop-tile-mark" aria-hidden="true" />
+              <span className="prop-tile-body">
+                <b>{noneLabel}</b>
+                {noneHint ? <small>{noneHint}</small> : null}
+              </span>
+            </button>
+          ) : null}
+        </div>
+        {empty}
+      </fieldset>
+    );
   }
 
   return (
@@ -70,11 +134,7 @@ export function PropertyPicker({
           </button>
         ))}
       </div>
-      {options.length === 0 ? (
-        <p className="hint mt-2">
-          No properties yet. Add them under Places before logging against one.
-        </p>
-      ) : null}
+      {empty}
     </div>
   );
 }

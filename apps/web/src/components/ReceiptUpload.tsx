@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 type Status = 'idle' | 'uploading' | 'reading' | 'done' | 'error';
 
@@ -36,7 +36,7 @@ export type ExtractionOutcome =
   | { status: 'not_receipt' }
   | {
       status: 'skipped';
-      reason: 'heic' | 'unsupported' | 'not_configured' | 'unreadable' | 'duplicate';
+      reason: 'heic' | 'unsupported' | 'not_configured' | 'unreadable' | 'duplicate' | 'not_requested';
     };
 
 export interface ReceiptRead {
@@ -46,7 +46,7 @@ export interface ReceiptRead {
 }
 
 /**
- * Receipt capture.
+ * Receipt capture, and the pane that shows what was captured.
  *
  * `capture="environment"` opens the rear camera straight from the form on a
  * phone, so photographing a receipt at the counter is one tap rather than a
@@ -60,6 +60,13 @@ export interface ReceiptRead {
  * is deliberately not allowed to hold anything up: the receipt is already
  * stored and the form is already usable, so a reader that is slow, unconfigured
  * or wrong costs a few seconds of a progress line and nothing else.
+ *
+ * THE PANE IS THE OTHER HALF OF THE JOB. A receipt that has been uploaded and
+ * then hidden behind a filename is a receipt nobody checks the figures against,
+ * and checking them is the entire reason a person is still in the loop. So the
+ * document stays on screen at a size you can read - beside the fields on a
+ * desktop, above them on a phone - and the browser renders it from bytes it
+ * already has, with no second download.
  */
 export function ReceiptUpload({
   name = 'receiptKey',
@@ -78,6 +85,15 @@ export function ReceiptUpload({
   /** Set when editing, so an expense cannot be reported as its own duplicate. */
   expenseId = null,
   /**
+   * Whether an uploaded file should be read by the model.
+   *
+   * False when correcting a record that already exists - see the `mode` note on
+   * the extract route. The upload, the hash and the duplicate check all still
+   * happen; only the reading is skipped, so the caller's fields are never
+   * touched by anything it did not type.
+   */
+  read = true,
+  /**
    * Tells the form an upload is in flight.
    *
    * The key only exists once S3 has the bytes, so a save submitted before then
@@ -91,7 +107,16 @@ export function ReceiptUpload({
    * wrong trade for anyone who would rather just type it.
    */
   onBusyChange,
-  /** Fires once the receipt has been read, however that turned out. */
+  /**
+   * Whether there is a receipt on the form at all.
+   *
+   * Separate from `onRead` because the two answer different questions: a
+   * receipt can be attached and unread, and a read that returned nothing is not
+   * a receipt that went away. The form arranges itself around the first, so it
+   * has to be told plainly.
+   */
+  onAttachedChange,
+  /** Fires once the receipt has been dealt with, however that turned out. */
   onRead,
 }: {
   name?: string;
@@ -99,7 +124,9 @@ export function ReceiptUpload({
   defaultSha256?: string | null;
   propertyId?: string | null;
   expenseId?: string | null;
+  read?: boolean;
   onBusyChange?: (busy: boolean) => void;
+  onAttachedChange?: (attached: boolean) => void;
   onRead?: (read: ReceiptRead) => void;
 }) {
   const [status, setStatus] = useState<Status>(defaultKey ? 'done' : 'idle');
@@ -107,13 +134,46 @@ export function ReceiptUpload({
   const [sha256, setSha256] = useState(defaultSha256 ?? '');
   const [error, setError] = useState<string | null>(null);
   const [filename, setFilename] = useState(defaultKey ? basename(defaultKey) : '');
+  /**
+   * What to draw in the pane.
+   *
+   * For a file chosen a moment ago this is an object URL - the bytes are in the
+   * page already, so the preview is instant and costs no request. For a receipt
+   * already on the record it is the view endpoint, which redirects to a signed
+   * URL; that only works once a record claims the key, which is exactly the
+   * case being described.
+   */
+  const [preview, setPreview] = useState<{ url: string; kind: 'image' | 'doc' } | null>(
+    defaultKey ? previewForKey(defaultKey) : null,
+  );
+  /** Fit the pane, or show the document at full size in a scroller. */
+  const [zoomed, setZoomed] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const objectUrl = useRef<string | null>(null);
+
+  // An object URL holds the file in memory until it is handed back.
+  useEffect(() => {
+    return () => {
+      if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
+    };
+  }, []);
+
+  function showLocally(file: File) {
+    if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
+    const url = URL.createObjectURL(file);
+    objectUrl.current = url;
+    setPreview({ url, kind: file.type === 'application/pdf' ? 'doc' : 'image' });
+  }
 
   async function upload(file: File) {
     setStatus('uploading');
     setError(null);
     setFilename(file.name);
     setSha256('');
+    setZoomed(false);
+    // Before the network, not after: the photograph appears the instant it is
+    // taken, which is what makes the wait legible as progress on something.
+    showLocally(file);
     onBusyChange?.(true);
 
     let uploadedKey: string;
@@ -182,6 +242,7 @@ export function ReceiptUpload({
       uploadedKey = presign.key;
       readToken = presign.readToken;
       setKey(uploadedKey);
+      onAttachedChange?.(true);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'The upload failed.');
       setStatus('error');
@@ -198,94 +259,213 @@ export function ReceiptUpload({
       const response = await fetch('/api/v1/receipts/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: uploadedKey, readToken, propertyId, expenseId }),
+        body: JSON.stringify({
+          key: uploadedKey,
+          readToken,
+          propertyId,
+          expenseId,
+          mode: read ? 'read' : 'attach',
+        }),
       });
 
       if (!response.ok) throw new Error('unreadable');
 
-      const read = (await response.json()) as ReceiptRead;
-      setSha256(read.sha256 ?? '');
-      onRead?.(read);
+      const result = (await response.json()) as ReceiptRead;
+      setSha256(result.sha256 ?? '');
+      onRead?.(result);
     } catch {
       // A reader that failed is not an upload that failed. The receipt is
       // attached, the form works, and saying so would be noise.
-      onRead?.({ sha256: '', extraction: { status: 'skipped', reason: 'unreadable' }, duplicate: null });
+      onRead?.({
+        sha256: '',
+        extraction: { status: 'skipped', reason: read ? 'unreadable' : 'not_requested' },
+        duplicate: null,
+      });
     } finally {
       setStatus('done');
     }
   }
 
   function clear() {
+    if (objectUrl.current) {
+      URL.revokeObjectURL(objectUrl.current);
+      objectUrl.current = null;
+    }
     setKey('');
     setSha256('');
     setStatus('idle');
     setError(null);
     setFilename('');
+    setPreview(null);
+    setZoomed(false);
     if (inputRef.current) inputRef.current.value = '';
-    onRead?.({ sha256: '', extraction: { status: 'skipped', reason: 'unreadable' }, duplicate: null });
+    onAttachedChange?.(false);
+    // Nothing to report and nothing to say about it: this clears the caller's
+    // duplicate warning and reading note without inventing a failure that did
+    // not happen.
+    onRead?.({ sha256: '', extraction: { status: 'skipped', reason: 'not_requested' }, duplicate: null });
   }
 
+  const busy = status === 'uploading' || status === 'reading';
+  const attached = status === 'done' && key !== '';
+  // Only the receipt already saved on the record can be opened through the app.
+  // A file uploaded a moment ago is in the bucket but not yet on any row, and
+  // the view endpoint refuses keys no record claims - so the local copy is what
+  // gets opened until the form is submitted.
+  const openHref = key && key === defaultKey
+    ? `/api/v1/receipts/view?key=${encodeURIComponent(key)}`
+    : preview?.url;
+
   return (
-    <div className="field">
-      <span className="field-label">Receipt (optional)</span>
+    <section className="receipt-pane" aria-label="Receipt">
       <input type="hidden" name={name} value={key} />
       {/* Empty rather than absent when unknown, so an edit that did not touch
           the receipt posts the hash it arrived with. */}
       <input type="hidden" name="receiptSha256" value={sha256} />
 
-      <input
-        ref={inputRef}
-        className="input"
-        type="file"
-        accept="image/*,application/pdf"
-        capture="environment"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) void upload(file);
-        }}
-        disabled={status === 'uploading' || status === 'reading'}
-        aria-describedby="receipt-status"
-      />
-
-      <p id="receipt-status" className="hint" role="status">
-        {status === 'idle' ? 'Photo or PDF, up to 12MB. Stored with the expense, and read to fill in the fields.' : null}
-        {status === 'uploading' ? `Uploading ${filename}…` : null}
-        {status === 'reading' ? `Reading ${filename}… you can fill it in yourself instead.` : null}
-        {status === 'done' ? (
-          <>
-            <span className="tag tag-pos">Attached</span> {filename}{' '}
-            {/*
-              Only the receipt already saved on the record can be viewed. A file
-              uploaded a moment ago is in the bucket but not yet on any row, and
-              the view endpoint refuses keys no record claims - so offering the
-              link before the form is submitted would offer a broken one.
-            */}
-            {key && key === defaultKey ? (
-              <>
-                <a
-                  className="linkbtn"
-                  href={`/api/v1/receipts/view?key=${encodeURIComponent(key)}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  View
-                </a>{' '}
-              </>
+      <div className="receipt-pane-head">
+        <span className="receipt-pane-title">Receipt</span>
+        {attached ? (
+          <span className="tag tag-pos">{key === defaultKey ? 'On file' : 'Attached'}</span>
+        ) : (
+          <span className="receipt-pane-optional">optional</span>
+        )}
+        {attached ? (
+          <span className="receipt-pane-acts">
+            {preview?.kind === 'image' ? (
+              <button
+                type="button"
+                className="act"
+                aria-pressed={zoomed}
+                onClick={() => setZoomed((z) => !z)}
+              >
+                {zoomed ? 'Fit' : 'Zoom'}
+              </button>
             ) : null}
-            <button type="button" className="linkbtn" onClick={clear}>
+            {openHref ? (
+              <a className="act" href={openHref} target="_blank" rel="noreferrer">
+                Open
+              </a>
+            ) : null}
+            <button type="button" className="act" onClick={() => inputRef.current?.click()}>
+              Replace
+            </button>
+            <button type="button" className="act act-danger" onClick={clear}>
               Remove
             </button>
-          </>
+          </span>
         ) : null}
+      </div>
+
+      <div className={`receipt-pane-body${zoomed ? ' receipt-pane-body-zoom' : ''}`}>
+        {/*
+          One input for every path - first choice, replacement, and the camera
+          button on a phone. A second one would be a second thing to keep in
+          step with the object URL and the S3 key.
+        */}
+        <input
+          ref={inputRef}
+          className="receipt-file"
+          id="receipt-file"
+          type="file"
+          accept="image/*,application/pdf"
+          capture="environment"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) void upload(file);
+          }}
+          disabled={busy}
+          aria-describedby="receipt-status"
+        />
+
+        {attached && preview ? (
+          preview.kind === 'image' ? (
+            <img
+              className={`receipt-image${zoomed ? ' receipt-image-zoom' : ''}`}
+              src={preview.url}
+              alt={`Receipt: ${filename}`}
+              onClick={() => setZoomed((z) => !z)}
+              /*
+               * A format the browser will not draw - HEIC, most often, which
+               * iOS still produces from the gallery even though the camera
+               * path sends JPEG. The file is stored and perfectly valid; only
+               * the thumbnail is impossible, so it falls back to the same card
+               * a PDF gets rather than leaving a broken image in the pane.
+               */
+              onError={() => setPreview((p) => (p ? { ...p, kind: 'doc' } : p))}
+            />
+          ) : (
+            <div className="receipt-doc">
+              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 2.5h7L18.5 8v13a.5.5 0 0 1-.5.5H6a.5.5 0 0 1-.5-.5v-18a.5.5 0 0 1 .5-.5z" />
+                <path d="M13 2.5V8h5.5" />
+              </svg>
+              <b>{filename}</b>
+              <span className="hint">
+                {/\.pdf$/i.test(filename)
+                  ? 'A PDF, attached. Open it to read the figures.'
+                  : 'Attached. This browser cannot draw the format, so open it to read the figures.'}
+              </span>
+            </div>
+          )
+        ) : attached ? (
+          <div className="receipt-doc">
+            <b>{filename}</b>
+            <span className="hint">Stored with this expense.</span>
+          </div>
+        ) : (
+          <label className="receipt-drop" htmlFor="receipt-file">
+            <span className="receipt-drop-icon">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h2.2l1.2-2h8.2l1.2 2h2.2A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z" />
+                <circle cx="12" cy="13" r="3.4" />
+              </svg>
+            </span>
+            <span className="receipt-drop-text">
+              <b>Photograph the receipt</b>
+              <span className="hint">
+                {read
+                  ? 'Photo or PDF, up to 12MB. It fills the fields in and stays here so you can check them against it.'
+                  : 'Photo or PDF, up to 12MB. Filed against this expense - the figures below are left exactly as they are.'}
+              </span>
+            </span>
+          </label>
+        )}
+      </div>
+
+      <p id="receipt-status" className="receipt-pane-foot hint" role="status">
+        {status === 'idle' ? (read ? 'No receipt yet.' : 'No receipt on this expense.') : null}
+        {status === 'uploading' ? `Uploading ${filename}…` : null}
+        {status === 'reading'
+          ? read
+            ? `Reading ${filename}… you can fill it in yourself instead.`
+            : `Filing ${filename}…`
+          : null}
+        {status === 'done' ? filename : null}
+        {status === 'error' ? 'Nothing attached.' : null}
       </p>
 
       {error ? (
-        <p className="error-text" role="alert">
+        <p className="error-text receipt-pane-foot" role="alert">
           {error} You can save the expense now and attach the receipt later.
         </p>
       ) : null}
-    </div>
+    </section>
   );
+}
+
+/**
+ * What a stored key can be drawn as.
+ *
+ * The extension is all there is to go on - the content type lives on the S3
+ * object, and fetching it to decide how to render a thumbnail would cost a
+ * round trip to answer a question the filename already answers.
+ */
+function previewForKey(key: string): { url: string; kind: 'image' | 'doc' } {
+  return {
+    url: `/api/v1/receipts/view?key=${encodeURIComponent(key)}`,
+    kind: /\.pdf$/i.test(key) ? 'doc' : 'image',
+  };
 }
 
 /** The stored key is a path; only its last segment is worth showing. */
