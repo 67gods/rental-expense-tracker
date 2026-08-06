@@ -488,18 +488,29 @@ export async function countNeedsReview(taxYear: number): Promise<number> {
  * precisely the expense the 2025 ledger silently dropped. Counting the
  * invoices of the year would have left the cross-year case unwarned, which is
  * the case this app exists to get right.
+ *
+ * The AMOUNT comes back beside the count, because they answer different
+ * questions. "One expense is unassigned" is a chore; "$929.50 that left the
+ * bank is in none of the figures above" is a reconciliation that will not
+ * close, and anyone matching this screen against a filed return needs the
+ * second sentence. The cents are what was PAID in the year, not the invoice
+ * total, for the same reason every other figure on Schedule E is.
  */
-export async function countMissingProperty(taxYear: number): Promise<number> {
+export async function missingPropertyTotals(
+  taxYear: number,
+): Promise<{ count: number; paidCents: number }> {
   const paidByExpense = await paidByExpenseInYear(taxYear);
   const rows = await expensesByIds([...paidByExpense.keys()]);
 
   let count = 0;
-  for (const [expenseId, paidCents] of paidByExpense) {
+  let paidCents = 0;
+  for (const [expenseId, paid] of paidByExpense) {
     const expense = rows.get(expenseId);
-    if (!expense || paidCents === 0) continue;
+    if (!expense || paid === 0) continue;
     if (needsPropertyOrSplit(expense.propertyId, expense.allocationRule as AllocationRule | null)) {
       count += 1;
+      paidCents += paid;
     }
   }
-  return count;
+  return { count, paidCents };
 }

@@ -54,8 +54,16 @@ export default async function OverviewPage({
     listLoanYears({ taxYear }),
   ]);
 
+  // Closing costs count as activity in their own right. A property bought late
+  // in December has no rent, no 1098 and nothing paid against it yet, and
+  // dropping its row would take the one figure that year's return reports about
+  // it - the settlement statement - off the screen with it.
   const withActivity = scheduleE.filter(
-    (s) => s.rentsReceivedCents !== 0 || s.totalExpenseCents !== 0 || s.capitalAdditionsCents !== 0,
+    (s) =>
+      s.rentsReceivedCents !== 0 ||
+      s.totalExpenseCents !== 0 ||
+      s.capitalAdditionsCents !== 0 ||
+      s.closingCostsCents !== null,
   );
 
   const total = (pick: (s: (typeof withActivity)[number]) => number) =>
@@ -64,6 +72,12 @@ export default async function OverviewPage({
   const rent = total((s) => s.rentsReceivedCents);
   const operating = total((s) => s.operatingExpenseCents);
   const shared = total((s) => s.sharedExpenseCents);
+  const interest = total((s) => s.mortgageInterestCents);
+  const propertyTax = total((s) => s.propertyTaxCents);
+  const insurance = total((s) => s.insuranceCents);
+  // Null is "did not close this year", which is not a figure to add. Every
+  // other column here can be summed blind; this one cannot.
+  const closingCosts = total((s) => s.closingCostsCents ?? 0);
   const depreciation = total((s) => s.depreciationCents);
   const deductible = total((s) => s.totalExpenseCents);
   const capital = total((s) => s.capitalAdditionsCents);
@@ -173,9 +187,36 @@ export default async function OverviewPage({
                     >
                       Expenses
                     </Th>
+                    {/*
+                      Four cuts of the column to their left, never addends to
+                      it. The first three are the lines a filed return is
+                      checked against one box at a time; the fourth answers a
+                      different question about the same money, so an insurance
+                      premium split five ways is inside two of these columns at
+                      once. All four muted, for the same reason `of which
+                      shared` always was.
+                    */}
                     <Th
                       numeric
-                      tip="Of the expenses to the left, the part that arrived as this property's share of a portfolio-wide cost rather than an invoice in its own name."
+                      tip="Schedule E line 12, inside the expenses to the left. Every source added together - the 1098 figure and anything booked through the ledger - because the return has one box for it."
+                    >
+                      of which interest
+                    </Th>
+                    <Th
+                      numeric
+                      tip="Schedule E line 16, inside the expenses to the left. Property tax from the 1098's escrow block plus anything paid direct."
+                    >
+                      of which taxes
+                    </Th>
+                    <Th
+                      numeric
+                      tip="Schedule E line 9, inside the expenses to the left. Premiums paid from escrow plus policies paid direct."
+                    >
+                      of which insurance
+                    </Th>
+                    <Th
+                      numeric
+                      tip="Of the expenses to the left, the part that arrived as this property's share of a portfolio-wide cost rather than an invoice in its own name. Overlaps the three columns before it rather than adding to them."
                     >
                       of which shared
                     </Th>
@@ -199,6 +240,12 @@ export default async function OverviewPage({
                     </Th>
                     <Th
                       numeric
+                      tip={`From the settlement statement, and only against a property bought in ${taxYear} - blank everywhere else. Basis rather than a deduction, so it is in no total on this row; how much of it is depreciable is your CPA's call.`}
+                    >
+                      Closing costs
+                    </Th>
+                    <Th
+                      numeric
                       tip="Deductible and capital added together: everything the property cost this year, whichever side of the line it fell on."
                     >
                       Total
@@ -216,8 +263,23 @@ export default async function OverviewPage({
                       <td className="num muted">{summary.availableFrom ?? '—'}</td>
                       <td className="num">{formatCents(summary.rentsReceivedCents)}</td>
                       <td className="num">{formatCents(summary.operatingExpenseCents)}</td>
-                      {/* Muted: it is a part of the column to its left, not a
+                      {/* Muted: each is a part of the column to its left, not a
                           figure to be added to it. */}
+                      <td className="num muted">
+                        {summary.mortgageInterestCents === 0
+                          ? '—'
+                          : formatCents(summary.mortgageInterestCents)}
+                      </td>
+                      <td className="num muted">
+                        {summary.propertyTaxCents === 0
+                          ? '—'
+                          : formatCents(summary.propertyTaxCents)}
+                      </td>
+                      <td className="num muted">
+                        {summary.insuranceCents === 0
+                          ? '—'
+                          : formatCents(summary.insuranceCents)}
+                      </td>
                       <td className="num muted">
                         {summary.sharedExpenseCents === 0
                           ? '—'
@@ -239,6 +301,14 @@ export default async function OverviewPage({
                           ? '—'
                           : formatCents(summary.capitalAdditionsCents)}
                       </td>
+                      {/* Capital-toned, not muted: like the column beside it
+                          this is basis rather than a deduction, and it is the
+                          tone that says so. */}
+                      <td className="num capital">
+                        {summary.closingCostsCents === null
+                          ? '—'
+                          : formatCents(summary.closingCostsCents)}
+                      </td>
                       <td className="num">
                         {formatCents(
                           summary.totalExpenseCents + summary.capitalAdditionsCents,
@@ -252,11 +322,17 @@ export default async function OverviewPage({
                     <td colSpan={2}>Portfolio</td>
                     <td className="num">{formatCents(rent)}</td>
                     <td className="num">{formatCents(operating)}</td>
+                    <td className="num">{formatCents(interest)}</td>
+                    <td className="num">{formatCents(propertyTax)}</td>
+                    <td className="num">{formatCents(insurance)}</td>
                     <td className="num">{formatCents(shared)}</td>
                     <td className="num">{formatCents(depreciation)}</td>
                     <td className="num">{formatCents(deductible)}</td>
                     <td className={net >= 0 ? 'num pos' : 'num neg'}>{formatCents(net)}</td>
                     <td className="num capital">{formatCents(capital)}</td>
+                    <td className="num capital">
+                      {closingCosts === 0 ? '—' : formatCents(closingCosts)}
+                    </td>
                     <td className="num">{formatCents(deductible + capital)}</td>
                   </tr>
                 </tfoot>
@@ -267,12 +343,19 @@ export default async function OverviewPage({
               <p className="hint mt-2">
                 <strong>Expenses + Depreciation = Deductible</strong>, and{' '}
                 <strong>Rent − Deductible = Net</strong>, which is Schedule E line 21 for that
-                property. <strong>of which shared</strong> is already inside Expenses — it is
-                named separately so a $5.97 line on a house can be traced back to the
-                portfolio cost it came out of. <strong>Total</strong> is Deductible and
-                Capital together — everything the property cost in {taxYear}, whichever side
-                of the line it fell on. Open any property to see every figure in its row
-                broken out by Schedule E line.
+                property. The four <strong>of which</strong> columns are all already inside
+                Expenses and none of them adds to it — <strong>interest</strong>,{' '}
+                <strong>taxes</strong> and <strong>insurance</strong> are lines 12, 16 and 9
+                with every source summed, which is the shape a filed return is checked
+                against, and <strong>shared</strong> cuts the same money a different way so a
+                $5.97 line on a house can be traced back to the portfolio cost it came out
+                of. A split insurance premium sits in two of those columns at once.{' '}
+                <strong>Total</strong> is Deductible and Capital together — everything the
+                property cost in {taxYear}, whichever side of the line it fell on.{' '}
+                <strong>Closing costs</strong> are in no total at all: they show only against
+                a property bought in {taxYear}, and they are basis rather than a deduction.
+                Open any property to see every figure in its row broken out by Schedule E
+                line.
                 {withActivity.some((s) => s.depreciationSource === 'schedule') ? (
                   <>
                     {' '}
@@ -364,9 +447,17 @@ export default async function OverviewPage({
                     <td className="nowrap">
                       <Tag tone="neg">Property</Tag>
                     </td>
+                    {/* The amount leads, because the amount is the problem. A
+                        count says how many chores are open; the figure says
+                        exactly how much the per-property table is short by,
+                        which is the only form of this warning any use to
+                        someone reconciling against a filed return. */}
                     <td>
-                      <strong>{data.missingPropertyCount}</strong> paid expenses with no
-                      property or split — not on Schedule E, and not in the figures above
+                      <strong>{formatCents(data.missingPropertyCents)}</strong> paid across{' '}
+                      {data.missingPropertyCount}{' '}
+                      {data.missingPropertyCount === 1 ? 'expense' : 'expenses'} with no
+                      property or split — not on Schedule E, and missing from every figure
+                      above
                     </td>
                     <td className="num nowrap">
                       <Link className="btn" href={withYear('/entries?tab=expenses', taxYear)}>

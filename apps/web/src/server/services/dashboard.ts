@@ -7,7 +7,7 @@ import {
   type ContractorYearTotal,
   type SafeHarborProgress,
 } from '@rental/domain';
-import { countMissingProperty, countNeedsReview, listExpenses } from './expenses';
+import { countNeedsReview, listExpenses, missingPropertyTotals } from './expenses';
 import { countProvisionalEntries, listTimeEntries } from './timeEntries';
 import { excludedPropertyIds, listContractors, listRentReceipts } from './reference';
 
@@ -23,6 +23,8 @@ export interface DashboardData {
   needsReviewCount: number;
   /** Paid, but with no property and no split - so absent from Schedule E (§6). */
   missingPropertyCount: number;
+  /** What that unassigned spend adds up to. The figure the per-property table is short by. */
+  missingPropertyCents: number;
   provisionalCount: number;
   w9Warnings: ContractorWarning[];
   contractorTotals: ContractorYearTotal[];
@@ -72,9 +74,9 @@ export async function getDashboardData(
     taxYear,
   );
 
-  const [needsReviewCount, missingPropertyCount, provisionalCount] = await Promise.all([
+  const [needsReviewCount, missingProperty, provisionalCount] = await Promise.all([
     countNeedsReview(taxYear),
-    countMissingProperty(taxYear),
+    missingPropertyTotals(taxYear),
     countProvisionalEntries(enterpriseId, taxYear),
   ]);
 
@@ -83,7 +85,8 @@ export async function getDashboardData(
     ytdExpenseCents: sumCents(expenseRows.map((e) => e.amountCents)),
     ytdIncomeCents: sumCents(rentRows.map((r) => r.amountCents)),
     needsReviewCount,
-    missingPropertyCount,
+    missingPropertyCount: missingProperty.count,
+    missingPropertyCents: missingProperty.paidCents,
     provisionalCount,
     w9Warnings: contractorW9Warnings(contractorTotals, asOf, taxYear),
     contractorTotals,

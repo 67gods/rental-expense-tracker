@@ -121,6 +121,22 @@ export interface SchedulePropertySummary {
    * than being booked against this property directly.
    */
   sharedExpenseCents: number;
+  /**
+   * The three lines a CPA reconciles first, pulled out by name.
+   *
+   * Each is a SUBSET of `operatingExpenseCents`, not something to add to it,
+   * and each is the sum of every source on that line - a property carrying
+   * ledger interest and 1098 interest reports one figure here even though the
+   * detail below keeps them as two rows. That is the whole point: the return
+   * has one box per line, so matching a filed return means seeing one number.
+   *
+   * They also overlap `sharedExpenseCents`. A portfolio insurance premium split
+   * five ways is inside both `insuranceCents` and `sharedExpenseCents`; they are
+   * two different cuts of the same money, not two piles of it.
+   */
+  mortgageInterestCents: number;
+  propertyTaxCents: number;
+  insuranceCents: number;
   /** Schedule E line 18. Zero when neither the CPA nor a schedule supplies one. */
   depreciationCents: number;
   /** Which of the two produced `depreciationCents`, or neither. */
@@ -129,6 +145,20 @@ export interface SchedulePropertySummary {
   depreciationNote: string | null;
   /** Capital additions, reported alongside rather than deducted. */
   capitalAdditionsCents: number;
+  /**
+   * What it cost to close, and ONLY in the year it closed.
+   *
+   * Null every other year, which is the whole reason it is derived here rather
+   * than read off the property record by each caller. Closing costs are a fact
+   * about the purchase, not about a tax year, and a column showing $5,204.57
+   * against Creedmore in 2026 and 2027 would read as money spent again.
+   *
+   * Not deductible and not in any total on this record. It is basis - most of
+   * it lands in the depreciable amount, some of it (prepaid tax and insurance,
+   * loan fees) does not, and which is which is the CPA's call. It rides here so
+   * the year of purchase can be checked against the return that reports it.
+   */
+  closingCostsCents: number | null;
   /** Schedule E line 21: rent less line 20, depreciation included. */
   netCents: number;
 }
@@ -293,8 +323,27 @@ export async function buildScheduleE(
     const capitalAdditionsCents = sumCents(
       expenseLines.filter((l) => l.isCapital).map((l) => l.amountCents),
     );
+
+    // One line of the return, every source that feeds it, capital left out.
+    // Summing across sources here is the opposite of what `expenseLines` does
+    // on purpose - the detail keeps a ledger figure and a 1098 figure apart so
+    // a double count is visible, and this collapses them because the return
+    // has a single box and that box is what gets matched.
+    const deductibleOnLine = (categoryId: string) =>
+      sumCents(
+        expenseLines
+          .filter((l) => l.categoryId === categoryId && !l.isCapital)
+          .map((l) => l.amountCents),
+      );
+
     const totalExpenseCents = operatingExpenseCents + depreciationCents;
     const rentsReceivedCents = rentByProperty.get(property.id) ?? 0;
+
+    // The closing year, taken from when it was acquired rather than from when
+    // it was placed in service. Those are the same day on a property bought
+    // ready to rent and months apart on one that needed work, and it is the
+    // purchase that the closing statement belongs to.
+    const closedThisYear = property.acquiredDate?.slice(0, 4) === String(taxYear);
 
     return {
       propertyId: property.id,
@@ -306,10 +355,14 @@ export async function buildScheduleE(
       totalExpenseCents,
       operatingExpenseCents,
       sharedExpenseCents,
+      mortgageInterestCents: deductibleOnLine('mortgage_interest'),
+      propertyTaxCents: deductibleOnLine('taxes'),
+      insuranceCents: deductibleOnLine('insurance'),
       depreciationCents,
       depreciationSource,
       depreciationNote,
       capitalAdditionsCents,
+      closingCostsCents: closedThisYear ? property.closingCostsCents : null,
       // Capital is not subtracted. The only route by which a capital cost ever
       // reduces the net is line 18 above, spread over the recovery period.
       netCents: rentsReceivedCents - totalExpenseCents,
@@ -464,6 +517,23 @@ export async function scheduleECsv(taxYear: number): Promise<string> {
         label: 'Total capital additions - depreciated by your CPA, not deducted here',
         amount: summary.capitalAdditionsCents,
         source: '',
+        prior: null,
+      });
+    }
+
+    // Only in the year it closed, and last of all - below the net and below the
+    // capital, because it is neither. It is here rather than only in the
+    // property-facts export so the year of purchase can be checked against the
+    // one return that reports it, without opening a second file.
+    if (summary.closingCostsCents !== null) {
+      rows.push({
+        property: summary.nickname,
+        address: summary.address,
+        line: '',
+        label:
+          'CLOSING COSTS - bought this year, from the settlement statement. Basis, not a deduction - how much is depreciable is your call',
+        amount: summary.closingCostsCents,
+        source: 'property record',
         prior: null,
       });
     }
