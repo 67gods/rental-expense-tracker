@@ -323,6 +323,45 @@ export async function expensesByIds(ids: readonly string[]): Promise<Map<string,
 }
 
 /**
+ * Every expense a year has to account for, with what it was paid in that year.
+ *
+ * Two sets, unioned. The invoices DATED in the year, which is what the review
+ * screen has always shown; and the invoices dated earlier that were still being
+ * paid off during it, which it never showed at all.
+ *
+ * The second set is the whole reason the payments table exists. An $8,244
+ * invoice raised in December 2025 with $2,500 settled then and the rest spread
+ * across 2026 is deducted in 2026 for all but the first payment - the Schedule E
+ * ledger has always got this right, because it starts from the payments. The
+ * entries screen started from the invoice date, so the year that actually
+ * deducted the money was the one year you could not see it in. The figures
+ * reconciled and the screen backing them did not.
+ *
+ * `paidByExpense` counts settled rows only, so a scheduled instalment pulls
+ * nothing into a year before it is confirmed.
+ */
+export async function expensesTouchingYear(
+  taxYear: number,
+  options: { limit?: number } = {},
+): Promise<{ expenses: Expense[]; paidByExpense: Map<string, number> }> {
+  const limit = options.limit ?? 5000;
+  const [invoicedThisYear, paidByExpense] = await Promise.all([
+    listExpenses({ taxYear, limit }),
+    paidByExpenseInYear(taxYear),
+  ]);
+
+  const seen = new Set(invoicedThisYear.map((e) => e.id));
+  const carriedIds = [...paidByExpense.keys()].filter((id) => !seen.has(id));
+  const carried = await expensesByIds(carriedIds);
+
+  const rows = [...invoicedThisYear, ...carried.values()].sort(
+    (a, b) => b.date.localeCompare(a.date) || b.createdAt.getTime() - a.createdAt.getTime(),
+  );
+
+  return { expenses: rows, paidByExpense };
+}
+
+/**
  * Expands an expense into its per-property lines (§6).
  * The stored record is untouched; these are derived for reports and display.
  */

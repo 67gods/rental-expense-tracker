@@ -10,10 +10,9 @@ import {
 } from '@rental/domain';
 import { requireUser } from '@/lib/session';
 import { listTimeEntries } from '@/server/services/timeEntries';
-import { listExpenses } from '@/server/services/expenses';
+import { expensesTouchingYear, listExpenses } from '@/server/services/expenses';
 import { listTrips } from '@/server/services/trips';
 import { listActors, listProperties, listRentReceipts } from '@/server/services/reference';
-import { paidByExpenseInYear } from '@/server/services/payments';
 import { deleteTimeEntryAction } from '@/app/actions/timeEntries';
 import {
   deleteExpenseAction,
@@ -167,10 +166,10 @@ async function ExpenseTable({
   propertyNames: Map<string, string>;
   jobTitles: Map<string, string>;
 }) {
-  const [expenses, paid] = await Promise.all([
-    listExpenses({ taxYear, limit: 5000 }),
-    paidByExpenseInYear(taxYear),
-  ]);
+  // Not `listExpenses({ taxYear })`: that reads the invoice date, and an
+  // invoice raised in December and paid off across the following year would be
+  // missing from the very year that deducts it (§7.6).
+  const { expenses, paidByExpense: paid } = await expensesTouchingYear(taxYear);
 
   if (expenses.length === 0) return <Empty what="expenses" year={taxYear} action={<Link className="btn btn-primary" href={withYear("/log/expense", taxYear)}>Add one</Link>} />;
 
@@ -179,6 +178,8 @@ async function ExpenseTable({
   // nothing but serialisable data crosses the boundary.
   const rows: DataRow[] = expenses.map((e) => {
     const paidCents = paid.get(e.id) ?? 0;
+    const invoiceYear = Number(e.date.slice(0, 4));
+    const carriedIn = invoiceYear !== taxYear;
     const line = safeScheduleE(e.scheduleECategory);
     const unresolved = needsPropertyOrSplit(e.propertyId, e.allocationRule as AllocationRule | null);
     const property = e.propertyId
@@ -196,6 +197,8 @@ async function ExpenseTable({
     if (e.jobId && jobTitles.get(e.jobId)) {
       badges.push({ label: 'Job', tone: 'muted' as const, href: `/jobs/${e.jobId}` });
     }
+    // Says why a row with somebody else's year on it is sitting in this list.
+    if (carriedIn) badges.push({ label: `${invoiceYear} invoice`, tone: 'info' as const });
 
     return {
       id: e.id,
@@ -218,7 +221,12 @@ async function ExpenseTable({
         paid: paidCents,
         written: e.createdAt.getTime(),
       },
-      numeric: { invoiced: e.amountCents, paid: paidCents },
+      // The invoice total of a carried-in row belongs to the year that raised
+      // it, so it sums to nothing here - "Invoiced in 2026" would otherwise
+      // include an invoice raised in 2025 and the strip would stop agreeing
+      // with the Schedule E report. The cell still shows the real total, next
+      // to the earlier date and the badge that explains it.
+      numeric: { invoiced: carriedIn ? 0 : e.amountCents, paid: paidCents },
       search: [e.vendor, property, line.label, e.notes ?? ''].join(' ').toLowerCase(),
       badges,
       // The one row where the two disagree is the one worth seeing.
@@ -237,7 +245,7 @@ async function ExpenseTable({
         { key: 'vendor', header: 'Vendor', isLink: true },
         { key: 'property', header: 'Property' },
         { key: 'line', header: 'Line', nowrap: true },
-        { key: 'invoiced', header: 'Invoiced', numeric: true },
+        { key: 'invoiced', header: 'Invoice total', numeric: true },
         { key: 'paid', header: `Paid in ${taxYear}`, numeric: true },
         { key: 'written', header: 'Written', nowrap: true, defaultHidden: true },
       ]}
@@ -247,7 +255,7 @@ async function ExpenseTable({
       ]}
       totals={[
         { key: '_count', label: 'Rows', count: true },
-        { key: 'invoiced', label: 'Invoiced', money: true },
+        { key: 'invoiced', label: `Invoiced in ${taxYear}`, money: true },
         { key: 'paid', label: `Paid in ${taxYear}`, money: true },
       ]}
       onDelete={deleteExpenseAction}

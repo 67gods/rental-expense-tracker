@@ -18,7 +18,7 @@ import {
   toCsv,
   type AllocationRule,
 } from '@rental/domain';
-import { expensesByIds, listExpenses } from './expenses';
+import { expensesByIds, expensesTouchingYear, listExpenses } from './expenses';
 import { listTimeEntries } from './timeEntries';
 import { listTrips } from './trips';
 import {
@@ -539,15 +539,21 @@ export async function contractorCsv(taxYear: number): Promise<string> {
  * they are the same number; on the two a year that straddle a year boundary
  * they are not, and the difference is the whole reason the payments table
  * exists.
+ *
+ * Which is also why the rows come from `expensesTouchingYear` and not from the
+ * invoice date. A December 2025 invoice paid off through 2026 is deducted on
+ * the 2026 Schedule E; a 2026 detail export that omitted it would send the CPA
+ * a backing sheet that does not add up to the summary it backs. The `Invoice
+ * date in year` column marks the ones carried in.
  */
 export async function expenseDetailCsv(taxYear: number): Promise<string> {
-  const [expenses, properties, actors, jobTitles, paidInYear] = await Promise.all([
-    listExpenses({ taxYear, limit: 20_000 }),
-    listProperties({ includeArchived: true }),
-    listActors({ includeArchived: true }),
-    jobTitlesById(),
-    paidByExpenseInYear(taxYear),
-  ]);
+  const [{ expenses, paidByExpense: paidInYear }, properties, actors, jobTitles] =
+    await Promise.all([
+      expensesTouchingYear(taxYear, { limit: 20_000 }),
+      listProperties({ includeArchived: true }),
+      listActors({ includeArchived: true }),
+      jobTitlesById(),
+    ]);
 
   const propertyNames = new Map(properties.map((p) => [p.id, p.nickname]));
   const actorNames = new Map(actors.map((a) => [a.id, a.name]));
@@ -556,6 +562,10 @@ export async function expenseDetailCsv(taxYear: number): Promise<string> {
 
   return toCsv(sorted, [
     { header: 'Date', value: (e) => e.date },
+    {
+      header: 'Invoice date in year',
+      value: (e) => (e.date.slice(0, 4) === String(taxYear) ? 'Yes' : 'No'),
+    },
     { header: 'Vendor', value: (e) => e.vendor },
     { header: 'Invoice total', value: (e) => formatCentsPlain(e.amountCents) },
     { header: 'Paid in year', value: (e) => formatCentsPlain(paidInYear.get(e.id) ?? 0) },
