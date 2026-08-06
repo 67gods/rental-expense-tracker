@@ -12,6 +12,7 @@ import {
   costTreatment,
   cpaFigureKind,
   documentSource,
+  donationKind,
   interestSource,
   paymentMethod,
   placedInServiceEvidence,
@@ -109,6 +110,10 @@ export const paymentMethodSchema = fromList(paymentMethod, 'Pick how it was paid
 export const placedInServiceEvidenceSchema = fromList(
   placedInServiceEvidence,
   'Pick what shows the property was available to rent.',
+);
+export const donationKindSchema = fromList(
+  donationKind,
+  'Say whether this was money or goods.',
 );
 export const cpaFigureKindSchema = fromList(cpaFigureKind, 'Pick what kind of figure this is.');
 export const reconciliationKindSchema = fromList(
@@ -303,6 +308,98 @@ export const upsertInterestYearSchema = z.object({
   documentNote: optionalText(),
 });
 export type UpsertInterestYearInput = z.input<typeof upsertInterestYearSchema>;
+
+// --- Charitable donations ---------------------------------------------------
+// Not a rental expense and not on Schedule E. A gift to a charity is an itemized
+// deduction on Schedule A, and it is kept here for the same reason the interest
+// is: the acknowledgment letters arrive in the same post as the 1099-INTs, and a
+// figure kept somewhere else is a figure found in March.
+//
+// Shaped like a ledger rather than like a yearly transcription. An account earns
+// interest once a year; a household gives to the same church twenty times, and
+// two envelopes on one Sunday are two gifts.
+
+/**
+ * A donee's EIN, as the IRS publishes it and the letter prints it.
+ *
+ * The one taxpayer identification number this app holds, and the exception is
+ * the point: a charity's EIN is public information, printed on the
+ * acknowledgment, and it identifies an organisation rather than anyone in the
+ * household. Nine bare digits are accepted and hyphenated, because that is how
+ * they come off a letter when somebody is typing quickly.
+ */
+const ein = z
+  .string()
+  .trim()
+  .transform((v) => (/^\d{9}$/.test(v) ? `${v.slice(0, 2)}-${v.slice(2)}` : v))
+  .refine((v) => v === '' || /^\d{2}-\d{7}$/.test(v), {
+    message: 'Enter the EIN as 12-3456789, or leave it blank.',
+  })
+  .transform((v) => v || null);
+
+export const createCharitySchema = z.object({
+  name: requiredText('The charity name', 200),
+  taxId: ein.nullable().optional().default(null),
+});
+export type CreateCharityInput = z.input<typeof createCharitySchema>;
+
+export const updateCharitySchema = z.object({
+  id: uuid,
+  name: requiredText('The charity name', 200),
+  taxId: ein.nullable().optional().default(null),
+  isArchived: z.boolean().optional(),
+});
+export type UpdateCharityInput = z.input<typeof updateCharitySchema>;
+
+/**
+ * A gift of nothing is not a gift.
+ *
+ * `amountCents` already refuses negatives everywhere. Zero is refused only here,
+ * because a zero expense is a plausible thing to record and a zero donation is a
+ * mistyped one.
+ */
+const giftAmountCents = amountCents.refine((cents) => cents > 0, {
+  message: 'A gift needs an amount.',
+});
+
+/**
+ * Goods have to be described.
+ *
+ * "$600" says nothing an auditor can check and nothing the owner will remember
+ * next January. Form 8283 asks what was given, so the answer is recorded when it
+ * is still known. Mirrors the `donations_non_cash_described` check constraint.
+ */
+const nonCashIsDescribed = <T extends { kind?: unknown; nonCashDescription?: unknown }>(
+  value: T,
+) => value.kind !== 'non_cash' || Boolean(value.nonCashDescription);
+
+const NON_CASH_MESSAGE = 'Say what was given - "12 boxes of books", not just an amount.';
+
+const donationFields = {
+  charityId: uuid,
+  date: isoDate,
+  /** Who recorded it. Nothing exists without an attributed actor (§4). */
+  actorId: uuid,
+  amountCents: giftAmountCents,
+  kind: donationKindSchema,
+  /** What the goods were. Required for a non-cash gift, refused nowhere else. */
+  nonCashDescription: optionalText(500),
+  acknowledgmentOnFile: z.boolean().optional().default(false),
+  receiptKey: z.string().max(500).nullable().optional().default(null),
+  /** Lowercase hex SHA-256 of the receipt bytes. Fixed width by construction. */
+  receiptSha256: receiptSha256.nullable().optional().default(null),
+  note: optionalText(),
+};
+
+export const createDonationSchema = z
+  .object(donationFields)
+  .refine(nonCashIsDescribed, { message: NON_CASH_MESSAGE, path: ['nonCashDescription'] });
+export type CreateDonationInput = z.input<typeof createDonationSchema>;
+
+export const updateDonationSchema = z
+  .object({ id: uuid, ...donationFields })
+  .refine(nonCashIsDescribed, { message: NON_CASH_MESSAGE, path: ['nonCashDescription'] });
+export type UpdateDonationInput = z.input<typeof updateDonationSchema>;
 
 // --- Trips -----------------------------------------------------------------
 
@@ -616,7 +713,10 @@ export const updateJobSchema = z.object({
   title: requiredText('A title', 200).optional(),
   propertyId: uuid.nullable().optional(),
   notes: optionalText(),
+  /** Pinned to the top of the list. Absent means "leave it as it was". */
+  isStarred: z.boolean().optional(),
 });
+export type UpdateJobInput = z.input<typeof updateJobSchema>;
 
 /**
  * Attaching existing records to a job, which is the "group these" action.

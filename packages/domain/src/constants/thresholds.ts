@@ -37,6 +37,18 @@ export interface ThresholdSet {
   w9ReportingThresholdCents: number;
   /** Month (1-12) from which unresolved W-9 warnings become persistent (§5.6). */
   w9WarningStartMonth: number;
+
+  /**
+   * A charitable gift at or above this is disallowed outright without a
+   * contemporaneous written acknowledgment from the charity.
+   *
+   * Unlike most thresholds here, this one does not merely flag - it decides
+   * whether the deduction survives an audit at all. Which is why the donations
+   * screen treats a missing letter as a warning rather than a detail.
+   */
+  charitableAcknowledgmentCents: number;
+  /** A non-cash gift above this needs Form 8283 filed with the return. */
+  nonCashForm8283Cents: number;
 }
 
 /**
@@ -63,6 +75,13 @@ const COMMON = {
   // contractor sitting exactly on the line. Over-flagging costs a glance;
   // under-flagging costs a missing 1099. Deliberate, and covered by a test.
   w9WarningStartMonth: 10, // October
+
+  // Both unmoved since 1993 and 1984 respectively, and neither is indexed. They
+  // still live under the year dimension rather than as globals, because the
+  // reason for that dimension is that a figure which has not moved yet is not a
+  // figure that cannot move.
+  charitableAcknowledgmentCents: 25_000, // $250
+  nonCashForm8283Cents: 50_000, // $500
 } as const;
 
 export const THRESHOLDS_BY_YEAR: Readonly<Record<number, ThresholdSet>> = {

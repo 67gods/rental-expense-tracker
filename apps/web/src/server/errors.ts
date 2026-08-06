@@ -147,6 +147,41 @@ export function toErrorPayload(error: unknown): ErrorPayload {
       message: 'That account is already on file.',
     };
   }
+  if (message.includes('charities_identity')) {
+    return {
+      status: 409,
+      error: 'rule_violation',
+      message: 'That charity is already on file.',
+    };
+  }
+  if (message.includes('charities_tax_id_shape')) {
+    return {
+      status: 400,
+      error: 'rule_violation',
+      message: 'Enter the EIN as 12-3456789, or leave it blank.',
+    };
+  }
+  if (message.includes('donations_non_cash_described')) {
+    return {
+      status: 400,
+      error: 'rule_violation',
+      message: 'Say what was given - "12 boxes of books", not just an amount.',
+    };
+  }
+  if (message.includes('donations_amount_positive')) {
+    return {
+      status: 400,
+      error: 'rule_violation',
+      message: 'A gift needs an amount.',
+    };
+  }
+  if (message.includes('donations_kind_known')) {
+    return {
+      status: 400,
+      error: 'rule_violation',
+      message: 'Say whether this was money or goods.',
+    };
+  }
   if (message.includes('timers_one_running_per_actor')) {
     return {
       status: 409,

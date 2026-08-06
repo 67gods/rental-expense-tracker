@@ -3,6 +3,7 @@ import { taxYearRange } from '@rental/domain';
 import { getDb } from '@/db/client';
 import {
   actors,
+  donations,
   expenses,
   interestYears,
   jobs,
@@ -32,6 +33,7 @@ export interface RailCountsResult {
   jobs: number;
   people: number;
   interest: number;
+  donations: number;
   reports: number;
 }
 
@@ -86,8 +88,17 @@ export async function railCounts(
   // here would only be hiding that the query is table-specific anyway.
   const count = sql<number>`count(*)::int`;
 
-  const [expenseRow, incomeRow, timeRow, tripRow, propertyRow, jobRow, peopleRow, interestRow] =
-    await Promise.all([
+  const [
+    expenseRow,
+    incomeRow,
+    timeRow,
+    tripRow,
+    propertyRow,
+    jobRow,
+    peopleRow,
+    interestRow,
+    donationRow,
+  ] = await Promise.all([
       db
         .select({ c: count })
         .from(expenses)
@@ -119,6 +130,12 @@ export async function railCounts(
         .select({ c: count })
         .from(interestYears)
         .where(eq(interestYears.taxYear, taxYear)),
+      // And back to a date range: a gift happened on a day, unlike the 1099-INT
+      // above it.
+      db
+        .select({ c: count })
+        .from(donations)
+        .where(and(gte(donations.date, range.start), lte(donations.date, range.end))),
     ]);
 
   return {
@@ -130,6 +147,7 @@ export async function railCounts(
     jobs: jobRow[0]?.c ?? 0,
     people: peopleRow[0]?.c ?? 0,
     interest: interestRow[0]?.c ?? 0,
+    donations: donationRow[0]?.c ?? 0,
     reports: reportCount,
   };
 }

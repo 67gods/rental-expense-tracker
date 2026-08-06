@@ -104,6 +104,30 @@ export const INTEREST_SOURCES: readonly PickList<InterestSource>[] = [
 
 export const interestSource = lookup('interest source', INTEREST_SOURCES);
 
+// --- What kind of thing was given away --------------------------------------
+// Two ids, because two is what changes the return. Cash and non-cash are
+// substantiated differently and a non-cash gift over $500 drags Form 8283 along
+// with it; how the money moved - cheque, card, transfer - changes nothing the
+// IRS asks about, and PAYMENT_METHODS already exists for anyone who wants to
+// say so in the note.
+
+export type DonationKind = 'cash' | 'non_cash';
+
+export const DONATION_KINDS: readonly PickList<DonationKind>[] = [
+  {
+    id: 'cash',
+    label: 'Money',
+    helper: 'Cash, cheque, card or transfer. The IRS calls all of it a cash contribution.',
+  },
+  {
+    id: 'non_cash',
+    label: 'Goods',
+    helper: 'Clothes, furniture, a car. The amount is fair market value, and over $500 needs Form 8283.',
+  },
+] as const;
+
+export const donationKind = lookup('donation kind', DONATION_KINDS);
+
 // --- How a payment was made (§3.3) -----------------------------------------
 
 export type PaymentMethod = 'card' | 'check' | 'ach' | 'cash' | 'escrow' | 'other';

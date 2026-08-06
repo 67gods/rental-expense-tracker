@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   assignJobSchema,
   createBankAccountSchema,
+  createCharitySchema,
+  createDonationSchema,
   createExpensePaymentSchema,
   createExpenseSchema,
   createPropertySchema,
@@ -452,5 +454,89 @@ describe('upsertInterestYearSchema', () => {
 
   it('rejects a tax year that is not one', () => {
     expect(upsertInterestYearSchema.safeParse(year({ taxYear: 25 })).success).toBe(false);
+  });
+});
+
+describe('createCharitySchema', () => {
+  const charity = (over: Record<string, unknown> = {}) => ({
+    name: 'American Red Cross',
+    ...over,
+  });
+
+  it('accepts a charity with an EIN already hyphenated', () => {
+    expect(createCharitySchema.parse(charity({ taxId: '53-0196605' })).taxId).toBe('53-0196605');
+  });
+
+  it('hyphenates nine bare digits, because that is how they come off a letter', () => {
+    expect(createCharitySchema.parse(charity({ taxId: '530196605' })).taxId).toBe('53-0196605');
+  });
+
+  it('treats a blank EIN as not recorded rather than as a value', () => {
+    // A gift whose letter is not to hand is still a gift worth recording, and a
+    // blank must not read as an EIN of nothing.
+    expect(createCharitySchema.parse(charity({ taxId: '   ' })).taxId).toBeNull();
+    expect(createCharitySchema.parse(charity()).taxId).toBeNull();
+  });
+
+  it('rejects an EIN that is the wrong shape', () => {
+    for (const taxId of ['53-019660', '5-30196605', '53 0196605', 'EIN 53-0196605', '12345']) {
+      expect(createCharitySchema.safeParse(charity({ taxId })).success).toBe(false);
+    }
+  });
+
+  it('rejects a name that is only whitespace', () => {
+    expect(createCharitySchema.safeParse(charity({ name: '  ' })).success).toBe(false);
+  });
+});
+
+describe('createDonationSchema', () => {
+  const gift = (over: Record<string, unknown> = {}) => ({
+    charityId: UUID,
+    date: '2025-03-14',
+    actorId: OTHER_UUID,
+    amountCents: 25_000,
+    kind: 'cash',
+    ...over,
+  });
+
+  it('accepts a cash gift with nothing but the five required fields', () => {
+    const parsed = createDonationSchema.parse(gift());
+    expect(parsed.amountCents).toBe(25_000);
+    expect(parsed.acknowledgmentOnFile).toBe(false);
+    expect(parsed.receiptKey).toBeNull();
+    expect(parsed.nonCashDescription).toBeNull();
+  });
+
+  it('accepts a non-cash gift that says what was given', () => {
+    const parsed = createDonationSchema.parse(
+      gift({ kind: 'non_cash', amountCents: 60_000, nonCashDescription: '12 boxes of books' }),
+    );
+    expect(parsed.nonCashDescription).toBe('12 boxes of books');
+  });
+
+  it('rejects a non-cash gift with no description', () => {
+    // "$600" says nothing an auditor can check and nothing the owner will
+    // remember next January.
+    expect(createDonationSchema.safeParse(gift({ kind: 'non_cash', amountCents: 60_000 })).success)
+      .toBe(false);
+  });
+
+  it('rejects a gift of nothing', () => {
+    expect(createDonationSchema.safeParse(gift({ amountCents: 0 })).success).toBe(false);
+    expect(createDonationSchema.safeParse(gift({ amountCents: -500 })).success).toBe(false);
+  });
+
+  it('rejects a kind the picker does not offer', () => {
+    expect(createDonationSchema.safeParse(gift({ kind: 'check' })).success).toBe(false);
+  });
+
+  it('rejects a date that is not a real one', () => {
+    expect(createDonationSchema.safeParse(gift({ date: '2025-02-30' })).success).toBe(false);
+  });
+
+  it('rejects a receipt hash that is not a digest', () => {
+    expect(createDonationSchema.safeParse(gift({ receiptSha256: 'not-a-hash' })).success).toBe(
+      false,
+    );
   });
 });

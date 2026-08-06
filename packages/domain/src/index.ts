@@ -25,6 +25,7 @@ export * from './rules/payments';
 export * from './rules/placedInService';
 export * from './rules/reconciliation';
 export * from './rules/jobs';
+export * from './rules/donations';
 
 export * from './totals/hours';
 

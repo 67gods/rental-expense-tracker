@@ -85,6 +85,15 @@ export function ReceiptUpload({
   /** Set when editing, so an expense cannot be reported as its own duplicate. */
   expenseId = null,
   /**
+   * Which ledger this receipt is being attached to.
+   *
+   * Only the duplicate search cares. It looks at expenses and nothing else, so
+   * asking it about a charity's acknowledgment letter returns the answer to a
+   * different question - and "already attached to an expense" is a warning
+   * nobody on a donation form can do anything with.
+   */
+  scope = 'expense',
+  /**
    * Whether an uploaded file should be read by the model.
    *
    * False when correcting a record that already exists - see the `mode` note on
@@ -124,6 +133,7 @@ export function ReceiptUpload({
   defaultSha256?: string | null;
   propertyId?: string | null;
   expenseId?: string | null;
+  scope?: 'expense' | 'donation';
   read?: boolean;
   onBusyChange?: (busy: boolean) => void;
   onAttachedChange?: (attached: boolean) => void;
@@ -264,6 +274,7 @@ export function ReceiptUpload({
           readToken,
           propertyId,
           expenseId,
+          scope,
           mode: read ? 'read' : 'attach',
         }),
       });

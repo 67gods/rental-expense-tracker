@@ -18,6 +18,7 @@
  */
 
 import { sql } from 'drizzle-orm';
+import type { DonationKind } from '@rental/domain';
 import {
   type AnyPgColumn,
   bigint,
@@ -306,6 +307,12 @@ export const jobs = pgTable(
       onDelete: 'set null',
     }),
     notes: text('notes'),
+    /**
+     * Pinned to the top of the list. A flag the owner sets, not a status the
+     * app derives - "the one I am in the middle of" is knowledge the app does
+     * not have and should not guess at from record counts or dates.
+     */
+    isStarred: boolean('is_starred').notNull().default(false),
     createdAt,
     updatedAt,
   },
@@ -764,6 +771,121 @@ export const interestYears = pgTable(
   ],
 );
 
+// --- Charitable donations ---------------------------------------------------
+// The second thing in this schema that is not about the rental. A gift to a
+// charity is an itemized deduction on Schedule A, it never reaches Schedule E,
+// and it is here for the reason the interest is: the acknowledgment letters
+// arrive in the same post as the 1099-INTs.
+//
+// Shaped like a LEDGER, not like the transcriptions above. An account earns
+// interest once a year and the figure gets corrected in place; a household gives
+// to the same church twenty times and each gift is its own record.
+//
+// What makes a donation different from an expense is that its deductibility
+// turns on paperwork rather than on arithmetic. A gift of $250 or more is
+// disallowed outright without a written acknowledgment, and the letter has to
+// exist by the filing date - so whether it exists is a stored fact, and the
+// donations screen exists mostly to show which ones are still missing.
+
+export const charities = pgTable(
+  'charities',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    name: text('name').notNull(),
+    /**
+     * The donee's EIN, and the one TIN in this schema.
+     *
+     * Everywhere else the rule is "name only, no account numbers and no TINs,
+     * masked or otherwise" - see the lender and bank tables above. This is the
+     * deliberate exception, and the reason is what a donee EIN actually is: the
+     * IRS publishes it, the acknowledgment letter prints it, and it identifies
+     * an organisation rather than anyone in the household. Without it the
+     * deduction cannot be checked by the person who has to sign for it.
+     *
+     * Null is allowed, because a gift whose letter is not to hand is still a
+     * gift worth recording, and a blank is not a zero.
+     */
+    taxId: text('tax_id'),
+    isArchived: boolean('is_archived').notNull().default(false),
+    createdAt,
+    updatedAt,
+  },
+  (t) => [
+    check('charities_name_present', sql`length(btrim(${t.name})) > 0`),
+    check(
+      'charities_tax_id_shape',
+      sql`${t.taxId} IS NULL OR ${t.taxId} ~ '^[0-9]{2}-[0-9]{7}$'`,
+    ),
+    // NULLS NOT DISTINCT, as bank_accounts_identity is and for the same reason:
+    // tax_id is null by design on a charity whose letter never arrived, and
+    // without it the same charity could be added twice with the uniqueness
+    // never firing.
+    unique('charities_identity').on(t.name, t.taxId).nullsNotDistinct(),
+  ],
+);
+
+export const donations = pgTable(
+  'donations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /**
+     * restrict, not cascade.
+     *
+     * The gifts ARE the record. A charity is archived rather than deleted, and
+     * nothing should be able to take a year of substantiated giving with it -
+     * which is precisely what the cascade on interest_years would do here.
+     */
+    charityId: uuid('charity_id')
+      .notNull()
+      .references(() => charities.id, { onDelete: 'restrict' }),
+    date: date('date', { mode: 'string' }).notNull(),
+    /** Who recorded it. Nothing exists without an attributed actor. */
+    actorId: uuid('actor_id')
+      .notNull()
+      .references(() => actors.id, { onDelete: 'restrict' }),
+    /** Fair market value, for a gift of goods. What was paid, for money. */
+    amountCents: bigint('amount_cents', { mode: 'number' }).notNull(),
+    /**
+     * DONATION_KINDS from @rental/domain, and constrained below rather than
+     * merely validated in app code the way `document_source` is.
+     *
+     * Two reasons this one earns a constraint. It decides a tax outcome - a
+     * non-cash gift over $500 drags Form 8283 along - and it is referenced by
+     * `donations_non_cash_described`, which a misspelled 'noncash' would slip
+     * straight past, storing an undescribed pile of goods that reads as money.
+     */
+    kind: text('kind').$type<DonationKind>().notNull(),
+    /** "12 boxes of books". Required for a non-cash gift, enforced below. */
+    nonCashDescription: text('non_cash_description'),
+    /**
+     * Whether the charity's written acknowledgment is in hand.
+     *
+     * Not derived from receiptKey. A letter can be filed in a drawer without
+     * being photographed, and a photographed receipt can be a bank slip rather
+     * than an acknowledgment. The IRS asks about the letter, so the letter is
+     * what is recorded.
+     */
+    acknowledgmentOnFile: boolean('acknowledgment_on_file').notNull().default(false),
+    receiptKey: text('receipt_key'),
+    receiptSha256: text('receipt_sha256'),
+    note: text('note'),
+    createdAt,
+    updatedAt,
+  },
+  (t) => [
+    // No unique index, unlike interest_years. Two envelopes to one church on one
+    // Sunday are two gifts, and an upsert target here would silently merge them.
+    index('donations_date_idx').on(t.date),
+    index('donations_charity_idx').on(t.charityId),
+    check('donations_amount_positive', sql`${t.amountCents} > 0`),
+    check('donations_kind_known', sql`${t.kind} IN ('cash', 'non_cash')`),
+    check(
+      'donations_non_cash_described',
+      sql`${t.kind} <> 'non_cash' OR length(btrim(coalesce(${t.nonCashDescription}, ''))) > 0`,
+    ),
+  ],
+);
+
 // --- Rent received against rent reported ------------------------------------
 // Three figures describe one year of rent and they never agree: what landed in
 // the bank, what the 1099-MISC reported, and what the leases called for. The
@@ -951,6 +1073,8 @@ export type RentReconciliationItem = typeof rentReconciliationItems.$inferSelect
 export type CpaFigure = typeof cpaFigures.$inferSelect;
 export type BankAccount = typeof bankAccounts.$inferSelect;
 export type InterestYear = typeof interestYears.$inferSelect;
+export type Charity = typeof charities.$inferSelect;
+export type Donation = typeof donations.$inferSelect;
 
 export type NewTimeEntry = typeof timeEntries.$inferInsert;
 export type NewExpense = typeof expenses.$inferInsert;
@@ -963,3 +1087,5 @@ export type NewRentReconciliation = typeof rentReconciliations.$inferInsert;
 export type NewCpaFigure = typeof cpaFigures.$inferInsert;
 export type NewBankAccount = typeof bankAccounts.$inferInsert;
 export type NewInterestYear = typeof interestYears.$inferInsert;
+export type NewCharity = typeof charities.$inferInsert;
+export type NewDonation = typeof donations.$inferInsert;

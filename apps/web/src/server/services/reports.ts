@@ -3,6 +3,7 @@ import {
   contractorW9Warnings,
   contractorYearTotals,
   costTreatmentLabel,
+  donationKind,
   formatCentsPlain,
   formatHoursDecimal,
   getHourCategory,
@@ -33,6 +34,7 @@ import { listPayments, paidByExpenseInYear } from './payments';
 import { getJobWithChildren, listJobs, jobTitlesById } from './jobs';
 import { reconciliationsForYear } from './reconciliation';
 import { listBankAccounts, listInterestYears } from './interest';
+import { listDonations } from './donations';
 
 /**
  * Year-end reports (§7.6, §10).
@@ -953,6 +955,42 @@ export async function interestIncomeCsv(taxYear: number): Promise<string> {
 }
 
 /**
+ * Charitable giving, one row per gift.
+ *
+ * Its own file for the same reason the interest is: this is Schedule A, and a
+ * column of it sitting under the rental figures is exactly how it would end up
+ * added to them.
+ *
+ * The last two columns are the ones the CPA actually reads. An amount without an
+ * acknowledgment is not a deduction at $250 and up, so "Letter on file" is
+ * exported as a plain Yes/No rather than being left implied by whether a file
+ * happens to be attached - those are different facts, and only one of them is
+ * the one the IRS asks about.
+ */
+export async function donationsCsv(taxYear: number): Promise<string> {
+  const gifts = await listDonations({ taxYear });
+
+  // Grouped by charity, oldest first within each. A CPA checking letters works
+  // charity by charity, because that is how the letters arrive.
+  const sorted = [...gifts].sort(
+    (a, b) => a.charityName.localeCompare(b.charityName) || a.date.localeCompare(b.date),
+  );
+
+  return toCsv(sorted, [
+    { header: 'Date', value: (r) => r.date },
+    { header: 'Tax ID', value: (r) => r.charityTaxId ?? '' },
+    { header: 'Name', value: (r) => r.charityName },
+    { header: 'Amount', value: (r) => formatCentsPlain(r.amountCents) },
+    { header: 'Kind', value: (r) => safeDonationKindLabel(r.kind) },
+    { header: 'What was given', value: (r) => r.nonCashDescription ?? '' },
+    { header: 'Letter on file', value: (r) => (r.acknowledgmentOnFile ? 'Yes' : 'No') },
+    { header: 'File attached', value: (r) => (r.receiptKey ? 'Yes' : 'No') },
+    { header: 'Note', value: (r) => r.note ?? '' },
+    { header: 'Recorded at', value: (r) => r.createdAt.toISOString() },
+  ]);
+}
+
+/**
  * The CPA hand-off.
  *
  * Ordered as the accountant reads them: the summary first, then the rows
@@ -971,9 +1009,13 @@ export const REPORTS = {
   'loan-years': { label: 'Mortgage and escrow, from the 1098s', build: loanYearsCsv },
   'cpa-figures': { label: 'Figures your CPA sent back', build: cpaFiguresCsv },
   'property-facts': { label: 'Property facts and management history', build: propertyFactsCsv },
-  // Last, and separate. Schedule B, not Schedule E - nothing in this file
-  // belongs anywhere near the rental figures above it.
+  // Last, and separate. Schedule B and Schedule A - nothing in these two files
+  // belongs anywhere near the rental figures above them.
   'interest-income': { label: 'Interest income, from the 1099-INTs', build: interestIncomeCsv },
+  'charitable-donations': {
+    label: 'Charitable donations, for Schedule A',
+    build: donationsCsv,
+  },
 } as const;
 
 export type ReportId = keyof typeof REPORTS;
@@ -993,6 +1035,13 @@ function safeCategoryLabel(id: string): string {
 /** Guarded: an id the picker no longer offers exports as blank, not a crash. */
 function safeInterestSourceLabel(id: string | null): string {
   return id && interestSource.has(id) ? interestSource.get(id).label : '';
+}
+
+/** Guarded the same way, but exporting the raw id rather than blank - a gift's
+    kind is never absent, so a value here that is not in the list is worth
+    seeing rather than hiding. */
+function safeDonationKindLabel(id: string): string {
+  return donationKind.has(id) ? donationKind.get(id).label : id;
 }
 
 function safeCategory(id: string): { line: number; label: string } {

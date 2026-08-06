@@ -42,6 +42,16 @@ const schema = z.object({
    * expense is worth saying out loud whichever screen you are on.
    */
   mode: z.enum(['read', 'attach']).optional().default('read'),
+  /**
+   * Which ledger the file is being attached to.
+   *
+   * The duplicate check searches expenses, and only expenses. Asking it about a
+   * charity's acknowledgment letter would report the answer for a different
+   * question - "this is already on an expense" is true and useless when the
+   * thing being attached is not an expense - so donations skip it rather than
+   * being told about a collision they cannot act on.
+   */
+  scope: z.enum(['expense', 'donation']).optional().default('expense'),
 });
 
 export const POST = route(async (_user, request) => {
@@ -56,9 +66,15 @@ export const POST = route(async (_user, request) => {
   // Asked before the model, not after: the same file uploaded twice is settled
   // by the hash, and there is no point paying to read a receipt we have already
   // read once.
-  const exact = await findExactDuplicate(sha256, input.expenseId);
-  if (exact) {
-    return ok({ sha256, extraction: { status: 'skipped', reason: 'duplicate' }, duplicate: exact });
+  if (input.scope === 'expense') {
+    const exact = await findExactDuplicate(sha256, input.expenseId);
+    if (exact) {
+      return ok({
+        sha256,
+        extraction: { status: 'skipped', reason: 'duplicate' },
+        duplicate: exact,
+      });
+    }
   }
 
   if (input.mode === 'attach') {

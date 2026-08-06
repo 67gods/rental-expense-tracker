@@ -24,6 +24,7 @@ export interface RailCounts {
   jobs: number;
   people: number;
   interest: number;
+  donations: number;
   reports: number;
 }
 
@@ -38,6 +39,7 @@ const ICONS = {
   users: 'M5 3.3a1.9 1.9 0 1 0 0 3.8 1.9 1.9 0 0 0 0-3.8zM1.6 12c0-2 1.5-3.2 3.4-3.2S8.4 10 8.4 12M10.4 4.2a1.6 1.6 0 1 1 0 3.2M12.4 12c0-1.6-1-2.6-2.4-2.9',
   calendar: 'M2.5 3.5h9v8.5a.5.5 0 0 1-.5.5H3a.5.5 0 0 1-.5-.5zM2.5 6.2h9M5 2v2.4M9 2v2.4',
   bank: 'M1.6 5.4 7 2.2l5.4 3.2M2.8 5.9v5.2M5.9 5.9v5.2M8.1 5.9v5.2M11.2 5.9v5.2M1.6 11.8h10.8',
+  gift: 'M2.2 6.4h9.6v5.4a.5.5 0 0 1-.5.5H2.7a.5.5 0 0 1-.5-.5zM1.4 4.3h11.2v2.1H1.4zM7 4.3v8M7 4.3S6.2 1.6 4.6 1.6a1.35 1.35 0 0 0 0 2.7zM7 4.3s.8-2.7 2.4-2.7a1.35 1.35 0 0 1 0 2.7z',
   doc: 'M3.2 1.6h4.4l3.2 3.2v7.6a.5.5 0 0 1-.5.5H3.2a.5.5 0 0 1-.5-.5V2.1a.5.5 0 0 1 .5-.5zM7.6 1.6v3.2h3.2',
   gear: 'M7 4.8a2.2 2.2 0 1 0 0 4.4 2.2 2.2 0 0 0 0-4.4zM7 1.2v1.5M7 11.3v1.5M12.8 7h-1.5M2.7 7H1.2M11.1 2.9l-1 1M3.9 10.1l-1 1M11.1 11.1l-1-1M3.9 3.9l-1-1',
 } as const;
@@ -111,6 +113,10 @@ export function Rail({
         // in the same post in the same week, so it sits with the rest of the
         // January sitting rather than among the rental records above.
         { href: '/interest', label: 'Interest income', icon: 'bank', count: counts.interest },
+        // Nor is this one - Schedule A rather than Schedule B - and it is here
+        // for the same reason: the acknowledgment letters arrive in that post
+        // too, and a screen nobody can reach is a screen found in March.
+        { href: '/donations', label: 'Donations', icon: 'gift', count: counts.donations },
         // Named with the year in it. "Close the year" begs the question which
         // year, and the answer is the one the rail is showing.
         { href: '/year-end', label: `Close ${taxYear}`, icon: 'calendar' },

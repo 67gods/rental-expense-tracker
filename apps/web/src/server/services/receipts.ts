@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { getDb } from '@/db/client';
-import { expensePayments, expenses } from '@/db/schema';
+import { charities, donations, expensePayments, expenses } from '@/db/schema';
 import { NotFoundError } from '../errors';
 import { slugifyVendor } from './receiptMatches';
 
@@ -25,9 +25,9 @@ export interface ReceiptRef {
 /**
  * Resolves a stored key to the record that owns it.
  *
- * Both expenses and payments carry a receipt, and the caller does not
+ * Expenses, payments and donations all carry a receipt, and the caller does not
  * necessarily know which one it is looking at - the key travels alone in a
- * link. Checking both is cheaper than making the link say.
+ * link. Checking each is cheaper than making the link say.
  */
 export async function resolveReceipt(key: string): Promise<ReceiptRef> {
   const db = getDb();
@@ -55,6 +55,20 @@ export async function resolveReceipt(key: string): Promise<ReceiptRef> {
       .where(eq(expenses.id, payment.expenseId))
       .limit(1);
     return { key, filename: nameFor(parent?.vendor ?? 'payment', payment.paidDate, key) };
+  }
+
+  // An acknowledgment letter attached to a gift. Named after the charity for the
+  // same reason the others are named after the vendor: these go to the CPA as
+  // attachments, and a folder of UUIDs is unusable in April.
+  const [donation] = await db
+    .select({ date: donations.date, charityName: charities.name })
+    .from(donations)
+    .innerJoin(charities, eq(charities.id, donations.charityId))
+    .where(eq(donations.receiptKey, key))
+    .limit(1);
+
+  if (donation) {
+    return { key, filename: nameFor(donation.charityName, donation.date, key) };
   }
 
   // Deliberately the same answer as a key that was never uploaded. Whether an

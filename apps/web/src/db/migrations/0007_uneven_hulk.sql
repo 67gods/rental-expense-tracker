@@ -1,0 +1,1 @@
+ALTER TABLE "donations" ADD CONSTRAINT "donations_kind_known" CHECK ("donations"."kind" IN ('cash', 'non_cash'));

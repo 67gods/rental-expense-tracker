@@ -3,7 +3,11 @@ import {
   documentSource,
   formatCents,
   getScheduleECategory,
+  hasThresholdsFor,
+  sumCents,
   taxYearRange,
+  thresholdsFor,
+  unsubstantiatedCount,
 } from '@rental/domain';
 import { requireUser } from '@/lib/session';
 import { listLoanYears } from '@/server/services/loanYears';
@@ -15,6 +19,7 @@ import {
   listBankAccounts,
   listInterestYears,
 } from '@/server/services/interest';
+import { donationTotalsForYear, listDonations } from '@/server/services/donations';
 import { listActors, listProperties } from '@/server/services/reference';
 import { LoanYearForm } from '@/components/LoanYearForm';
 import { ReconciliationPanel } from '@/components/ReconciliationPanel';
@@ -67,6 +72,8 @@ export default async function YearEndPage({
     bankAccounts,
     interestRows,
     interestTotals,
+    gifts,
+    donationTotals,
   ] = await Promise.all([
     listProperties(),
     listActors(),
@@ -77,9 +84,33 @@ export default async function YearEndPage({
     listBankAccounts(),
     listInterestYears({ taxYear }),
     interestTotalsForYear(taxYear),
+    listDonations({ taxYear }),
+    donationTotalsForYear(taxYear),
   ]);
 
   const interestByAccount = new Map(interestRows.map((row) => [row.bankAccountId, row]));
+
+  /**
+   * The year's giving, one line per charity rather than per gift.
+   *
+   * Twenty envelopes to one church is one line on Schedule A, and this page is
+   * the summary. The count of missing letters travels with it, because that is
+   * the only part of this block anybody has to act on before filing.
+   */
+  const giving = [...new Map(gifts.map((g) => [g.charityId, g.charityName])).entries()]
+    .map(([charityId, charityName]) => {
+      const mine = gifts.filter((g) => g.charityId === charityId);
+      return {
+        charityId,
+        charityName,
+        totalCents: sumCents(mine.map((g) => g.amountCents)),
+        giftCount: mine.length,
+        missingLetters: hasThresholdsFor(taxYear)
+          ? unsubstantiatedCount(mine, thresholdsFor(taxYear))
+          : 0,
+      };
+    })
+    .sort((a, b) => b.totalCents - a.totalCents);
 
   const propertyOptions = properties.map((p) => ({ id: p.id, label: p.nickname }));
   const propertyNames = new Map(properties.map((p) => [p.id, p.nickname]));
@@ -463,6 +494,57 @@ export default async function YearEndPage({
 
           <Link href={`/interest?year=${taxYear}`} className="btn mt-2">
             Enter the 1099-INTs
+          </Link>
+        </section>
+
+        {/* 6 --------------------------------------------------------------- */}
+        <section>
+          <h2 className="section-title mb-2">Charitable giving · for Schedule A</h2>
+          <p className="hint mb-2">
+            Not a rental expense. A gift belongs on Schedule A and none of it reaches Schedule
+            E — it is listed here because anything from $250 up is disallowed without a written
+            acknowledgment, and January is the last month those can still be chased.
+          </p>
+
+          {giving.length > 0 ? (
+            <div className="tablebox">
+              {giving.map((row) => (
+                <div key={row.charityId} className="kv">
+                  <div>
+                    <p className="rowtitle">{row.charityName}</p>
+                    <p className="hint">
+                      {row.giftCount} {row.giftCount === 1 ? 'gift' : 'gifts'}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {row.missingLetters > 0 ? (
+                      <span className="tag tag-warn">
+                        {row.missingLetters} letter{row.missingLetters === 1 ? '' : 's'} missing
+                      </span>
+                    ) : null}
+                    <span className="num text-sm font-semibold">
+                      {formatCents(row.totalCents)}
+                    </span>
+                  </div>
+                </div>
+              ))}
+              <div className="kv">
+                <p className="rowtitle">Total given in {taxYear}</p>
+                <span className="num text-sm font-semibold">
+                  {formatCents(donationTotals.totalCents)}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <p className="panel panel-body hint">
+              Nothing recorded for {taxYear}. A gift with the letter still in a drawer is worth
+              entering now — the letter can be ticked off later, and a gift nobody wrote down
+              is one nobody deducts.
+            </p>
+          )}
+
+          <Link href={`/donations?year=${taxYear}`} className="btn mt-2">
+            Log the year&rsquo;s giving
           </Link>
         </section>
 
