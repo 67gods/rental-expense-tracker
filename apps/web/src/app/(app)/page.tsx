@@ -17,6 +17,7 @@ import {
   StatStrip,
   Tag,
   TableBox,
+  Th,
   Well,
 } from '@/components/ui';
 import { resolveTaxYear, withYear } from '@/lib/year';
@@ -26,10 +27,15 @@ export const metadata = { title: 'Overview' };
 /**
  * The year in one screen.
  *
- * Ordered by what a person actually wants: the five figures that describe the
- * year, then the same figures per property, then anything waiting on a
- * decision. Nothing here computes a tax position - the net is rent banked less
- * what left the bank, and depreciation is absent because the CPA supplies it.
+ * Ordered by what a person actually wants: the figures that describe the year,
+ * then the same figures per property, then anything waiting on a decision.
+ *
+ * The per-property table is built to be RECONCILED AGAINST A FILED RETURN, not
+ * just glanced at, which is why the deductible arrives in named parts rather
+ * than as one total. Every column has a tooltip saying exactly what is in it,
+ * because "Deductible $14,897.52" is unanswerable otherwise - paid or invoiced,
+ * depreciation in or out, does this property's share of the portfolio software
+ * count - and each of those questions changes the number.
  */
 export default async function OverviewPage({
   searchParams,
@@ -52,24 +58,30 @@ export default async function OverviewPage({
     (s) => s.rentsReceivedCents !== 0 || s.totalExpenseCents !== 0 || s.capitalAdditionsCents !== 0,
   );
 
-  const rent = withActivity.reduce((t, s) => t + s.rentsReceivedCents, 0);
-  const deductible = withActivity.reduce((t, s) => t + s.totalExpenseCents, 0);
-  const capital = withActivity.reduce((t, s) => t + s.capitalAdditionsCents, 0);
+  const total = (pick: (s: (typeof withActivity)[number]) => number) =>
+    withActivity.reduce((sum, s) => sum + pick(s), 0);
+
+  const rent = total((s) => s.rentsReceivedCents);
+  const operating = total((s) => s.operatingExpenseCents);
+  const shared = total((s) => s.sharedExpenseCents);
+  const depreciation = total((s) => s.depreciationCents);
+  const deductible = total((s) => s.totalExpenseCents);
+  const capital = total((s) => s.capitalAdditionsCents);
   const net = rent - deductible;
 
-  const bySource = (source: 'ledger' | '1098' | 'cpa') =>
+  const bySource = (source: 'ledger' | '1098' | 'cpa' | 'schedule') =>
     withActivity.reduce(
-      (total, summary) =>
-        total +
+      (sum, summary) =>
+        sum +
         summary.expenseLines
           .filter((line) => line.source === source && !line.isCapital)
-          .reduce((sum, line) => sum + line.amountCents, 0),
+          .reduce((subtotal, line) => subtotal + line.amountCents, 0),
       0,
     );
 
   const ledger = bySource('ledger');
   const from1098 = bySource('1098');
-  const denominator = Math.max(1, ledger + from1098 + capital);
+  const denominator = Math.max(1, ledger + from1098 + depreciation + capital);
 
   const unreconciled = reconciliations.filter(
     (view) => view.reportedGrossCents !== null && !view.isReconciled,
@@ -99,13 +111,13 @@ export default async function OverviewPage({
               key: 'deductible',
               label: 'Deductible',
               value: formatCents(deductible),
-              sub: 'what left the bank',
+              sub: `incl. ${formatCents(depreciation)} depreciation`,
             },
             {
               key: 'net',
               label: 'Net',
               value: formatCents(net),
-              sub: 'before depreciation',
+              sub: 'Schedule E line 21',
               tone: net >= 0 ? 'pos' : 'neg',
             },
             {
@@ -134,12 +146,51 @@ export default async function OverviewPage({
               <TableBox>
                 <thead>
                   <tr>
-                    <th>Property</th>
-                    <th>Available from</th>
-                    <th className="num">Rent</th>
-                    <th className="num">Deductible</th>
-                    <th className="num">Net</th>
-                    <th className="num">Capital</th>
+                    <Th tip={`Opens the property, where every figure in this row is broken down line by line for ${taxYear}.`}>
+                      Property
+                    </Th>
+                    <Th
+                      nowrap
+                      tip="The placed-in-service date: when it was ready to rent. Depreciation starts here and costs before it are acquisition rather than operating."
+                    >
+                      Available from
+                    </Th>
+                    <Th
+                      numeric
+                      tip={`Rent banked in ${taxYear}, from the receipts. What was owed but never arrived is not in here - this is cash basis.`}
+                    >
+                      Rent
+                    </Th>
+                    <Th
+                      numeric
+                      tip="Money that left the bank plus the 1098 figures, before depreciation. Paid in the year, not invoiced in it."
+                    >
+                      Expenses
+                    </Th>
+                    <Th
+                      numeric
+                      tip="Of the expenses to the left, the part that arrived as this property's share of a portfolio-wide cost rather than an invoice in its own name."
+                    >
+                      of which shared
+                    </Th>
+                    <Th
+                      numeric
+                      tip="Schedule E line 18. Your CPA's figure where there is one; otherwise the flat schedule from the property's own start month and annual amount."
+                    >
+                      Depreciation
+                    </Th>
+                    <Th numeric tip="Schedule E line 20: expenses and depreciation together.">
+                      Deductible
+                    </Th>
+                    <Th numeric tip="Schedule E line 21. Rent less the deductible total, depreciation included.">
+                      Net
+                    </Th>
+                    <Th
+                      numeric
+                      tip="Improvements. Not deducted and not in the net - they are basis, and reach the return only through depreciation."
+                    >
+                      Capital
+                    </Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -152,6 +203,21 @@ export default async function OverviewPage({
                       </td>
                       <td className="num muted">{summary.availableFrom ?? '—'}</td>
                       <td className="num">{formatCents(summary.rentsReceivedCents)}</td>
+                      <td className="num">{formatCents(summary.operatingExpenseCents)}</td>
+                      {/* Muted: it is a part of the column to its left, not a
+                          figure to be added to it. */}
+                      <td className="num muted">
+                        {summary.sharedExpenseCents === 0
+                          ? '—'
+                          : formatCents(summary.sharedExpenseCents)}
+                      </td>
+                      <td className="num">
+                        {summary.depreciationCents === 0 ? (
+                          <span className="muted">—</span>
+                        ) : (
+                          formatCents(summary.depreciationCents)
+                        )}
+                      </td>
                       <td className="num">{formatCents(summary.totalExpenseCents)}</td>
                       <td className={summary.netCents >= 0 ? 'num pos' : 'num neg'}>
                         {formatCents(summary.netCents)}
@@ -168,6 +234,9 @@ export default async function OverviewPage({
                   <tr>
                     <td colSpan={2}>Portfolio</td>
                     <td className="num">{formatCents(rent)}</td>
+                    <td className="num">{formatCents(operating)}</td>
+                    <td className="num">{formatCents(shared)}</td>
+                    <td className="num">{formatCents(depreciation)}</td>
                     <td className="num">{formatCents(deductible)}</td>
                     <td className={net >= 0 ? 'num pos' : 'num neg'}>{formatCents(net)}</td>
                     <td className="num capital">{formatCents(capital)}</td>
@@ -175,6 +244,25 @@ export default async function OverviewPage({
                 </tfoot>
               </TableBox>
             )}
+
+            {withActivity.length > 0 ? (
+              <p className="hint mt-2">
+                <strong>Expenses + Depreciation = Deductible</strong>, and{' '}
+                <strong>Rent − Deductible = Net</strong>, which is Schedule E line 21 for that
+                property. <strong>of which shared</strong> is already inside Expenses — it is
+                named separately so a $5.97 line on a house can be traced back to the
+                portfolio cost it came out of. Open any property to see every figure in its
+                row broken out by Schedule E line.
+                {withActivity.some((s) => s.depreciationSource === 'schedule') ? (
+                  <>
+                    {' '}
+                    Depreciation shown against a property with no CPA figure yet is{' '}
+                    <strong>your own schedule</strong>, from the start month and annual amount
+                    on the property record.
+                  </>
+                ) : null}
+              </p>
+            ) : null}
 
             <SectionTitle>Waiting on a decision</SectionTitle>
             <TableBox>
@@ -285,7 +373,7 @@ export default async function OverviewPage({
               <div className={net >= 0 ? 'panel-figure pos' : 'panel-figure neg'}>
                 {formatCents(net)}
               </div>
-              <p className="muted">Rent banked less what actually left the bank.</p>
+              <p className="muted">Rent banked less everything Schedule E lets you deduct.</p>
               <SplitBar
                 parts={[
                   {
@@ -301,6 +389,12 @@ export default async function OverviewPage({
                     color: 'var(--pos)',
                   },
                   {
+                    key: 'depreciation',
+                    label: `Depreciation ${formatCents(depreciation)}`,
+                    pct: (depreciation / denominator) * 100,
+                    color: 'var(--warn)',
+                  },
+                  {
                     key: 'capital',
                     label: `Capital ${formatCents(capital)}`,
                     pct: (capital / denominator) * 100,
@@ -309,9 +403,9 @@ export default async function OverviewPage({
                 ]}
               />
               <Note>
-                Capital is shown alongside, never inside the net. An improvement is basis your
-                CPA depreciates — it reaches the return as their figure on line 18, not as a
-                deduction here.
+                Capital is shown alongside, never inside the net. An improvement is basis, and
+                it reaches the return only through the depreciation band beside it — never as
+                a deduction in the year it was spent.
               </Note>
             </Panel>
 

@@ -2,7 +2,11 @@
 
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { formatCentsPlain, PLACED_IN_SERVICE_EVIDENCE } from '@rental/domain';
+import {
+  DEPRECIATION_MONTHS,
+  formatCentsPlain,
+  PLACED_IN_SERVICE_EVIDENCE,
+} from '@rental/domain';
 import { savePropertyAction } from '@/app/actions/admin';
 import { EMPTY_FORM_STATE } from '@/app/actions/formState';
 import { SubmitButton } from './Pickers';
@@ -21,6 +25,9 @@ export interface PropertyDefaults {
   placedInServiceDate?: string | null;
   placedInServiceEvidence?: string | null;
   firstTenantDate?: string | null;
+  depreciationStartMonth?: number | null;
+  depreciationStartYear?: number | null;
+  annualDepreciationCents?: number | null;
   purchasePriceCents?: number | null;
   closingCostsCents?: number | null;
   landValueCents?: number | null;
@@ -61,7 +68,8 @@ export function PropertyForm({
       defaults.landValueCents ||
       defaults.wasPersonalResidence ||
       defaults.soldDate ||
-      defaults.section469Activity,
+      defaults.section469Activity ||
+      defaults.annualDepreciationCents,
   );
 
   return (
@@ -288,6 +296,8 @@ function PurchaseAndCpaDetails({
         </label>
       </div>
 
+      <DepreciationSchedule defaults={defaults} />
+
       <div className="mt-6 grid gap-1">
         <h3 className="section-title">Off the closing statement</h3>
 
@@ -426,6 +436,89 @@ function PurchaseAndCpaDetails({
         </label>
       </div>
     </details>
+  );
+}
+
+/**
+ * The two facts that make the middle years readable without a phone call.
+ *
+ * Deliberately NOT a basis box with a divide-by-27.5 behind it. The depreciable
+ * basis is the land split plus the closing costs plus whatever an amended
+ * return did to it, and that arithmetic belongs to the CPA. What the owner has
+ * is the figure off last year's Form 4562 - a number that has not changed since
+ * the property was placed in service and will not change until it is sold - and
+ * typing it once is enough to make every year in between add up.
+ */
+function DepreciationSchedule({ defaults }: { defaults: PropertyDefaults }) {
+  // The year defaults to whatever the in-service date says, which is where
+  // depreciation starts unless something moved it. Shown as a placeholder
+  // rather than pre-filled, so a blank box stays honestly blank.
+  const impliedYear = defaults.placedInServiceDate?.slice(0, 4) ?? '';
+  const impliedMonth = defaults.placedInServiceDate
+    ? Number(defaults.placedInServiceDate.slice(5, 7))
+    : null;
+
+  return (
+    <div className="mt-6 grid gap-1">
+      <h3 className="section-title">Depreciation schedule</h3>
+      <p className="hint">
+        The <strong>flat full-year amount</strong> your CPA is running, off Form 4562. Every
+        year between the first and the last gets exactly this figure, so entering it once
+        makes the middle years visible without waiting on anybody. The first year is
+        apportioned by the mid-month convention. A figure your CPA sends back for a specific
+        year always replaces this one.
+      </p>
+
+      <div className="grid gap-1 sm:grid-cols-3 sm:gap-3">
+        <label className="field">
+          <span className="field-label">Starting month</span>
+          <select
+            className="select"
+            name="depreciationStartMonth"
+            defaultValue={defaults.depreciationStartMonth ?? ''}
+          >
+            <option value="">
+              {impliedMonth
+                ? `${DEPRECIATION_MONTHS[impliedMonth - 1]?.label} — from in-service`
+                : 'Not recorded'}
+            </option>
+            {DEPRECIATION_MONTHS.map((month) => (
+              <option key={month.value} value={month.value}>
+                {month.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="field">
+          <span className="field-label">Starting year</span>
+          <input
+            className="input num"
+            name="depreciationStartYear"
+            inputMode="numeric"
+            maxLength={4}
+            defaultValue={defaults.depreciationStartYear ?? ''}
+            placeholder={impliedYear || '2025'}
+          />
+        </label>
+
+        <label className="field">
+          <span className="field-label">Amount a year</span>
+          <input
+            className="input num"
+            name="annualDepreciation"
+            inputMode="decimal"
+            defaultValue={money(defaults.annualDepreciationCents)}
+            placeholder="8981.82"
+          />
+        </label>
+      </div>
+
+      <p className="hint">
+        Leave the month and year blank to use the placed-in-service date above, which is where
+        depreciation starts unless a conversion or an amended return moved it.
+      </p>
+    </div>
   );
 }
 

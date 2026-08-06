@@ -3,6 +3,8 @@ import {
   contractorW9Warnings,
   contractorYearTotals,
   costTreatmentLabel,
+  DEPRECIATION_MONTHS,
+  depreciationForYear,
   donationKind,
   formatCentsPlain,
   formatHoursDecimal,
@@ -12,6 +14,7 @@ import {
   listScheduleECategories,
   needsPropertyOrSplit,
   RECONCILIATION_KINDS,
+  resolveDepreciationSchedule,
   rollUpHours,
   SCHEDULE_E_RENTS_RECEIVED_LINE,
   sumCents,
@@ -45,8 +48,15 @@ import { listDonations } from './donations';
  * so the per-property figures sum back to the parent amounts exactly.
  */
 
-/** Where a figure came from. Never merged - the CPA has to be able to see. */
-export type FigureSource = 'ledger' | '1098' | 'cpa';
+/**
+ * Where a figure came from. Never merged - the CPA has to be able to see.
+ *
+ * `schedule` is the owner's own straight-line depreciation working, and it is
+ * deliberately its own source rather than being dressed up as a `cpa` figure.
+ * It is only ever used for a property-year the CPA has not answered yet; the
+ * moment a transcribed figure arrives, that one wins and this one disappears.
+ */
+export type FigureSource = 'ledger' | '1098' | 'cpa' | 'schedule';
 
 export interface ScheduleELine {
   line: number;
@@ -70,6 +80,17 @@ export interface ScheduleELine {
   isCapital: boolean;
   /** The same property and line, all sources, in the year before. */
   priorYearCents: number;
+  /**
+   * True when this figure reached the property through an allocation rule
+   * rather than being booked against it directly - a portfolio insurance
+   * premium or a year of Google storage, split five ways.
+   *
+   * Its own flag rather than its own source, because the money came from the
+   * same place either way. What differs is whether the property was named on
+   * the invoice, and that is the question "why is there $9.28 of software on
+   * this house" actually asks.
+   */
+  isShared: boolean;
 }
 
 export interface SchedulePropertySummary {
@@ -84,10 +105,31 @@ export interface SchedulePropertySummary {
   availableFrom: string | null;
   rentsReceivedCents: number;
   expenseLines: ScheduleELine[];
-  /** Deductible expenses only. Capital additions are not in here. */
+  /**
+   * Schedule E line 20: every deductible line including depreciation. Capital
+   * additions are not in here and never will be.
+   */
   totalExpenseCents: number;
+  /**
+   * Line 20 less line 18 - what left the bank plus what the 1098s report,
+   * without the depreciation. This is the figure that has a receipt behind
+   * every cent of it, which is why it gets its own name.
+   */
+  operatingExpenseCents: number;
+  /**
+   * The part of `operatingExpenseCents` that arrived through a split rather
+   * than being booked against this property directly.
+   */
+  sharedExpenseCents: number;
+  /** Schedule E line 18. Zero when neither the CPA nor a schedule supplies one. */
+  depreciationCents: number;
+  /** Which of the two produced `depreciationCents`, or neither. */
+  depreciationSource: 'cpa' | 'schedule' | 'none';
+  /** One sentence saying how `depreciationCents` was arrived at. */
+  depreciationNote: string | null;
   /** Capital additions, reported alongside rather than deducted. */
   capitalAdditionsCents: number;
+  /** Schedule E line 21: rent less line 20, depreciation included. */
   netCents: number;
 }
 
@@ -109,6 +151,12 @@ export interface SchedulePropertySummary {
  * A property with mortgage interest from both the ledger and a 1098 gets two
  * rows on line 12, not one sum. Merging them would hide a double count, which
  * is exactly the error worth catching.
+ *
+ * DEPRECIATION IS THE ONE PLACE TWO SOURCES DO NOT BOTH APPEAR. Line 18 is a
+ * single figure on the return, so a transcribed CPA figure and the owner's own
+ * schedule cannot both sit on it - that would not be a visible disagreement,
+ * it would be a doubled deduction. The CPA figure wins whenever there is one,
+ * and the schedule fills the gap in the years before it arrives.
  */
 export async function buildScheduleE(
   taxYear: number,
@@ -152,7 +200,7 @@ export async function buildScheduleE(
       categoryId: string,
       amountCents: number,
       source: FigureSource,
-      isCapital = false,
+      options: { isCapital?: boolean; isShared?: boolean } = {},
     ) => {
       if (amountCents === 0) return;
       const category = safeCategory(categoryId);
@@ -162,16 +210,28 @@ export async function buildScheduleE(
         label: category.label,
         amountCents,
         source,
-        isCapital,
+        isCapital: options.isCapital ?? false,
+        isShared: options.isShared ?? false,
         priorYearCents: priorByKey.get(`${property.id}:${categoryId}`) ?? 0,
       });
     };
 
+    // Direct and shared stay as separate rows on the same line rather than one
+    // sum, so "$554.97 of operating expense" can always be read back as the
+    // part with this property's name on the invoice and the part that arrived
+    // as a share of something portfolio-wide.
     for (const category of listScheduleECategories()) {
-      push(category.id, ledger.deductible.get(`${property.id}:${category.id}`) ?? 0, 'ledger');
+      push(category.id, ledger.direct.get(`${property.id}:${category.id}`) ?? 0, 'ledger');
     }
     for (const category of listScheduleECategories()) {
-      push(category.id, ledger.capital.get(`${property.id}:${category.id}`) ?? 0, 'ledger', true);
+      push(category.id, ledger.shared.get(`${property.id}:${category.id}`) ?? 0, 'ledger', {
+        isShared: true,
+      });
+    }
+    for (const category of listScheduleECategories()) {
+      push(category.id, ledger.capital.get(`${property.id}:${category.id}`) ?? 0, 'ledger', {
+        isCapital: true,
+      });
     }
 
     // The 1098 figures. Interest to line 12, property tax to line 16, escrowed
@@ -195,12 +255,45 @@ export async function buildScheduleE(
       push(category.id, cpa.get(`${property.id}:${category.id}`) ?? 0, 'cpa');
     }
 
-    const totalExpenseCents = sumCents(
-      expenseLines.filter((l) => !l.isCapital).map((l) => l.amountCents),
+    // Line 18, from whichever source has one. The CPA's figure is what is on
+    // the return, so it is asked first; the owner's schedule only speaks for a
+    // year that has not been filed yet.
+    const cpaDepreciationCents = cpa.get(`${property.id}:depreciation`) ?? 0;
+    let depreciationCents = cpaDepreciationCents;
+    let depreciationSource: 'cpa' | 'schedule' | 'none' =
+      cpaDepreciationCents === 0 ? 'none' : 'cpa';
+    let depreciationNote: string | null =
+      depreciationSource === 'cpa'
+        ? `Transcribed from what your CPA filed for ${taxYear}.`
+        : null;
+
+    if (depreciationSource === 'none') {
+      const schedule = resolveDepreciationSchedule(property);
+      if (schedule) {
+        const year = depreciationForYear(schedule, taxYear);
+        depreciationNote = year.explanation;
+        if (year.cents !== 0) {
+          depreciationCents = year.cents;
+          depreciationSource = 'schedule';
+          push('depreciation', year.cents, 'schedule');
+        }
+      }
+    }
+
+    const operatingExpenseCents = sumCents(
+      expenseLines
+        .filter((l) => !l.isCapital && l.categoryId !== 'depreciation')
+        .map((l) => l.amountCents),
+    );
+    const sharedExpenseCents = sumCents(
+      expenseLines
+        .filter((l) => l.isShared && !l.isCapital && l.categoryId !== 'depreciation')
+        .map((l) => l.amountCents),
     );
     const capitalAdditionsCents = sumCents(
       expenseLines.filter((l) => l.isCapital).map((l) => l.amountCents),
     );
+    const totalExpenseCents = operatingExpenseCents + depreciationCents;
     const rentsReceivedCents = rentByProperty.get(property.id) ?? 0;
 
     return {
@@ -211,10 +304,14 @@ export async function buildScheduleE(
       rentsReceivedCents,
       expenseLines,
       totalExpenseCents,
+      operatingExpenseCents,
+      sharedExpenseCents,
+      depreciationCents,
+      depreciationSource,
+      depreciationNote,
       capitalAdditionsCents,
-      // Capital is not subtracted. Depreciation reaches this report as a `cpa`
-      // figure on line 18 once the CPA sends one back, which is the only route
-      // by which a capital cost should ever reduce the net.
+      // Capital is not subtracted. The only route by which a capital cost ever
+      // reduces the net is line 18 above, spread over the recovery period.
       netCents: rentsReceivedCents - totalExpenseCents,
     };
   });
@@ -227,10 +324,18 @@ export async function buildScheduleE(
  * The allocation rule is applied to the PAID amount rather than the invoice
  * total, so a split invoice paid in instalments splits the same way each time
  * and the pieces still sum back to what was paid, to the cent.
+ *
+ * Three buckets, not two. Deductible spend is kept apart by whether it arrived
+ * through a split, because a property's own $416 of supplies and its $5.97
+ * share of a portfolio software subscription are answers to different
+ * questions, and adding them together is how the second one becomes
+ * unexplainable six months later.
  */
-async function ledgerLinesFor(
-  taxYear: number,
-): Promise<{ deductible: Map<string, number>; capital: Map<string, number> }> {
+async function ledgerLinesFor(taxYear: number): Promise<{
+  direct: Map<string, number>;
+  shared: Map<string, number>;
+  capital: Map<string, number>;
+}> {
   const paidByExpense = await paidByExpenseInYear(taxYear);
   const [expenses, properties] = await Promise.all([
     expensesByIds([...paidByExpense.keys()]),
@@ -238,7 +343,8 @@ async function ledgerLinesFor(
   ]);
 
   const domainProperties = toDomainProperties(properties);
-  const deductible = new Map<string, number>();
+  const direct = new Map<string, number>();
+  const shared = new Map<string, number>();
   const capital = new Map<string, number>();
 
   for (const [expenseId, paidCents] of paidByExpense) {
@@ -250,17 +356,17 @@ async function ledgerLinesFor(
       continue;
     }
 
-    const lines = allocateExpense(
-      paidCents,
-      expense.allocationRule as AllocationRule | null,
-      domainProperties,
-      expense.propertyId,
-    );
+    const rule = expense.allocationRule as AllocationRule | null;
+    const lines = allocateExpense(paidCents, rule, domainProperties, expense.propertyId);
 
     // Split on the classification already stored against the expense. An
     // improvement is basis, not a deduction, and merging the two would put
     // appliances and flooring on the same line as consumables.
-    const target = expense.capitalClassification === 'improvement' ? capital : deductible;
+    //
+    // Capital is not split further by shared-or-not: it is not deducted at all,
+    // so the distinction has nothing to explain.
+    const target =
+      expense.capitalClassification === 'improvement' ? capital : rule ? shared : direct;
 
     for (const line of lines) {
       const key = `${line.propertyId}:${expense.scheduleECategory}`;
@@ -268,7 +374,7 @@ async function ledgerLinesFor(
     }
   }
 
-  return { deductible, capital };
+  return { direct, shared, capital };
 }
 
 export async function scheduleECsv(taxYear: number): Promise<string> {
@@ -300,17 +406,29 @@ export async function scheduleECsv(taxYear: number): Promise<string> {
         property: summary.nickname,
         address: summary.address,
         line: String(line.line),
-        label: line.label,
+        label: line.isShared ? `${line.label} - share of a portfolio-wide cost` : line.label,
         amount: line.amountCents,
         source: line.source,
         prior: line.priorYearCents,
       });
     }
+    // Both subtotals, in the order the form asks them. Line 20 is what goes on
+    // the return; the line above it is what has a receipt behind it, and a CPA
+    // checking the depreciation wants to see the two apart.
     rows.push({
       property: summary.nickname,
       address: summary.address,
       line: '',
-      label: 'Total expenses',
+      label: 'Expenses before depreciation',
+      amount: summary.operatingExpenseCents,
+      source: '',
+      prior: null,
+    });
+    rows.push({
+      property: summary.nickname,
+      address: summary.address,
+      line: '',
+      label: 'Total expenses (line 20, depreciation included)',
       amount: summary.totalExpenseCents,
       source: '',
       prior: null,
@@ -319,7 +437,7 @@ export async function scheduleECsv(taxYear: number): Promise<string> {
       property: summary.nickname,
       address: summary.address,
       line: '',
-      label: 'Net',
+      label: 'Net (line 21)',
       amount: summary.netCents,
       source: '',
       prior: null,
@@ -776,6 +894,22 @@ export async function propertyFactsCsv(_taxYear?: number): Promise<string> {
     { header: 'Placed in service', value: (p) => p.placedInServiceDate ?? '' },
     { header: 'In-service evidence', value: (p) => p.placedInServiceEvidence ?? '' },
     { header: 'First tenant', value: (p) => p.firstTenantDate ?? '' },
+    // The owner's own schedule, exported so the CPA can check it against theirs.
+    // Blank in both columns is a property nobody has entered a schedule for, not
+    // a property that does not depreciate.
+    {
+      header: 'Depreciation starts',
+      value: (p) => {
+        const schedule = resolveDepreciationSchedule(p);
+        return schedule
+          ? `${DEPRECIATION_MONTHS[schedule.startMonth - 1]?.label} ${schedule.startYear}`
+          : '';
+      },
+    },
+    {
+      header: 'Depreciation a year (owner-entered)',
+      value: (p) => plain(p.annualDepreciationCents),
+    },
     { header: 'Purchase price', value: (p) => plain(p.purchasePriceCents) },
     { header: 'Closing costs', value: (p) => plain(p.closingCostsCents) },
     { header: 'Land value', value: (p) => plain(p.landValueCents) },

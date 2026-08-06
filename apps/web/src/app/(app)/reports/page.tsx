@@ -124,15 +124,22 @@ export default async function ReportsPage({
                   <th className="num">Ledger</th>
                   <th className="num">1098</th>
                   <th className="num">CPA</th>
+                  <th className="num">Depreciation</th>
                   <th className="num">Net</th>
                   <th className="num">Capital</th>
                 </tr>
               </thead>
               <tbody>
                 {scheduleE.map((summary) => {
+                  // Depreciation has its own column, so it comes out of the
+                  // source columns - otherwise the CPA column and the
+                  // depreciation column would show the same money twice.
                   const bySource = (source: 'ledger' | '1098' | 'cpa') =>
                     summary.expenseLines
-                      .filter((l) => l.source === source && !l.isCapital)
+                      .filter(
+                        (l) =>
+                          l.source === source && !l.isCapital && l.categoryId !== 'depreciation',
+                      )
                       .reduce((total, l) => total + l.amountCents, 0);
 
                   return (
@@ -145,6 +152,12 @@ export default async function ReportsPage({
                       <td className="num">{formatCents(bySource('ledger'))}</td>
                       <td className="num">{formatCents(bySource('1098'))}</td>
                       <td className="num">{formatCents(bySource('cpa'))}</td>
+                      <td className="num">
+                        {formatCents(summary.depreciationCents)}
+                        {summary.depreciationSource === 'schedule' ? (
+                          <span className="hint"> your schedule</span>
+                        ) : null}
+                      </td>
                       <td className="num">{formatCents(summary.netCents)}</td>
                       {/* Alongside the net, never inside it. */}
                       <td className="num">{formatCents(summary.capitalAdditionsCents)}</td>
@@ -153,7 +166,7 @@ export default async function ReportsPage({
                 })}
                 {scheduleE.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="hint">
+                    <td colSpan={8} className="hint">
                       No properties yet.
                     </td>
                   </tr>
@@ -168,7 +181,13 @@ export default async function ReportsPage({
           <p className="hint mt-1">
             <strong>Capital is listed separately and is not in the net.</strong> Anything marked
             an improvement is basis your CPA depreciates, not a deduction this year — it reaches
-            the net only as their depreciation figure on line 18.
+            the net only through the depreciation column, spread over the recovery period.
+          </p>
+          <p className="hint mt-1">
+            <strong>Net is Schedule E line 21</strong> — rents less every column between,
+            depreciation included. A depreciation figure marked <em>your schedule</em> is the
+            flat amount on the property record, apportioned for its first year; a figure your
+            CPA sends back for the year replaces it everywhere.
           </p>
         </section>
 

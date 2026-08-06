@@ -1,9 +1,12 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import {
+  DEPRECIATION_MONTHS,
+  depreciationForYear,
   formatCents,
   formatMinutes,
   placedInServiceEvidence,
+  resolveDepreciationSchedule,
   rollUpHours,
   sumCents,
 } from '@rental/domain';
@@ -17,21 +20,29 @@ import {
 } from '@/server/services/reference';
 import { listTimeEntries } from '@/server/services/timeEntries';
 import { listExpenses } from '@/server/services/expenses';
+import { buildScheduleE } from '@/server/services/reports';
 import { NotFoundError } from '@/server/errors';
 import { PropertyForm } from '@/components/PropertyForm';
+import { ScheduleEBreakdown } from '@/components/ScheduleEBreakdown';
 import type { PropertyManagementPeriod } from '@/db/schema';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Well } from '@/components/ui';
+import { resolveTaxYear } from '@/lib/year';
 
 export const metadata = { title: 'Property' };
 
 export default async function PropertyDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ year?: string }>;
 }) {
   const { id } = await params;
   const user = await requireUser();
+  // The year travels in the URL from whatever linked here, so opening a
+  // property from the 2025 overview shows 2025 rather than the session's year.
+  const taxYear = resolveTaxYear((await searchParams).year, user.taxYear);
 
   let property;
   try {
@@ -41,14 +52,18 @@ export default async function PropertyDetailPage({
     throw error;
   }
 
-  const [entries, expenses, receipts, periods, managerActors, actors] = await Promise.all([
-    listTimeEntries({ propertyId: id, taxYear: user.taxYear, limit: 2000 }),
-    listExpenses({ propertyId: id, taxYear: user.taxYear, limit: 2000 }),
-    listRentReceipts({ propertyId: id, taxYear: user.taxYear, limit: 2000 }),
-    listManagementPeriods(id),
-    listPropertyManagers(),
-    listActors({ includeArchived: true }),
-  ]);
+  const [entries, expenses, receipts, periods, managerActors, actors, scheduleE] =
+    await Promise.all([
+      listTimeEntries({ propertyId: id, taxYear, limit: 2000 }),
+      listExpenses({ propertyId: id, taxYear, limit: 2000 }),
+      listRentReceipts({ propertyId: id, taxYear, limit: 2000 }),
+      listManagementPeriods(id),
+      listPropertyManagers(),
+      listActors({ includeArchived: true }),
+      buildScheduleE(taxYear),
+    ]);
+
+  const summary = scheduleE.find((s) => s.propertyId === id);
 
   const names = new Map(actors.map((a) => [a.id, a.name]));
   const openPeriod = periods.find((p) => p.endDate === null);
@@ -68,6 +83,7 @@ export default async function PropertyDetailPage({
     <>
       <PageHeader
         title={property.nickname}
+        crumb={`${taxYear} · cash basis`}
         actions={
           <Link href="/properties" className="btn">
             ← Back
@@ -102,7 +118,11 @@ export default async function PropertyDetailPage({
           </section>
         </div>
 
-        <PropertyFacts property={property} />
+        {/* Directly under the three headline figures, because this is the
+            answer to the question those figures raise. */}
+        {summary ? <ScheduleEBreakdown summary={summary} taxYear={taxYear} /> : null}
+
+        <PropertyFacts property={property} taxYear={taxYear} />
 
         <ManagementHistory periods={periods} names={names} />
 
@@ -134,6 +154,9 @@ export default async function PropertyDetailPage({
               placedInServiceDate: property.placedInServiceDate,
               placedInServiceEvidence: property.placedInServiceEvidence,
               firstTenantDate: property.firstTenantDate,
+              depreciationStartMonth: property.depreciationStartMonth,
+              depreciationStartYear: property.depreciationStartYear,
+              annualDepreciationCents: property.annualDepreciationCents,
               purchasePriceCents: property.purchasePriceCents,
               closingCostsCents: property.closingCostsCents,
               landValueCents: property.landValueCents,
@@ -170,12 +193,17 @@ export default async function PropertyDetailPage({
  */
 function PropertyFacts({
   property,
+  taxYear,
 }: {
+  taxYear: number;
   property: {
     acquiredDate: string | null;
     placedInServiceDate: string | null;
     placedInServiceEvidence: string | null;
     firstTenantDate: string | null;
+    depreciationStartMonth: number | null;
+    depreciationStartYear: number | null;
+    annualDepreciationCents: number | null;
     purchasePriceCents: number | null;
     closingCostsCents: number | null;
     landValueCents: number | null;
@@ -195,6 +223,12 @@ function PropertyFacts({
     ? placedInServiceEvidence.get(property.placedInServiceEvidence as string).label
     : null;
 
+  // Both halves of the schedule, shown as one fact because neither is any use
+  // alone: a start month with no amount produces nothing, and an amount with no
+  // start cannot be apportioned into a first year.
+  const schedule = resolveDepreciationSchedule(property);
+  const thisYear = schedule ? depreciationForYear(schedule, taxYear) : null;
+
   return (
     <section className="panel panel-body">
       <h2 className="section-title">Facts for the CPA</h2>
@@ -207,6 +241,24 @@ function PropertyFacts({
           note={evidence ?? undefined}
         />
         <Fact label="First tenant" value={property.firstTenantDate} />
+        <Fact
+          label="Depreciation starts"
+          value={
+            schedule
+              ? `${DEPRECIATION_MONTHS[schedule.startMonth - 1]?.label} ${schedule.startYear}`
+              : null
+          }
+          note={
+            property.depreciationStartMonth === null && schedule
+              ? 'from the in-service date'
+              : undefined
+          }
+        />
+        <Fact
+          label="Depreciation a year"
+          value={cents(property.annualDepreciationCents)}
+          note={thisYear ? `${formatCents(thisYear.cents)} in ${taxYear}` : undefined}
+        />
         <Fact label="Purchase price" value={cents(property.purchasePriceCents)} />
         <Fact label="Closing costs" value={cents(property.closingCostsCents)} />
         <Fact label="Land value" value={cents(property.landValueCents)} />

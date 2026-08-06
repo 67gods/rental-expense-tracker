@@ -467,6 +467,91 @@
   }
 
   /*
+   * --- column tooltips --------------------------------------------------
+   *
+   * The header stays exactly as loud as it was: no accent, no border, just a
+   * faint question mark that firms up when you reach for it. A column of money
+   * is the thing being read and a row of blue markers above it would compete
+   * with the figures.
+   *
+   * Shown on hover AND on focus, because the whole point is the person who
+   * does not already know what the column means, and that person is as likely
+   * to be tabbing as pointing. `position: static` on the th plus an absolutely
+   * positioned body means the bubble escapes the cell but not the table - the
+   * tablebox clips overflow, so it is anchored from the left rather than
+   * centred, which keeps the last column's tooltip on screen.
+   */
+  .tip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: help;
+  }
+  .tip-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 1px solid var(--line-strong);
+    color: var(--ink-faint);
+    font: 600 8px/1 var(--sans);
+    font-style: normal;
+    flex: none;
+  }
+  .tip:hover .tip-mark,
+  .tip:focus-visible .tip-mark {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .tip-body {
+    position: absolute;
+    top: calc(100% + 7px);
+    left: 0;
+    z-index: 40;
+    width: max-content;
+    max-width: 290px;
+    padding: 8px 10px;
+    background: var(--selected);
+    border: 1px solid var(--line-strong);
+    border-radius: 6px;
+    box-shadow: 0 8px 22px rgb(0 0 0 / 55%);
+    color: var(--ink);
+    font: 400 11.5px/1.5 var(--sans);
+    letter-spacing: 0;
+    text-transform: none;
+    white-space: normal;
+    /* Hidden with visibility rather than display, so the bubble is measured and
+       does not reflow the header row the first time it opens. */
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 90ms ease;
+    pointer-events: none;
+  }
+  /* A tooltip on a right-aligned money column hangs off the right edge instead,
+     or the last two columns would push their bubbles into the scroll. */
+  .table th.num .tip-body {
+    left: auto;
+    right: 0;
+    text-align: left;
+  }
+  .tip:hover .tip-body,
+  .tip:focus-visible .tip-body {
+    visibility: visible;
+    opacity: 1;
+  }
+  /*
+   * The bubble opens DOWNWARD, into the table body, and is deliberately kept
+   * short. The tablebox clips - it has to, the rounded corners and the
+   * horizontal scroll both depend on it - and `overflow-x: auto` drags
+   * `overflow-y` to auto with it whatever you write, so there is no way to let
+   * one axis out. Two or three lines opening over the first rows always fits;
+   * anything longer belongs in a Note under the table.
+   */
+
+  /*
    * Links inside a row.
    *
    * The reset strips every anchor of colour and underline, which is right for

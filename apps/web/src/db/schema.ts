@@ -26,6 +26,7 @@ import {
   check,
   date,
   index,
+  integer,
   jsonb,
   numeric,
   pgEnum,
@@ -147,6 +148,30 @@ export const properties = pgTable(
     /** Kept separate from the above, because it is usually a later date. */
     firstTenantDate: date('first_tenant_date', { mode: 'string' }),
 
+    // --- Depreciation schedule --------------------------------------------
+    // The owner's own straight-line working, so the middle years - which are
+    // flat, identical, and unchanged since the property was placed in service -
+    // can be seen without waiting on the CPA to restate them every January.
+    //
+    // A month and a year rather than a date, because the mid-month convention
+    // is the finest resolution that means anything: a schedule that started on
+    // the 3rd and one that started on the 27th earn the same half-month. A date
+    // column would record a precision the rule does not have.
+    //
+    // Both are NULL by default and fall back to `placed_in_service_date`, which
+    // is where depreciation starts unless something moved it - a conversion
+    // from a home, a basis restated on an amended return. They exist so that
+    // can be said without editing the in-service date, which decides other
+    // things.
+    depreciationStartMonth: integer('depreciation_start_month'),
+    depreciationStartYear: integer('depreciation_start_year'),
+    /**
+     * The flat full-year figure, NOT the basis. The owner transcribes what the
+     * CPA is running; nothing here derives it, because the land split and the
+     * recovery period are both the CPA's call.
+     */
+    annualDepreciationCents: bigint('annual_depreciation_cents', { mode: 'number' }),
+
     // --- Purchase facts, transcribed from the closing statement -----------
     purchasePriceCents: bigint('purchase_price_cents', { mode: 'number' }),
     closingCostsCents: bigint('closing_costs_cents', { mode: 'number' }),
@@ -184,7 +209,15 @@ export const properties = pgTable(
         AND (${t.closingCostsCents} IS NULL OR ${t.closingCostsCents} >= 0)
         AND (${t.landValueCents} IS NULL OR ${t.landValueCents} >= 0)
         AND (${t.fmvAtConversionCents} IS NULL OR ${t.fmvAtConversionCents} >= 0)
-        AND (${t.salePriceCents} IS NULL OR ${t.salePriceCents} >= 0)`,
+        AND (${t.salePriceCents} IS NULL OR ${t.salePriceCents} >= 0)
+        AND (${t.annualDepreciationCents} IS NULL OR ${t.annualDepreciationCents} >= 0)`,
+    ),
+    // A month outside 1-12 is a typo, and a schedule keyed off month 0 would
+    // quietly hand the first year an extra month of the mid-month convention.
+    check(
+      'properties_depreciation_start_month_range',
+      sql`${t.depreciationStartMonth} IS NULL
+        OR (${t.depreciationStartMonth} >= 1 AND ${t.depreciationStartMonth} <= 12)`,
     ),
     check(
       'properties_sold_after_acquired',

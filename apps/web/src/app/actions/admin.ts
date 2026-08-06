@@ -36,6 +36,7 @@ export async function savePropertyAction(
     const landValueCents = money.optional('landValue');
     const fmvAtConversionCents = money.optional('fmvAtConversion');
     const salePriceCents = money.optional('salePrice');
+    const annualDepreciationCents = money.optional('annualDepreciation');
 
     if (money.hasErrors) {
       return {
@@ -71,6 +72,14 @@ export async function savePropertyAction(
       placedInServiceDate: str(formData, 'placedInServiceDate') || null,
       placedInServiceEvidence: evidence(str(formData, 'placedInServiceEvidence')),
       firstTenantDate: str(formData, 'firstTenantDate') || null,
+
+      // Both halves of the schedule stay nullable and independent. Blank means
+      // "use the in-service date", which is a real answer rather than a gap -
+      // it is where depreciation starts unless something moved it.
+      depreciationStartMonth: wholeNumber(str(formData, 'depreciationStartMonth')),
+      depreciationStartYear: wholeNumber(str(formData, 'depreciationStartYear')),
+      annualDepreciationCents,
+
       purchasePriceCents,
       closingCostsCents,
       landValueCents,
@@ -131,6 +140,20 @@ function evidence(value: string): PlacedInServiceEvidence | null {
   return PLACED_IN_SERVICE_EVIDENCE.some((option) => option.id === value)
     ? (value as PlacedInServiceEvidence)
     : null;
+}
+
+/**
+ * A whole number from a text box, or null.
+ *
+ * Anything that is not one becomes null rather than NaN, which the schema would
+ * then reject with a message about an expected number - true, unhelpful, and
+ * about a field the person may not have touched. The range checks live in the
+ * schema, which is the one place that says what a valid month or year is.
+ */
+function wholeNumber(value: string): number | null {
+  if (!value) return null;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) ? parsed : null;
 }
 
 export async function saveActorAction(

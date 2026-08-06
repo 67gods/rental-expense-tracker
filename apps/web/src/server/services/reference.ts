@@ -70,6 +70,9 @@ function propertyFactColumns(data: {
   placedInServiceDate?: string | null;
   placedInServiceEvidence?: string | null;
   firstTenantDate?: string | null;
+  depreciationStartMonth?: number | null;
+  depreciationStartYear?: number | null;
+  annualDepreciationCents?: number | null;
   purchasePriceCents?: number | null;
   closingCostsCents?: number | null;
   landValueCents?: number | null;
@@ -84,6 +87,9 @@ function propertyFactColumns(data: {
     placedInServiceDate: data.placedInServiceDate ?? null,
     placedInServiceEvidence: data.placedInServiceEvidence ?? null,
     firstTenantDate: data.firstTenantDate ?? null,
+    depreciationStartMonth: data.depreciationStartMonth ?? null,
+    depreciationStartYear: data.depreciationStartYear ?? null,
+    annualDepreciationCents: data.annualDepreciationCents ?? null,
     purchasePriceCents: data.purchasePriceCents ?? null,
     closingCostsCents: data.closingCostsCents ?? null,
     landValueCents: data.landValueCents ?? null,
@@ -176,6 +182,12 @@ export async function updateProperty(
         existing.placedInServiceEvidence,
       ),
       firstTenantDate: keep(data.firstTenantDate, existing.firstTenantDate),
+      depreciationStartMonth: keep(data.depreciationStartMonth, existing.depreciationStartMonth),
+      depreciationStartYear: keep(data.depreciationStartYear, existing.depreciationStartYear),
+      annualDepreciationCents: keep(
+        data.annualDepreciationCents,
+        existing.annualDepreciationCents,
+      ),
       purchasePriceCents: keep(data.purchasePriceCents, existing.purchasePriceCents),
       closingCostsCents: keep(data.closingCostsCents, existing.closingCostsCents),
       landValueCents: keep(data.landValueCents, existing.landValueCents),

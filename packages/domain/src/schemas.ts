@@ -456,6 +456,13 @@ export const createPropertySchema = z
     placedInServiceEvidence: placedInServiceEvidenceSchema.nullable().optional().default(null),
     firstTenantDate: isoDate.nullable().optional().default(null),
 
+    // --- Depreciation schedule, transcribed from what the CPA is running --
+    // A month and a year, not a date: the mid-month convention cannot tell the
+    // 3rd from the 27th. Both fall back to the in-service date when left blank.
+    depreciationStartMonth: z.number().int().min(1).max(12).nullable().optional().default(null),
+    depreciationStartYear: z.number().int().min(1900).max(2999).nullable().optional().default(null),
+    annualDepreciationCents: optionalAmountCents,
+
     // --- Purchase facts, off the closing statement ------------------------
     purchasePriceCents: optionalAmountCents,
     closingCostsCents: optionalAmountCents,
@@ -520,6 +527,9 @@ export const updatePropertySchema = z.object({
   placedInServiceDate: isoDate.nullable().optional(),
   placedInServiceEvidence: placedInServiceEvidenceSchema.nullable().optional(),
   firstTenantDate: isoDate.nullable().optional(),
+  depreciationStartMonth: z.number().int().min(1).max(12).nullable().optional(),
+  depreciationStartYear: z.number().int().min(1900).max(2999).nullable().optional(),
+  annualDepreciationCents: amountCents.nullable().optional(),
   purchasePriceCents: amountCents.nullable().optional(),
   closingCostsCents: amountCents.nullable().optional(),
   landValueCents: amountCents.nullable().optional(),

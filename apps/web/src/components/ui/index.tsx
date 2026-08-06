@@ -179,6 +179,49 @@ export function TableBox({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * A column header that can explain itself.
+ *
+ * A money column headed "Deductible" is only readable by someone who already
+ * knows whether that means invoiced or paid, whether depreciation is in it, and
+ * whether a share of a portfolio-wide cost counts. Everyone else guesses, and a
+ * guess about a tax figure is worse than no figure.
+ *
+ * CSS-only rather than a popover component, so this stays a server component
+ * and a table of eight headers does not ship eight event handlers. The text is
+ * in `aria-describedby`-shaped markup - a visually hidden span the tooltip is
+ * drawn from - so a screen reader gets the same sentence a mouse does, and
+ * `tabIndex` puts it on the keyboard path.
+ */
+export function Th({
+  tip,
+  numeric,
+  nowrap,
+  children,
+}: {
+  /** One or two sentences. Longer than that belongs in a Note under the table. */
+  tip?: string;
+  numeric?: boolean;
+  nowrap?: boolean;
+  children: React.ReactNode;
+}) {
+  const className = [numeric ? 'num' : '', nowrap ? 'nowrap' : ''].filter(Boolean).join(' ');
+
+  if (!tip) return <th className={className || undefined}>{children}</th>;
+
+  return (
+    <th className={className || undefined}>
+      <span className="tip" tabIndex={0} role="note">
+        {children}
+        <i className="tip-mark" aria-hidden="true">
+          ?
+        </i>
+        <span className="tip-body">{tip}</span>
+      </span>
+    </th>
+  );
+}
+
 /** Shown in place of a table when a year genuinely holds nothing. */
 export function Empty({
   what,
