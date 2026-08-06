@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useTransition, type ReactNode } from 'react';
 import Link from 'next/link';
 import { formatCents } from '@rental/domain';
 import { DeleteButton } from '@/components/DeleteButton';
@@ -69,6 +69,20 @@ export interface DataRow {
   /** What the delete confirmation names. Carried per row: a function cannot
       cross into a client component, and the server already had the string. */
   deleteLabel?: string;
+  /**
+   * Extra controls for the row's action column - an Edit that opens a dialog,
+   * most often.
+   *
+   * Rendered JSX rather than a render function, because the rows are built in a
+   * server component and a function cannot cross into this one. Whatever the
+   * page puts here is mounted per row, so it should be a small client component
+   * with the row's own values already baked in.
+   */
+  actions?: ReactNode;
+  /** Drawn in the leading star column. Only read when `onToggleStar` is given. */
+  starred?: boolean;
+  /** What the star's accessible label names, e.g. the job title. */
+  starLabel?: string;
 }
 
 export function DataTable({
@@ -79,6 +93,7 @@ export function DataTable({
   totals = [],
   searchPlaceholder = 'Search…',
   onDelete,
+  onToggleStar,
   openLabel = 'Open',
 }: {
   /** Distinguishes this table's remembered column choices from every other table's. */
@@ -90,6 +105,13 @@ export function DataTable({
   searchPlaceholder?: string;
   /** A server action. Omitted when rows are not deletable from the list. */
   onDelete?: (id: string) => Promise<void>;
+  /**
+   * A server action. Given, every row gets a leading star that pins it.
+   *
+   * The NEXT value is passed rather than toggled inside, so two quick taps
+   * cannot both read the same stale state.
+   */
+  onToggleStar?: (id: string, next: boolean) => Promise<void>;
   openLabel?: string;
 }) {
   const [query, setQuery] = useState('');
@@ -205,6 +227,10 @@ export function DataTable({
 
   const isFiltered = query.trim() !== '' || Object.values(chosen).some(Boolean);
 
+  // The trailing column exists if anything wants to live in it: a delete, or a
+  // row that brought its own controls.
+  const hasActs = Boolean(onDelete) || rows.some((row) => row.actions);
+
   function toggleSort(key: string) {
     if (sortKey === key) {
       setDescending((value) => !value);
@@ -319,6 +345,7 @@ export function DataTable({
           <table className="table">
             <thead>
               <tr>
+                {onToggleStar ? <th className="star-cell" aria-label="Starred" /> : null}
                 {visibleColumns.map((column) => {
                   const active = sortKey === column.key;
                   return (
@@ -341,12 +368,23 @@ export function DataTable({
                     </th>
                   );
                 })}
-                {onDelete ? <th className="acts-cell" aria-label="Actions" /> : null}
+                {hasActs ? <th className="acts-cell" aria-label="Actions" /> : null}
               </tr>
             </thead>
             <tbody>
               {visible.map((row) => (
                 <tr key={row.id}>
+                  {onToggleStar ? (
+                    <td className="star-cell">
+                      <StarButton
+                        starred={Boolean(row.starred)}
+                        label={row.starLabel ?? 'this row'}
+                        onToggle={async (next) => {
+                          await onToggleStar(row.id, next);
+                        }}
+                      />
+                    </td>
+                  ) : null}
                   {visibleColumns.map((column) => (
                     <td
                       key={column.key}
@@ -373,21 +411,27 @@ export function DataTable({
                         : null}
                     </td>
                   ))}
-                  {onDelete ? (
+                  {hasActs ? (
                     <td className="acts-cell">
                       <span className="acts">
-                        {row.href ? (
+                        {/* Only alongside a delete. A table whose first column
+                            is already a link to the row does not need a second
+                            way in taking up the same space. */}
+                        {onDelete && row.href ? (
                           <Link href={row.href} className="act">
                             {openLabel}
                           </Link>
                         ) : null}
-                        <DeleteButton
-                          variant="action"
-                          what={row.deleteLabel ?? 'this record'}
-                          onDelete={async () => {
-                            await onDelete(row.id);
-                          }}
-                        />
+                        {row.actions}
+                        {onDelete ? (
+                          <DeleteButton
+                            variant="action"
+                            what={row.deleteLabel ?? 'this record'}
+                            onDelete={async () => {
+                              await onDelete(row.id);
+                            }}
+                          />
+                        ) : null}
                       </span>
                     </td>
                   ) : null}
@@ -395,7 +439,12 @@ export function DataTable({
               ))}
               {visible.length === 0 ? (
                 <tr>
-                  <td colSpan={visibleColumns.length + (onDelete ? 1 : 0)} className="muted">
+                  <td
+                    colSpan={
+                      visibleColumns.length + (hasActs ? 1 : 0) + (onToggleStar ? 1 : 0)
+                    }
+                    className="muted"
+                  >
                     Nothing matches those filters.
                   </td>
                 </tr>
@@ -411,6 +460,55 @@ export function DataTable({
           : `${rows.length} ${rows.length === 1 ? 'row' : 'rows'}. Click a column to sort.`}
       </p>
     </>
+  );
+}
+
+/**
+ * The pin, as a single tap.
+ *
+ * Optimistic: the star fills the moment it is clicked rather than after the
+ * round trip, because a pin that lags feels broken and the failure case is a
+ * revalidate putting it back. `aria-pressed` carries the state, so the label
+ * stays "Star X" rather than changing under a screen reader mid-action.
+ */
+function StarButton({
+  starred,
+  label,
+  onToggle,
+}: {
+  starred: boolean;
+  label: string;
+  onToggle: (next: boolean) => Promise<void>;
+}) {
+  const [pending, startTransition] = useTransition();
+  const [optimistic, setOptimistic] = useState(starred);
+
+  // The server is the authority again once it has answered - otherwise a failed
+  // write would leave the star showing a state the database never took.
+  useEffect(() => {
+    setOptimistic(starred);
+  }, [starred]);
+
+  const on = pending ? optimistic : starred;
+
+  return (
+    <button
+      type="button"
+      className="star"
+      aria-pressed={on}
+      aria-label={`Star ${label}`}
+      title={on ? 'Starred — click to unpin' : 'Star this to pin it to the top'}
+      disabled={pending}
+      onClick={() => {
+        const next = !on;
+        setOptimistic(next);
+        startTransition(async () => {
+          await onToggle(next);
+        });
+      }}
+    >
+      {on ? '★' : '☆'}
+    </button>
   );
 }
 

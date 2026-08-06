@@ -12,6 +12,7 @@ import {
   updateJobSchema,
   type AssignJobInput,
   type CreateJobInput,
+  type UpdateJobInput,
   type JobRollup,
   type UnassignJobInput,
 } from '@rental/domain';
@@ -77,7 +78,9 @@ export async function listJobs(
     })
     .from(jobs)
     .where(filter.propertyId ? eq(jobs.propertyId, filter.propertyId) : undefined)
-    .orderBy(desc(jobs.createdAt))
+    // Starred first, then newest. The star is the owner saying "this is the one
+    // I am working on", and a pin that does not float to the top is decoration.
+    .orderBy(desc(jobs.isStarred), desc(jobs.createdAt))
     .limit(filter.limit ?? 200);
 
   return rows.map((r) => ({ ...r.job, recordCount: Number(r.recordCount) }));
@@ -200,7 +203,7 @@ export async function createJob(input: CreateJobInput): Promise<Job> {
 }
 
 export async function updateJob(
-  input: { id: string } & Partial<CreateJobInput>,
+  input: UpdateJobInput,
 ): Promise<Job> {
   const data = updateJobSchema.parse(input);
   const existing = await getJob(data.id);
@@ -211,6 +214,7 @@ export async function updateJob(
       title: data.title ?? existing.title,
       propertyId: data.propertyId === undefined ? existing.propertyId : data.propertyId,
       notes: data.notes === undefined ? existing.notes : data.notes,
+      isStarred: data.isStarred === undefined ? existing.isStarred : data.isStarred,
       updatedAt: new Date(),
     })
     .where(eq(jobs.id, data.id))

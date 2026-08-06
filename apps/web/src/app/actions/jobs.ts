@@ -100,17 +100,36 @@ export async function renameJobAction(
 ): Promise<FormState> {
   try {
     await requireUser();
+    const id = str(formData, 'id');
     await updateJob({
-      id: str(formData, 'id'),
+      id,
       title: str(formData, 'title'),
       notes: str(formData, 'notes') || null,
     });
     revalidatePath('/jobs');
+    // The job's own page and the entries list too: both render the title, and
+    // without these a rename from the list leaves the old one on screen.
+    revalidatePath(`/jobs/${id}`);
+    revalidatePath('/entries');
     return { ok: true, saved: 'Saved.' };
   } catch (error) {
     const payload = toErrorPayload(error);
     return { ok: false, message: payload.message, fields: payload.fields };
   }
+}
+
+/**
+ * Pins a job to the top of the list, or unpins it.
+ *
+ * The new value is passed in rather than read-then-flipped: two taps in quick
+ * succession would otherwise both read the old state, and the second would undo
+ * nothing. The caller already knows what it is showing.
+ */
+export async function setJobStarAction(id: string, isStarred: boolean): Promise<void> {
+  await requireUser();
+  await updateJob({ id, isStarred });
+  revalidatePath('/jobs');
+  revalidatePath(`/jobs/${id}`);
 }
 
 /** Takes records back out of a job. Only the membership goes. */

@@ -800,6 +800,38 @@
     width: 1%;
   }
 
+  /* The star pins a row to the top. Leading column, as narrow as the glyph. */
+  .table td.star-cell,
+  .table th.star-cell {
+    width: 1%;
+    padding-right: 0;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .star {
+    border: 0;
+    background: none;
+    cursor: pointer;
+    font-size: 15px;
+    line-height: 1;
+    padding: 2px 4px;
+    border-radius: 4px;
+    /* Dim until it means something: an unstarred row should read as a row, not
+       as a control waiting to be used. */
+    color: var(--ink-dim);
+  }
+  .star[aria-pressed='true'] {
+    color: var(--warn);
+  }
+  .star:hover:not(:disabled) {
+    background: var(--line);
+    color: var(--warn);
+  }
+  .star:disabled {
+    cursor: default;
+    opacity: 0.6;
+  }
+
   .seg {
     display: inline-flex;
     border: 1px solid var(--line-strong);
@@ -1470,6 +1502,62 @@
   }
   .receipt-doc .hint {
     margin-top: 0;
+  }
+
+  /* --- the pop-up ------------------------------------------------------- */
+
+  /*
+   * A small edit, over the row it belongs to.
+   *
+   * Sized to the couple of fields it holds and no larger: a dialog the width of
+   * the page reads as a page, and the point of this one is that the list is
+   * still there behind it. The browser centres it; the margin rule is only
+   * because the UA default is `auto` on the top and bottom too, which on a
+   * short viewport pins a tall form to the middle and clips both ends.
+   */
+  .modal {
+    width: min(440px, calc(100vw - 32px));
+    max-height: calc(100vh - 64px);
+    margin: auto;
+    padding: 0;
+    border: 1px solid var(--line-strong);
+    border-radius: 10px;
+    background: var(--panel);
+    color: var(--ink);
+    overflow: hidden;
+    box-shadow: 0 18px 48px rgb(0 0 0 / 0.55);
+  }
+  .modal::backdrop {
+    background: rgb(0 0 0 / 0.55);
+  }
+  .modal-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 9px 9px 14px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel-head);
+  }
+  .modal-title {
+    font-size: 12.5px;
+    font-weight: 600;
+    /* One line, ellipsised: the title is the record's own name and some of them
+       are a whole receipt description. */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .modal-head .act {
+    margin-left: auto;
+  }
+  .modal-body {
+    padding: 14px;
+    /* The head stays put and the fields scroll under it. */
+    max-height: calc(100vh - 128px);
+    overflow-y: auto;
+  }
+  .modal-body .field:last-of-type {
+    margin-bottom: 14px;
   }
 }
 
