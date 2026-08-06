@@ -137,8 +137,14 @@ export default async function OverviewPage({
           ]}
         />
 
-        <div className="cols-detail mt-[18px]">
-          <div>
+        {/*
+          The table gets the whole width. Ten money columns in a 1fr column
+          beside a 340px rail is ten money columns behind a horizontal scrollbar,
+          and a figure you have to drag a table sideways to reach is a figure
+          nobody checks. Everything that used to sit in that rail now sits under
+          it, where it is read second anyway.
+        */}
+        <div className="mt-[18px]">
             <SectionTitle>Per property</SectionTitle>
             {withActivity.length === 0 ? (
               <Empty what="activity" year={taxYear} />
@@ -191,6 +197,12 @@ export default async function OverviewPage({
                     >
                       Capital
                     </Th>
+                    <Th
+                      numeric
+                      tip="Deductible and capital added together: everything the property cost this year, whichever side of the line it fell on."
+                    >
+                      Total
+                    </Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -227,6 +239,11 @@ export default async function OverviewPage({
                           ? '—'
                           : formatCents(summary.capitalAdditionsCents)}
                       </td>
+                      <td className="num">
+                        {formatCents(
+                          summary.totalExpenseCents + summary.capitalAdditionsCents,
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -240,6 +257,7 @@ export default async function OverviewPage({
                     <td className="num">{formatCents(deductible)}</td>
                     <td className={net >= 0 ? 'num pos' : 'num neg'}>{formatCents(net)}</td>
                     <td className="num capital">{formatCents(capital)}</td>
+                    <td className="num">{formatCents(deductible + capital)}</td>
                   </tr>
                 </tfoot>
               </TableBox>
@@ -251,8 +269,10 @@ export default async function OverviewPage({
                 <strong>Rent − Deductible = Net</strong>, which is Schedule E line 21 for that
                 property. <strong>of which shared</strong> is already inside Expenses — it is
                 named separately so a $5.97 line on a house can be traced back to the
-                portfolio cost it came out of. Open any property to see every figure in its
-                row broken out by Schedule E line.
+                portfolio cost it came out of. <strong>Total</strong> is Deductible and
+                Capital together — everything the property cost in {taxYear}, whichever side
+                of the line it fell on. Open any property to see every figure in its row
+                broken out by Schedule E line.
                 {withActivity.some((s) => s.depreciationSource === 'schedule') ? (
                   <>
                     {' '}
@@ -263,6 +283,58 @@ export default async function OverviewPage({
                 ) : null}
               </p>
             ) : null}
+
+        </div>
+
+        {/*
+          Directly under the table it describes, not off in the right rail. It
+          is the same money broken up a second way - by where each figure came
+          from rather than by which property it landed on - and reading one
+          against the other meant scrolling between two columns that never
+          lined up.
+        */}
+        <div className="cols-detail mt-[18px]">
+          <div>
+            <SectionTitle>Where the deductions come from</SectionTitle>
+            <Panel>
+              <div className={net >= 0 ? 'panel-figure pos' : 'panel-figure neg'}>
+                {formatCents(net)}
+              </div>
+              <p className="muted">Rent banked less everything Schedule E lets you deduct.</p>
+              <SplitBar
+                parts={[
+                  {
+                    key: 'ledger',
+                    label: `Ledger ${formatCents(ledger)}`,
+                    pct: (ledger / denominator) * 100,
+                    color: 'var(--accent)',
+                  },
+                  {
+                    key: '1098',
+                    label: `1098 ${formatCents(from1098)}`,
+                    pct: (from1098 / denominator) * 100,
+                    color: 'var(--pos)',
+                  },
+                  {
+                    key: 'depreciation',
+                    label: `Depreciation ${formatCents(depreciation)}`,
+                    pct: (depreciation / denominator) * 100,
+                    color: 'var(--warn)',
+                  },
+                  {
+                    key: 'capital',
+                    label: `Capital ${formatCents(capital)}`,
+                    pct: (capital / denominator) * 100,
+                    color: 'var(--plum)',
+                  },
+                ]}
+              />
+              <Note>
+                Capital is shown alongside, never inside the net. An improvement is basis, and
+                it reaches the return only through the depreciation band beside it — never as
+                a deduction in the year it was spent.
+              </Note>
+            </Panel>
 
             <SectionTitle>Waiting on a decision</SectionTitle>
             <TableBox>
@@ -369,46 +441,6 @@ export default async function OverviewPage({
           </div>
 
           <div className="stack">
-            <Panel title="Where the deductions come from">
-              <div className={net >= 0 ? 'panel-figure pos' : 'panel-figure neg'}>
-                {formatCents(net)}
-              </div>
-              <p className="muted">Rent banked less everything Schedule E lets you deduct.</p>
-              <SplitBar
-                parts={[
-                  {
-                    key: 'ledger',
-                    label: `Ledger ${formatCents(ledger)}`,
-                    pct: (ledger / denominator) * 100,
-                    color: 'var(--accent)',
-                  },
-                  {
-                    key: '1098',
-                    label: `1098 ${formatCents(from1098)}`,
-                    pct: (from1098 / denominator) * 100,
-                    color: 'var(--pos)',
-                  },
-                  {
-                    key: 'depreciation',
-                    label: `Depreciation ${formatCents(depreciation)}`,
-                    pct: (depreciation / denominator) * 100,
-                    color: 'var(--warn)',
-                  },
-                  {
-                    key: 'capital',
-                    label: `Capital ${formatCents(capital)}`,
-                    pct: (capital / denominator) * 100,
-                    color: 'var(--plum)',
-                  },
-                ]}
-              />
-              <Note>
-                Capital is shown alongside, never inside the net. An improvement is basis, and
-                it reaches the return only through the depreciation band beside it — never as
-                a deduction in the year it was spent.
-              </Note>
-            </Panel>
-
             <Panel title={`Closing ${taxYear}`}>
               <KeyValues
                 rows={[
