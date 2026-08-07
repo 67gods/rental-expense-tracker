@@ -1,8 +1,8 @@
 import Link from 'next/link';
-import { formatCents, formatMinutes } from '@rental/domain';
+import { formatCents, formatMinutes, sumCents } from '@rental/domain';
 import { requireUser } from '@/lib/session';
 import { getDashboardData } from '@/server/services/dashboard';
-import { buildScheduleE } from '@/server/services/reports';
+import { buildScheduleE, type SchedulePropertySummary } from '@/server/services/reports';
 import { scheduledPayments } from '@/server/services/payments';
 import { reconciliationsForYear } from '@/server/services/reconciliation';
 import { listLoanYears } from '@/server/services/loanYears';
@@ -17,7 +17,7 @@ import {
   StatStrip,
   Tag,
   TableBox,
-  Th,
+  Tip,
   Well,
 } from '@/components/ui';
 import { resolveTaxYear, withYear } from '@/lib/year';
@@ -31,11 +31,27 @@ export const metadata = { title: 'Overview' };
  * then the same figures per property, then anything waiting on a decision.
  *
  * The per-property table is built to be RECONCILED AGAINST A FILED RETURN, not
- * just glanced at, which is why the deductible arrives in named parts rather
- * than as one total. Every column has a tooltip saying exactly what is in it,
- * because "Deductible $14,897.52" is unanswerable otherwise - paid or invoiced,
- * depreciation in or out, does this property's share of the portfolio software
- * count - and each of those questions changes the number.
+ * just glanced at, and it runs VERTICALLY for that reason: one column per
+ * property, rent at the top, each row subtracting, landing on Schedule E line
+ * 21 at the bottom. That is the direction the sum runs, so every step of it is
+ * checkable by eye against the figure above it.
+ *
+ * The version before this one laid the same figures out as a row per property
+ * and could not be read. It carried four `of which` columns that overlapped
+ * each other AND overlapped the column to their left, so no row on the screen
+ * added up to anything - the reader had no way to tell which numbers were
+ * addends and which were re-cuts of money already counted.
+ *
+ * So the rule here is: EVERY ROW EITHER ADDS OR IS FENCED OFF AND SAID TO. The
+ * five expense rows are mutually exclusive and sum to `Cash out`; that plus
+ * depreciation is line 20; rent less line 20 is line 21. Below the result sit
+ * the memo rows - capital, closing costs - which subtract from nothing, and
+ * are under their own band saying so.
+ *
+ * Every row still carries a tooltip, because "Total expenses $14,897.52" is
+ * unanswerable without one - paid or invoiced, depreciation in or out, does
+ * this property's share of the portfolio software count - and each of those
+ * questions changes the number.
  */
 export default async function OverviewPage({
   searchParams,
@@ -66,12 +82,51 @@ export default async function OverviewPage({
       s.closingCostsCents !== null,
   );
 
+  /*
+   * The five expense rows have to be MUTUALLY EXCLUSIVE or the column does not
+   * add up, and a column that does not add up is the thing this table exists
+   * to fix.
+   *
+   * `sharedExpenseCents` cannot be subtracted alongside the three named lines
+   * to get there. It is a second CUT of the same money rather than a fifth
+   * pile of it: a portfolio insurance premium split five ways sits inside both
+   * it and `insuranceCents`, and taking both off would deduct that premium
+   * twice. So the shared row is only the shared spend NOT already on one of
+   * the three named lines, and `everything else` is whatever survives all four.
+   *
+   * Which makes the invariant, per property and in the portfolio column:
+   *
+   *   interest + tax + insurance + everythingElse + sharedOther === operating
+   */
+  const NAMED_LINES = new Set(['mortgage_interest', 'taxes', 'insurance']);
+
+  const sharedOtherCents = (s: SchedulePropertySummary) =>
+    sumCents(
+      s.expenseLines
+        .filter(
+          (line) =>
+            line.isShared &&
+            !line.isCapital &&
+            line.categoryId !== 'depreciation' &&
+            !NAMED_LINES.has(line.categoryId),
+        )
+        .map((line) => line.amountCents),
+    );
+
+  const everythingElseCents = (s: SchedulePropertySummary) =>
+    s.operatingExpenseCents -
+    s.mortgageInterestCents -
+    s.propertyTaxCents -
+    s.insuranceCents -
+    sharedOtherCents(s);
+
   const total = (pick: (s: (typeof withActivity)[number]) => number) =>
     withActivity.reduce((sum, s) => sum + pick(s), 0);
 
   const rent = total((s) => s.rentsReceivedCents);
   const operating = total((s) => s.operatingExpenseCents);
-  const shared = total((s) => s.sharedExpenseCents);
+  const sharedOther = total(sharedOtherCents);
+  const everythingElse = total(everythingElseCents);
   const interest = total((s) => s.mortgageInterestCents);
   const propertyTax = total((s) => s.propertyTaxCents);
   const insurance = total((s) => s.insuranceCents);
@@ -100,6 +155,204 @@ export default async function OverviewPage({
   const unreconciled = reconciliations.filter(
     (view) => view.reportedGrossCents !== null && !view.isReconciled,
   );
+
+  /*
+   * The calculation, as data.
+   *
+   * One list rather than hand-written rows because the arithmetic only READS
+   * as arithmetic when every row is laid out identically - a row that decides
+   * for itself where the dash goes or how the label sits is a row you have to
+   * stop and re-check, which defeats reading the column straight down.
+   */
+  type LedgerEntry =
+    | { kind: 'band'; key: string; label: string }
+    | {
+        kind: 'row';
+        key: string;
+        /** The gutter glyph. Absent on a memo row, which neither adds nor subtracts. */
+        op?: string;
+        label: string;
+        /** The Schedule E box, worn as a chip beside the label. */
+        line?: string;
+        sub?: string;
+        tip: string;
+        pick: (s: SchedulePropertySummary) => number | null;
+        portfolio: number | null;
+        /**
+         * On most rows a zero means "nothing here" and reads better as a dash.
+         * On a subtotal or a result it is a real answer and has to be shown.
+         */
+        zeroIsReal?: boolean;
+        tone?: 'signed' | 'capital';
+        rowClass?: string;
+      };
+
+  const ledgerRows: LedgerEntry[] = [
+    { kind: 'band', key: 'in', label: 'Money in' },
+    {
+      kind: 'row',
+      key: 'rent',
+      label: 'Rent received',
+      line: 'line 3',
+      tip: `Rent banked in ${taxYear}, from the receipts. What was owed but never arrived is not in here - this is cash basis.`,
+      pick: (s) => s.rentsReceivedCents,
+      portfolio: rent,
+    },
+
+    { kind: 'band', key: 'out', label: 'Money out — paid from the bank' },
+    {
+      kind: 'row',
+      key: 'interest',
+      op: '−',
+      label: 'Mortgage interest',
+      line: 'line 12',
+      tip: 'Every source added together - the 1098 figure and anything booked through the ledger - because the return has one box for it.',
+      pick: (s) => s.mortgageInterestCents,
+      portfolio: interest,
+    },
+    {
+      kind: 'row',
+      key: 'tax',
+      op: '−',
+      label: 'Property tax',
+      line: 'line 16',
+      tip: "Property tax from the 1098's escrow block plus anything paid direct.",
+      pick: (s) => s.propertyTaxCents,
+      portfolio: propertyTax,
+    },
+    {
+      kind: 'row',
+      key: 'insurance',
+      op: '−',
+      label: 'Insurance',
+      line: 'line 9',
+      tip: 'Premiums paid out of escrow plus policies paid direct.',
+      pick: (s) => s.insuranceCents,
+      portfolio: insurance,
+    },
+    {
+      kind: 'row',
+      key: 'else',
+      op: '−',
+      label: 'Everything else',
+      line: 'lines 5–19',
+      sub: 'Repairs, cleaning, supplies, utilities, advertising, other.',
+      tip: 'Every remaining deductible line, added together. Open the property to see which ones and how much each.',
+      pick: everythingElseCents,
+      portfolio: everythingElse,
+    },
+    {
+      kind: 'row',
+      key: 'shared',
+      op: '−',
+      label: 'Shared portfolio costs',
+      line: 'within 19',
+      sub: "This property's slice of a bill that never carried its name.",
+      tip: 'Portfolio-wide costs split across properties - and only the part not already counted in the three lines above, so this column still adds up.',
+      pick: sharedOtherCents,
+      portfolio: sharedOther,
+    },
+    {
+      kind: 'row',
+      key: 'cash-out',
+      op: '=',
+      label: 'Cash out',
+      rowClass: 'subtotal-soft',
+      tip: 'The five rows above, added. Every cent of this one has a receipt behind it.',
+      pick: (s) => s.operatingExpenseCents,
+      portfolio: operating,
+      zeroIsReal: true,
+    },
+
+    { kind: 'band', key: 'noncash', label: 'Money out — no cheque written' },
+    {
+      kind: 'row',
+      key: 'depreciation',
+      op: '−',
+      label: 'Depreciation',
+      line: 'line 18',
+      sub: 'Blank means none on file yet, not nothing to claim.',
+      tip: "Your CPA's figure where there is one; otherwise the flat schedule from the property's own start month and annual amount.",
+      pick: (s) => s.depreciationCents,
+      portfolio: depreciation,
+    },
+    {
+      kind: 'row',
+      key: 'total-expenses',
+      op: '=',
+      label: 'Total expenses',
+      line: 'line 20',
+      rowClass: 'subtotal',
+      tip: 'Cash out and depreciation together. This is the box the return totals to.',
+      pick: (s) => s.totalExpenseCents,
+      portfolio: deductible,
+      zeroIsReal: true,
+    },
+    {
+      kind: 'row',
+      key: 'net',
+      op: '=',
+      label: 'Net — rent less total expenses',
+      line: 'line 21',
+      rowClass: 'result',
+      tip: 'What the return reports for this property. Capital additions are not in it and never will be.',
+      pick: (s) => s.netCents,
+      portfolio: net,
+      zeroIsReal: true,
+      tone: 'signed',
+    },
+
+    { kind: 'band', key: 'memo', label: 'Memo — on no line of the return' },
+    {
+      kind: 'row',
+      key: 'cash-left',
+      label: 'Cash left after the bills',
+      sub: 'Rent less cash out, before depreciation.',
+      rowClass: 'memo',
+      tip: 'What the year did to the bank balance, ignoring the one deduction no cheque was written for. On no return, but it is the figure that says whether a property is paying for itself.',
+      pick: (s) => s.rentsReceivedCents - s.operatingExpenseCents,
+      portfolio: rent - operating,
+      zeroIsReal: true,
+      tone: 'signed',
+    },
+    {
+      kind: 'row',
+      key: 'capital',
+      label: 'Capital additions',
+      sub: 'Improvements. Basis, not a deduction.',
+      rowClass: 'memo',
+      tip: 'Not deducted and not in the net above - they are basis, and reach the return only through depreciation, spread over the recovery period.',
+      pick: (s) => s.capitalAdditionsCents,
+      portfolio: capital,
+      tone: 'capital',
+    },
+    {
+      kind: 'row',
+      key: 'closing',
+      label: 'Closing costs',
+      sub: `Only against a property bought in ${taxYear}.`,
+      rowClass: 'memo',
+      tip: 'From the settlement statement. Basis rather than a deduction, so it is in no total here; how much of it is depreciable is your CPA’s call.',
+      pick: (s) => s.closingCostsCents,
+      portfolio: closingCosts === 0 ? null : closingCosts,
+      tone: 'capital',
+    },
+  ];
+
+  // A figure that is absent and a figure that is genuinely zero are the same
+  // dash everywhere except on the rows where zero is the answer.
+  const isBlank = (row: Extract<LedgerEntry, { kind: 'row' }>, value: number | null) =>
+    value === null || (value === 0 && !row.zeroIsReal);
+
+  const cellClass = (row: Extract<LedgerEntry, { kind: 'row' }>, value: number | null) => {
+    if (isBlank(row, value)) return 'num muted';
+    if (row.tone === 'signed') return value! >= 0 ? 'num pos' : 'num neg';
+    if (row.tone === 'capital') return 'num capital';
+    return 'num';
+  };
+
+  const cellText = (row: Extract<LedgerEntry, { kind: 'row' }>, value: number | null) =>
+    isBlank(row, value) ? '—' : formatCents(value!);
 
   return (
     <>
@@ -152,221 +405,101 @@ export default async function OverviewPage({
         />
 
         {/*
-          The table gets the whole width. Ten money columns in a 1fr column
-          beside a 340px rail is ten money columns behind a horizontal scrollbar,
-          and a figure you have to drag a table sideways to reach is a figure
-          nobody checks. Everything that used to sit in that rail now sits under
-          it, where it is read second anyway.
+          The table gets the whole width. Turned vertical it needs less of it
+          than the row-per-property version did - two label columns and one
+          column per property - but the calculation still has to be readable
+          without dragging anything sideways, and a figure you have to scroll
+          to reach is a figure nobody checks. Everything that used to sit in a
+          right rail now sits under it, where it is read second anyway.
         */}
         <div className="mt-[18px]">
-            <SectionTitle>Per property</SectionTitle>
-            {withActivity.length === 0 ? (
-              <Empty what="activity" year={taxYear} />
-            ) : (
-              <TableBox>
-                <thead>
-                  <tr>
-                    <Th tip={`Opens the property, where every figure in this row is broken down line by line for ${taxYear}.`}>
-                      Property
-                    </Th>
-                    <Th
-                      nowrap
-                      tip="The placed-in-service date: when it was ready to rent. Depreciation starts here and costs before it are acquisition rather than operating."
-                    >
-                      Available from
-                    </Th>
-                    <Th
-                      numeric
-                      tip={`Rent banked in ${taxYear}, from the receipts. What was owed but never arrived is not in here - this is cash basis.`}
-                    >
-                      Rent
-                    </Th>
-                    <Th
-                      numeric
-                      tip="Money that left the bank plus the 1098 figures, before depreciation. Paid in the year, not invoiced in it."
-                    >
-                      Expenses
-                    </Th>
-                    {/*
-                      Four cuts of the column to their left, never addends to
-                      it. The first three are the lines a filed return is
-                      checked against one box at a time; the fourth answers a
-                      different question about the same money, so an insurance
-                      premium split five ways is inside two of these columns at
-                      once. All four muted, for the same reason `of which
-                      shared` always was.
-                    */}
-                    <Th
-                      numeric
-                      tip="Schedule E line 12, inside the expenses to the left. Every source added together - the 1098 figure and anything booked through the ledger - because the return has one box for it."
-                    >
-                      of which interest
-                    </Th>
-                    <Th
-                      numeric
-                      tip="Schedule E line 16, inside the expenses to the left. Property tax from the 1098's escrow block plus anything paid direct."
-                    >
-                      of which taxes
-                    </Th>
-                    <Th
-                      numeric
-                      tip="Schedule E line 9, inside the expenses to the left. Premiums paid from escrow plus policies paid direct."
-                    >
-                      of which insurance
-                    </Th>
-                    <Th
-                      numeric
-                      tip="Of the expenses to the left, the part that arrived as this property's share of a portfolio-wide cost rather than an invoice in its own name. Overlaps the three columns before it rather than adding to them."
-                    >
-                      of which shared
-                    </Th>
-                    <Th
-                      numeric
-                      tip="Schedule E line 18. Your CPA's figure where there is one; otherwise the flat schedule from the property's own start month and annual amount."
-                    >
-                      Depreciation
-                    </Th>
-                    <Th numeric tip="Schedule E line 20: expenses and depreciation together.">
-                      Deductible
-                    </Th>
-                    <Th numeric tip="Schedule E line 21. Rent less the deductible total, depreciation included.">
-                      Net
-                    </Th>
-                    <Th
-                      numeric
-                      tip="Improvements. Not deducted and not in the net - they are basis, and reach the return only through depreciation."
-                    >
-                      Capital
-                    </Th>
-                    <Th
-                      numeric
-                      tip={`From the settlement statement, and only against a property bought in ${taxYear} - blank everywhere else. Basis rather than a deduction, so it is in no total on this row; how much of it is depreciable is your CPA's call.`}
-                    >
-                      Closing costs
-                    </Th>
-                    <Th
-                      numeric
-                      tip="Deductible and capital added together: everything the property cost this year, whichever side of the line it fell on."
-                    >
-                      Total
-                    </Th>
-                  </tr>
-                </thead>
-                <tbody>
+          <SectionTitle>Per property</SectionTitle>
+          {withActivity.length === 0 ? (
+            <Empty what="activity" year={taxYear} />
+          ) : (
+            <TableBox variant="ledger">
+              <thead>
+                <tr>
+                  {/* The operator gutter has no heading. It is punctuation. */}
+                  <th className="op" aria-hidden="true" />
+                  <th>{taxYear} · cash basis</th>
                   {withActivity.map((summary) => (
-                    <tr key={summary.propertyId}>
-                      <td>
-                        <Link href={withYear(`/properties/${summary.propertyId}`, taxYear)}>
-                          {summary.nickname}
-                        </Link>
+                    <th className="num" key={summary.propertyId}>
+                      <Link href={withYear(`/properties/${summary.propertyId}`, taxYear)}>
+                        {summary.nickname}
+                      </Link>
+                      {/* The placed-in-service date: when it was ready to rent.
+                          Depreciation starts there, and it is the line every
+                          figure in the column falls one side or the other of. */}
+                      <span className="when">
+                        {summary.availableFrom ? `avail. ${summary.availableFrom}` : 'no date'}
+                      </span>
+                    </th>
+                  ))}
+                  <th className="num total-col">
+                    Portfolio
+                    <span className="when">
+                      {withActivity.length}{' '}
+                      {withActivity.length === 1 ? 'property' : 'properties'}
+                    </span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {ledgerRows.map((row) =>
+                  row.kind === 'band' ? (
+                    <tr className="band" key={row.key}>
+                      <td colSpan={withActivity.length + 3}>{row.label}</td>
+                    </tr>
+                  ) : (
+                    <tr className={row.rowClass} key={row.key}>
+                      <td className="op">{row.op ?? ''}</td>
+                      <td className="item">
+                        <Tip body={row.tip}>{row.label}</Tip>
+                        {row.line ? <span className="ln">{row.line}</span> : null}
+                        {row.sub ? <span className="item-sub">{row.sub}</span> : null}
                       </td>
-                      <td className="num muted">{summary.availableFrom ?? '—'}</td>
-                      <td className="num">{formatCents(summary.rentsReceivedCents)}</td>
-                      <td className="num">{formatCents(summary.operatingExpenseCents)}</td>
-                      {/* Muted: each is a part of the column to its left, not a
-                          figure to be added to it. */}
-                      <td className="num muted">
-                        {summary.mortgageInterestCents === 0
-                          ? '—'
-                          : formatCents(summary.mortgageInterestCents)}
-                      </td>
-                      <td className="num muted">
-                        {summary.propertyTaxCents === 0
-                          ? '—'
-                          : formatCents(summary.propertyTaxCents)}
-                      </td>
-                      <td className="num muted">
-                        {summary.insuranceCents === 0
-                          ? '—'
-                          : formatCents(summary.insuranceCents)}
-                      </td>
-                      <td className="num muted">
-                        {summary.sharedExpenseCents === 0
-                          ? '—'
-                          : formatCents(summary.sharedExpenseCents)}
-                      </td>
-                      <td className="num">
-                        {summary.depreciationCents === 0 ? (
-                          <span className="muted">—</span>
-                        ) : (
-                          formatCents(summary.depreciationCents)
-                        )}
-                      </td>
-                      <td className="num">{formatCents(summary.totalExpenseCents)}</td>
-                      <td className={summary.netCents >= 0 ? 'num pos' : 'num neg'}>
-                        {formatCents(summary.netCents)}
-                      </td>
-                      <td className="num capital">
-                        {summary.capitalAdditionsCents === 0
-                          ? '—'
-                          : formatCents(summary.capitalAdditionsCents)}
-                      </td>
-                      {/* Capital-toned, not muted: like the column beside it
-                          this is basis rather than a deduction, and it is the
-                          tone that says so. */}
-                      <td className="num capital">
-                        {summary.closingCostsCents === null
-                          ? '—'
-                          : formatCents(summary.closingCostsCents)}
-                      </td>
-                      <td className="num">
-                        {formatCents(
-                          summary.totalExpenseCents + summary.capitalAdditionsCents,
-                        )}
+                      {withActivity.map((summary) => {
+                        const value = row.pick(summary);
+                        return (
+                          <td className={cellClass(row, value)} key={summary.propertyId}>
+                            {cellText(row, value)}
+                          </td>
+                        );
+                      })}
+                      <td className={`${cellClass(row, row.portfolio)} total-col`}>
+                        {cellText(row, row.portfolio)}
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr>
-                    <td colSpan={2}>Portfolio</td>
-                    <td className="num">{formatCents(rent)}</td>
-                    <td className="num">{formatCents(operating)}</td>
-                    <td className="num">{formatCents(interest)}</td>
-                    <td className="num">{formatCents(propertyTax)}</td>
-                    <td className="num">{formatCents(insurance)}</td>
-                    <td className="num">{formatCents(shared)}</td>
-                    <td className="num">{formatCents(depreciation)}</td>
-                    <td className="num">{formatCents(deductible)}</td>
-                    <td className={net >= 0 ? 'num pos' : 'num neg'}>{formatCents(net)}</td>
-                    <td className="num capital">{formatCents(capital)}</td>
-                    <td className="num capital">
-                      {closingCosts === 0 ? '—' : formatCents(closingCosts)}
-                    </td>
-                    <td className="num">{formatCents(deductible + capital)}</td>
-                  </tr>
-                </tfoot>
-              </TableBox>
-            )}
+                  ),
+                )}
+              </tbody>
+            </TableBox>
+          )}
 
-            {withActivity.length > 0 ? (
-              <p className="hint mt-2">
-                <strong>Expenses + Depreciation = Deductible</strong>, and{' '}
-                <strong>Rent − Deductible = Net</strong>, which is Schedule E line 21 for that
-                property. The four <strong>of which</strong> columns are all already inside
-                Expenses and none of them adds to it — <strong>interest</strong>,{' '}
-                <strong>taxes</strong> and <strong>insurance</strong> are lines 12, 16 and 9
-                with every source summed, which is the shape a filed return is checked
-                against, and <strong>shared</strong> cuts the same money a different way so a
-                $5.97 line on a house can be traced back to the portfolio cost it came out
-                of. A split insurance premium sits in two of those columns at once.{' '}
-                <strong>Total</strong> is Deductible and Capital together — everything the
-                property cost in {taxYear}, whichever side of the line it fell on.{' '}
-                <strong>Closing costs</strong> are in no total at all: they show only against
-                a property bought in {taxYear}, and they are basis rather than a deduction.
-                Open any property to see every figure in its row broken out by Schedule E
-                line.
-                {withActivity.some((s) => s.depreciationSource === 'schedule') ? (
-                  <>
-                    {' '}
-                    Depreciation shown against a property with no CPA figure yet is{' '}
-                    <strong>your own schedule</strong>, from the start month and annual amount
-                    on the property record.
-                  </>
-                ) : null}
-              </p>
-            ) : null}
-
+          {withActivity.length > 0 ? (
+            <p className="hint mt-2">
+              <strong>Read a column downwards.</strong> Start at rent, subtract each row as
+              you meet it, and the figure at the double rule is{' '}
+              <strong>Schedule E line 21</strong> for that property. The five rows under{' '}
+              <strong>money out</strong> are mutually exclusive and add up to{' '}
+              <strong>cash out</strong> — nothing is counted twice and nothing is left over
+              — and cash out plus <strong>depreciation</strong> is{' '}
+              <strong>line 20</strong>, the box the return totals to. Everything under the
+              last band subtracts from nothing: <strong>capital additions</strong> and{' '}
+              <strong>closing costs</strong> are basis rather than deductions, and reach a
+              return only later, through depreciation. Open any property to see a row broken
+              out line by line.
+              {withActivity.some((s) => s.depreciationSource === 'schedule') ? (
+                <>
+                  {' '}
+                  Depreciation shown against a property with no CPA figure yet is{' '}
+                  <strong>your own schedule</strong>, from the start month and annual amount
+                  on the property record.
+                </>
+              ) : null}
+            </p>
+          ) : null}
         </div>
 
         {/*

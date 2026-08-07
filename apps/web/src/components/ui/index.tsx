@@ -169,13 +169,50 @@ export function Note({
 
 /* ---------------------------------------------------------------- Table --- */
 
-export function TableBox({ children }: { children: React.ReactNode }) {
+export function TableBox({
+  children,
+  variant,
+}: {
+  children: React.ReactNode;
+  /**
+   * `ledger` turns the table on its side: the operator gutter, the section
+   * bands and the subtotal rules that make a column of figures add up. Used by
+   * the per-property calculation on the overview.
+   */
+  variant?: 'ledger';
+}) {
   return (
     <div className="tablebox">
       <div className="tablescroll">
-        <table className="table">{children}</table>
+        <table className={variant ? `table table-${variant}` : 'table'}>{children}</table>
       </div>
     </div>
+  );
+}
+
+/**
+ * A label that can explain itself.
+ *
+ * Extracted from `Th` because the explanation belongs wherever the figure is
+ * named, and on the ledger table that is a row label rather than a column
+ * header. "Deductible $14,897.52" is unanswerable without one - paid or
+ * invoiced, depreciation in or out, does this property's share of the
+ * portfolio software count - and each of those questions changes the number.
+ *
+ * CSS-only rather than a popover, so this stays a server component and a table
+ * of a dozen of them ships no event handlers. `tabIndex` puts it on the
+ * keyboard path, because the person who does not already know what a row means
+ * is as likely to be tabbing as pointing.
+ */
+export function Tip({ body, children }: { body: string; children: React.ReactNode }) {
+  return (
+    <span className="tip" tabIndex={0} role="note">
+      {children}
+      <i className="tip-mark" aria-hidden="true">
+        ?
+      </i>
+      <span className="tip-body">{body}</span>
+    </span>
   );
 }
 
@@ -211,13 +248,7 @@ export function Th({
 
   return (
     <th className={className || undefined}>
-      <span className="tip" tabIndex={0} role="note">
-        {children}
-        <i className="tip-mark" aria-hidden="true">
-          ?
-        </i>
-        <span className="tip-body">{tip}</span>
-      </span>
+      <Tip body={tip}>{children}</Tip>
     </th>
   );
 }

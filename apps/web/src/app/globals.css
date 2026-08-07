@@ -467,6 +467,131 @@
   }
 
   /*
+   * --- the ledger table --------------------------------------------------
+   *
+   * The per-property figures, turned on their side: properties are the
+   * columns and the arithmetic is the rows.
+   *
+   * That is the direction the sum actually runs. Start at rent, subtract
+   * down the column, land on line 21 - and every step of it is checkable
+   * by eye against the figure above it. Laid out the other way the same
+   * numbers are a row of unrelated money with a total at the end that you
+   * either trust or do not.
+   *
+   * The leftmost column is an OPERATOR GUTTER holding nothing but a minus
+   * or an equals. That is what lets every figure in the table stay an
+   * unsigned positive: the sign belongs to the row, not to the number, and
+   * given its own column five minus signs stack up under each other and
+   * read as one subtraction.
+   */
+  .table-ledger td,
+  .table-ledger th {
+    vertical-align: baseline;
+  }
+  .table-ledger td.op,
+  .table-ledger th.op {
+    width: 24px;
+    padding-right: 0;
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--ink-faint);
+  }
+  .table-ledger td.item {
+    width: 290px;
+    white-space: normal;
+  }
+  .table-ledger .item-sub {
+    display: block;
+    margin-top: 2px;
+    font-size: 11px;
+    line-height: 1.45;
+    color: var(--ink-faint);
+  }
+  /* The Schedule E box a row lands in, worn small beside the label. It is a
+     lookup key for someone holding a return, not a sentence. */
+  .table-ledger .ln {
+    display: inline-block;
+    margin-left: 7px;
+    padding: 1px 4px;
+    border: 1px solid var(--line-strong);
+    border-radius: 3px;
+    font: 400 9.5px/1.35 var(--mono);
+    letter-spacing: 0.04em;
+    color: var(--ink-faint);
+    white-space: nowrap;
+    vertical-align: 1px;
+  }
+  .table-ledger th .when {
+    display: block;
+    margin-top: 3px;
+    font: 400 9.5px/1.3 var(--mono);
+    letter-spacing: 0.04em;
+    text-transform: none;
+    color: var(--ink-faint);
+  }
+  /* The portfolio column, set apart because it is not a fifth property - it
+     is the figure that carries to the return's totals block. */
+  .table-ledger .total-col {
+    border-left: 1px solid var(--line-strong);
+    background: color-mix(in srgb, var(--accent) 6%, transparent);
+  }
+  .table-ledger th.total-col {
+    color: var(--accent);
+  }
+  .table-ledger tbody tr:hover td.total-col {
+    background: color-mix(in srgb, var(--accent) 11%, transparent);
+  }
+  /* Section bands: which side of the calculation the rows under them are on. */
+  .table-ledger tr.band td {
+    padding: 8px 12px 6px;
+    background: var(--panel-head);
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    font: 600 10px/1.4 var(--sans);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .table-ledger tbody tr.band:hover td {
+    background: var(--panel-head);
+  }
+  /* The two rules that mean "add up what is above". Soft for the running
+     subtotal, strong for the figure that is a box on the return. */
+  .table-ledger tr.subtotal td {
+    border-top: 1px solid var(--line-strong);
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .table-ledger tr.subtotal-soft td {
+    border-top: 1px solid var(--line);
+  }
+  .table-ledger tr.subtotal-soft td.item {
+    color: var(--ink-dim);
+  }
+  /* The answer. */
+  .table-ledger tr.result td {
+    padding-top: 12px;
+    padding-bottom: 12px;
+    border-top: 2px solid var(--line-strong);
+    border-bottom: 2px solid var(--line-strong);
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+    font-weight: 600;
+  }
+  .table-ledger tr.result td.num {
+    font-size: 14.5px;
+  }
+  .table-ledger tr.result td.total-col,
+  .table-ledger tbody tr.result:hover td.total-col {
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
+  }
+  /* Rows that subtract from nothing. Only the label is dimmed - the figures
+     keep whatever tone they earned, because a loss is still a loss down here. */
+  .table-ledger tr.memo td.item {
+    color: var(--ink-dim);
+  }
+
+  /*
    * --- column tooltips --------------------------------------------------
    *
    * The header stays exactly as loud as it was: no accent, no border, just a
