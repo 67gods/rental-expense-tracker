@@ -48,6 +48,18 @@ export async function getEnterprise(id: string): Promise<Enterprise> {
 
 // --- Properties -------------------------------------------------------------
 
+/**
+ * Every property list in the app, in the order the owner thinks of them: oldest
+ * acquisition first.
+ *
+ * It was alphabetical, which is the right default for a list you look things up
+ * in and the wrong one for this app - Schedule E, the year-end screen and the
+ * per-property column on the overview are all read left to right as a history,
+ * and alphabetical shuffles the newest purchase into the middle of it. A
+ * property with no acquisition date on file yet sorts last rather than first,
+ * because a blank is "not answered", not "bought before everything else";
+ * nickname breaks the tie so the order never depends on insert order.
+ */
 export async function listProperties(options: { includeArchived?: boolean } = {}): Promise<
   Property[]
 > {
@@ -56,7 +68,7 @@ export async function listProperties(options: { includeArchived?: boolean } = {}
     .select()
     .from(properties)
     .where(options.includeArchived ? undefined : eq(properties.isArchived, false))
-    .orderBy(asc(properties.nickname));
+    .orderBy(sql`${properties.acquiredDate} ASC NULLS LAST`, asc(properties.nickname));
 }
 
 export async function getProperty(id: string): Promise<Property> {

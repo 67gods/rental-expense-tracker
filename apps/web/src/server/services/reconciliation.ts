@@ -127,7 +127,9 @@ export async function reconciliationsForYear(
     .select({ id: properties.id, nickname: properties.nickname })
     .from(properties)
     .where(eq(properties.isArchived, false))
-    .orderBy(asc(properties.nickname));
+    // Acquisition order, matching `listProperties` - the year-end screen reads
+    // this list beside others built from it, and two orders would not line up.
+    .orderBy(sql`${properties.acquiredDate} ASC NULLS LAST`, asc(properties.nickname));
 
   const views: (ReconciliationView & { propertyNickname: string })[] = [];
   for (const row of rows) {
